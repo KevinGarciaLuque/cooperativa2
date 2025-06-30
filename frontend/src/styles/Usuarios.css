@@ -1,0 +1,45 @@
+.tabla-usuarios-container {
+    max-height: 270px;   /* Ajusta según el espacio disponible en tu app */
+    overflow-y: auto;
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid #f0f0f0;
+  }
+  
+  .tabla-usuarios th,
+  .tabla-usuarios td {
+    font-size: 0.91em;
+    padding: 6px 10px !important;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  
+  .tabla-usuarios th {
+    position: sticky;
+    top: 0;
+    background: #f8fafc;
+    z-index: 1;
+    border-bottom: 1px solid #e3e6ec;
+  }
+  
+  .tabla-usuarios tr {
+    transition: background 0.18s;
+  }
+  
+  .tabla-usuarios tr:hover {
+    background: #f0f4fa !important;
+  }
+  
+  .small-table {
+    border-radius: 12px;
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+    box-shadow: 0 1px 6px 0 rgba(60,70,90,0.09);
+  }
+  
+  .text-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 110px;
+  }
+  

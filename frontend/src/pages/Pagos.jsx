@@ -46,6 +46,7 @@ export default function Pagos() {
   const [form, setForm] = useState({
     id_prestamo: "",
     monto: "",
+    metodo_pago: "Efectivo",
     fecha: new Date().toISOString().split("T")[0],
     descripcion: "",
   });
@@ -99,7 +100,7 @@ export default function Pagos() {
     const nombreUsuario = usuario?.nombre_completo?.toLowerCase() || "";
     const coincideBusqueda = nombreUsuario.includes(filtro.toLowerCase());
 
-    const fechaPago = p.fecha ? p.fecha.substring(0, 10) : "";
+    const fechaPago = (p.fecha_pago || p.fecha || "").substring(0, 10);
     const coincideFechaInicio = fechaInicio ? fechaPago >= fechaInicio : true;
     const coincideFechaFin = fechaFin ? fechaPago <= fechaFin : true;
 
@@ -120,6 +121,7 @@ export default function Pagos() {
     setForm({
       id_prestamo: "",
       monto: "",
+      metodo_pago: "Efectivo",
       fecha: new Date().toISOString().split("T")[0],
       descripcion: "",
     });
@@ -130,9 +132,10 @@ export default function Pagos() {
     setEditPago(pago);
     setForm({
       id_prestamo: pago.id_prestamo,
-      monto: pago.monto,
-      fecha: pago.fecha
-        ? pago.fecha.substring(0, 10)
+      monto: pago.monto_pagado ?? pago.monto,
+      metodo_pago: pago.metodo_pago || "Efectivo",
+      fecha: pago.fecha_pago
+        ? pago.fecha_pago.substring(0, 10)
         : new Date().toISOString().split("T")[0],
       descripcion: pago.descripcion || "",
     });
@@ -155,13 +158,20 @@ export default function Pagos() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // El backend espera monto_pagado, no monto
+      const payload = {
+        id_prestamo: parseInt(form.id_prestamo),
+        monto_pagado: parseFloat(form.monto),
+        metodo_pago: form.metodo_pago || "Efectivo",
+        descripcion: form.descripcion || "",
+      };
       if (editPago) {
-        await axios.put(`${API_URL}/pagos/${editPago.id_pago}`, form, {
+        await axios.put(`${API_URL}/pagos/${editPago.id_pago}`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
         mostrarAlerta("Pago actualizado correctamente.", "success");
       } else {
-        await axios.post(`${API_URL}/pagos`, form, {
+        await axios.post(`${API_URL}/pagos`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
         mostrarAlerta("Pago registrado correctamente.", "success");
@@ -169,6 +179,7 @@ export default function Pagos() {
       setForm({
         id_prestamo: "",
         monto: "",
+        metodo_pago: "Efectivo",
         fecha: new Date().toISOString().split("T")[0],
         descripcion: "",
       });
@@ -189,7 +200,7 @@ export default function Pagos() {
 
   // Estadísticas
   const totalPagos = pagos.length;
-  const montoTotal = pagos.reduce((sum, p) => sum + parseFloat(p.monto || 0), 0);
+  const montoTotal = pagos.reduce((sum, p) => sum + parseFloat(p.monto_pagado ?? p.monto ?? 0), 0);
   const promedioPago = totalPagos > 0 ? montoTotal / totalPagos : 0;
 
   // Pagos este mes
@@ -198,9 +209,9 @@ export default function Pagos() {
     .toISOString()
     .split("T")[0];
   const pagosMes = pagos.filter(
-    (p) => p.fecha && p.fecha.substring(0, 10) >= primerDiaMes
+    (p) => p.fecha_pago && p.fecha_pago.substring(0, 10) >= primerDiaMes
   );
-  const montoMes = pagosMes.reduce((sum, p) => sum + parseFloat(p.monto || 0), 0);
+  const montoMes = pagosMes.reduce((sum, p) => sum + parseFloat(p.monto_pagado || 0), 0);
 
   // Datos para gráfico de pagos mensuales (últimos 6 meses)
   const obtenerDatosMensuales = () => {
@@ -213,15 +224,15 @@ export default function Pagos() {
       const nombreMes = fecha.toLocaleDateString("es", { month: "short" });
 
       const pagosMes = pagos.filter((p) => {
-        if (!p.fecha) return false;
-        const fechaPago = new Date(p.fecha);
+        if (!p.fecha_pago) return false;
+        const fechaPago = new Date(p.fecha_pago);
         return (
           fechaPago.getFullYear() === año &&
           fechaPago.getMonth() + 1 === mes
         );
       });
 
-      const total = pagosMes.reduce((sum, p) => sum + parseFloat(p.monto || 0), 0);
+      const total = pagosMes.reduce((sum, p) => sum + parseFloat(p.monto_pagado || 0), 0);
 
       datos.push({
         mes: nombreMes,
@@ -676,7 +687,7 @@ function TablaPagos({
           </div>
           <div className="col-3">Socio / Préstamo</div>
           <div className="col-2 text-center">Monto Pagado</div>
-          <div className="col-2 text-center">Fecha</div>
+          <div className="col-2 text-center">Fecha / Método</div>
           <div className="col-2 text-center">Progreso</div>
           <div className="col text-center">Acciones</div>
         </div>
@@ -689,7 +700,7 @@ function TablaPagos({
             const prestamo = getPrestamo(pago.id_prestamo);
             const usuario = prestamo ? getUsuario(prestamo.id_usuario) : null;
             const progreso = calcularProgresoPrestamo(pago.id_prestamo);
-            const fecha = pago.fecha ? pago.fecha.substring(0, 10) : "-";
+            const fecha = (pago.fecha_pago || pago.fecha || "").substring(0, 10) || "-";
 
             // Determinar estado del préstamo
             const saldoRestante = parseFloat(prestamo?.saldo_restante || 0);
@@ -776,28 +787,56 @@ function TablaPagos({
                           className="fw-bold"
                           style={{ fontSize: "18px", color: "#27ae60" }}
                         >
-                          L. {parseFloat(pago.monto || 0).toFixed(2)}
+                          L. {parseFloat(pago.monto_pagado || pago.monto || 0).toFixed(2)}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Fecha */}
+                  {/* Fecha + Método */}
                   <div className="col-2 text-center">
                     <div
-                      className="badge px-3 py-2 d-inline-flex align-items-center"
+                      className="badge px-3 py-2 d-inline-flex align-items-center mb-1"
                       style={{
                         background: "rgba(155, 89, 182, 0.1)",
                         color: "#9b59b6",
                         fontWeight: "600",
-                        fontSize: "13px",
+                        fontSize: "12px",
                         border: "2px solid #9b59b6",
                         borderRadius: "10px",
+                        display: "block",
                       }}
                     >
-                      <FaCalendarAlt className="me-2" />
+                      <FaCalendarAlt className="me-1" />
                       {fecha}
                     </div>
+                    {pago.metodo_pago && (() => {
+                      const metodoBadge = {
+                        efectivo:          { label: "💵 Efectivo",      color: "#27ae60", bg: "rgba(39,174,96,0.1)" },
+                        transferencia:     { label: "🏦 Transferencia", color: "#3498db", bg: "rgba(52,152,219,0.1)" },
+                        cheque:            { label: "📋 Cheque",         color: "#9b59b6", bg: "rgba(155,89,182,0.1)" },
+                        deposito:          { label: "🏧 Depósito",       color: "#e67e22", bg: "rgba(230,126,34,0.1)" },
+                        "tarjeta de débito": { label: "💳 T. Débito",    color: "#e74c3c", bg: "rgba(231,76,60,0.1)" },
+                        "pago móvil":       { label: "📱 Pago Móvil",    color: "#1abc9c", bg: "rgba(26,188,156,0.1)" },
+                      };
+                      const m = metodoBadge[pago.metodo_pago.toLowerCase()] || { label: pago.metodo_pago, color: "#7f8c8d", bg: "#f1f1f1" };
+                      return (
+                        <div
+                          className="badge px-2 py-1"
+                          style={{
+                            background: m.bg,
+                            color: m.color,
+                            border: `1.5px solid ${m.color}`,
+                            borderRadius: "8px",
+                            fontSize: "11px",
+                            fontWeight: "600",
+                            display: "block",
+                          }}
+                        >
+                          {m.label}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Progreso */}
@@ -921,7 +960,7 @@ function TablaPagos({
           Total de pagos: <span className="text-primary fw-bold">{pagos.length}</span>
           {" | "}
           Monto total: <span className="text-success fw-bold">
-            L. {pagos.reduce((sum, p) => sum + parseFloat(p.monto || 0), 0).toFixed(2)}
+            L. {pagos.reduce((sum, p) => sum + parseFloat(p.monto_pagado || p.monto || 0), 0).toFixed(2)}
           </span>
         </p>
       </div>
@@ -1144,6 +1183,53 @@ function ModalPago({
                     padding: "12px 16px",
                   }}
                 />
+              </div>
+
+              {/* Método de Pago */}
+              <div className="col-12">
+                <label
+                  className="form-label fw-semibold d-flex align-items-center"
+                  style={{ color: "#2c3e50" }}
+                >
+                  <FaMoneyCheckAlt className="me-2" style={{ color: "#27ae60" }} />
+                  Método de Pago
+                </label>
+                <div className="row g-2">
+                  {[
+                    { value: "Efectivo",           icon: "💵",  color: "#27ae60", bg: "rgba(39,174,96,0.08)",  border: "#27ae60" },
+                    { value: "Transferencia",      icon: "🏦",  color: "#3498db", bg: "rgba(52,152,219,0.08)", border: "#3498db" },
+                    { value: "Cheque",             icon: "📋",  color: "#9b59b6", bg: "rgba(155,89,182,0.08)", border: "#9b59b6" },
+                    { value: "Deposito",           icon: "🏧",  color: "#e67e22", bg: "rgba(230,126,34,0.08)", border: "#e67e22" },
+                    { value: "Tarjeta de débito", icon: "💳",  color: "#e74c3c", bg: "rgba(231,76,60,0.08)",  border: "#e74c3c" },
+                    { value: "Pago móvil",         icon: "📱",  color: "#1abc9c", bg: "rgba(26,188,156,0.08)", border: "#1abc9c" },
+                  ].map(({ value, icon, color, bg, border }) => (
+                    <div className="col-6 col-md-4" key={value}>
+                      <button
+                        type="button"
+                        onClick={() => handleInput({ target: { name: "metodo_pago", value } })}
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          borderRadius: "10px",
+                          border: `2px solid ${form.metodo_pago === value ? border : "#e9ecef"}`,
+                          background: form.metodo_pago === value ? bg : "white",
+                          color: form.metodo_pago === value ? color : "#7f8c8d",
+                          fontWeight: form.metodo_pago === value ? "700" : "500",
+                          fontSize: "13px",
+                          textAlign: "left",
+                          transition: "all 0.2s ease",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <span className="me-2" style={{ fontSize: "16px" }}>{icon}</span>
+                        {value}
+                        {form.metodo_pago === value && (
+                          <span className="float-end" style={{ color }}>✓</span>
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Descripción */}

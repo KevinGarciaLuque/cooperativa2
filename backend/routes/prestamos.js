@@ -254,8 +254,8 @@ router.post("/solicitar", async (req, res) => {
       return res.status(400).json({ message: "El monto debe ser positivo" });
     }
 
-    if (isNaN(tasaNum) || tasaNum < 0 || tasaNum > 100) {
-      return res.status(400).json({ message: "La tasa de interés debe estar entre 0 y 100" });
+    if (isNaN(tasaNum) || tasaNum < 0 || tasaNum > 1000) {
+      return res.status(400).json({ message: "La tasa de interés debe ser un valor positivo" });
     }
 
     if (isNaN(plazoNum) || plazoNum <= 0 || plazoNum > 360) {
@@ -386,7 +386,7 @@ router.patch("/:id/aprobar", async (req, res) => {
 
         // Registrar movimiento
         await connection.query(
-          `INSERT INTO movimientos_cuenta (id_cuenta, tipo, monto, descripcion, fecha) 
+          `INSERT INTO movimientos_cuenta (id_cuenta, tipo_movimiento, monto, descripcion, fecha) 
            VALUES (?, 'aporte', ?, ?, NOW())`,
           [
             cuenta[0].id_cuenta,
@@ -739,7 +739,7 @@ router.get("/estadisticas/general", async (req, res) => {
 router.post("/", async (req, res) => {
   const connection = await pool.getConnection();
   try {
-    const { id_usuario, monto, tasa_interes, plazo_meses, descripcion, estado, fecha_otorgado } = req.body;
+    const { id_usuario, monto, tasa_interes, plazo_meses, descripcion, estado, fecha_otorgado, tipo_tasa, tasa_original } = req.body;
 
     if (!id_usuario || !monto || !tasa_interes || !plazo_meses) {
       return res.status(400).json({ message: "Usuario, monto, tasa de interés y plazo son requeridos." });
@@ -751,8 +751,8 @@ router.post("/", async (req, res) => {
 
     if (isNaN(montoNum) || montoNum <= 0)
       return res.status(400).json({ message: "El monto debe ser positivo" });
-    if (isNaN(tasaNum) || tasaNum < 0 || tasaNum > 100)
-      return res.status(400).json({ message: "La tasa de interés debe estar entre 0 y 100" });
+    if (isNaN(tasaNum) || tasaNum < 0 || tasaNum > 1000)
+      return res.status(400).json({ message: "La tasa de interés debe ser un valor positivo" });
     if (isNaN(plazoNum) || plazoNum <= 0 || plazoNum > 360)
       return res.status(400).json({ message: "El plazo debe ser entre 1 y 360 meses" });
 
@@ -766,13 +766,15 @@ router.post("/", async (req, res) => {
     const cuotaMensual = calcularCuotaMensual(montoNum, tasaNum, plazoNum);
     const estadoPrestamo = estado || "pendiente";
     const fechaOtorgado = fecha_otorgado || null;
+    const tipoTasaGuardar = tipo_tasa || "nominal_anual";
+    const tasaOriginalGuardar = tasa_original != null ? parseFloat(tasa_original) : tasaNum;
 
     await connection.beginTransaction();
 
     const [result] = await connection.query(
-      `INSERT INTO prestamos (id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id_usuario, montoNum, tasaNum, plazoNum, montoNum, estadoPrestamo, fechaOtorgado]
+      `INSERT INTO prestamos (id_usuario, monto, tasa_interes, tipo_tasa, tasa_original, plazo_meses, saldo_restante, estado, fecha_otorgado)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id_usuario, montoNum, tasaNum, tipoTasaGuardar, tasaOriginalGuardar, plazoNum, montoNum, estadoPrestamo, fechaOtorgado]
     );
 
     await connection.query(
@@ -803,7 +805,7 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { monto, tasa_interes, plazo_meses, fecha_otorgado, estado } = req.body;
+    const { monto, tasa_interes, plazo_meses, fecha_otorgado, estado, tipo_tasa, tasa_original } = req.body;
 
     const [existing] = await pool.query(`SELECT * FROM prestamos WHERE id_prestamo = ?`, [id]);
     if (existing.length === 0)
@@ -814,10 +816,12 @@ router.put("/:id", async (req, res) => {
     const plazoNum = parseInt(plazo_meses) || existing[0].plazo_meses;
     const nuevoEstado = estado || existing[0].estado;
     const nuevaFecha = fecha_otorgado || existing[0].fecha_otorgado;
+    const tipoTasaGuardar = tipo_tasa || existing[0].tipo_tasa || "nominal_anual";
+    const tasaOriginalGuardar = tasa_original != null ? parseFloat(tasa_original) : (existing[0].tasa_original || tasaNum);
 
     await pool.query(
-      `UPDATE prestamos SET monto = ?, tasa_interes = ?, plazo_meses = ?, estado = ?, fecha_otorgado = ? WHERE id_prestamo = ?`,
-      [montoNum, tasaNum, plazoNum, nuevoEstado, nuevaFecha, id]
+      `UPDATE prestamos SET monto = ?, tasa_interes = ?, tipo_tasa = ?, tasa_original = ?, plazo_meses = ?, estado = ?, fecha_otorgado = ? WHERE id_prestamo = ?`,
+      [montoNum, tasaNum, tipoTasaGuardar, tasaOriginalGuardar, plazoNum, nuevoEstado, nuevaFecha, id]
     );
 
     res.json({ success: true, message: "Préstamo actualizado correctamente." });
@@ -841,8 +845,8 @@ router.delete("/:id", async (req, res) => {
 
     await connection.beginTransaction();
 
-    // Eliminar cuotas relacionadas si existen
-    await connection.query(`DELETE FROM cuotas WHERE id_prestamo = ?`, [id]);
+    // Eliminar pagos relacionados primero (FK) y luego el préstamo
+    await connection.query(`DELETE FROM pagos_prestamo WHERE id_prestamo = ?`, [id]);
     await connection.query(`DELETE FROM prestamos WHERE id_prestamo = ?`, [id]);
 
     await connection.commit();

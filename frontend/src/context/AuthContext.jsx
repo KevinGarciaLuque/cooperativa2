@@ -9,8 +9,7 @@ export function AuthProvider({ children }) {
   );
   const [token, setToken] = useState(localStorage.getItem("token") || "");
 
-  // Cambia por tu URL real del backend
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
   const login = async (dni, password) => {
     try {

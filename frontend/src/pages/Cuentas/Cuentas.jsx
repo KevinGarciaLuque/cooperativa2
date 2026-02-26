@@ -28,7 +28,7 @@ export default function Cuentas() {
   const [form, setForm] = useState({
     id_usuario: "",
     tipo_cuenta: "",
-    saldo_actual: "0",
+    saldo_inicial: "0",
     estado: "activa",
   });
 
@@ -82,7 +82,7 @@ export default function Cuentas() {
     setForm({
       id_usuario: "",
       tipo_cuenta: "",
-      saldo_actual: "0",
+      saldo_inicial: "0",
       estado: "activa",
     });
     setShowModal(true);
@@ -93,7 +93,7 @@ export default function Cuentas() {
     setForm({
       id_usuario: cuenta.id_usuario,
       tipo_cuenta: cuenta.tipo_cuenta,
-      saldo_actual: cuenta.saldo_actual || cuenta.saldo || "0",
+      saldo_inicial: cuenta.saldo_actual || "0",
       estado: cuenta.estado,
     });
     setShowModal(true);
@@ -129,7 +129,7 @@ export default function Cuentas() {
       setForm({
         id_usuario: "",
         tipo_cuenta: "",
-        saldo_actual: "0",
+        saldo_inicial: "0",
         estado: "activa",
       });
       setEditCuenta(null);
@@ -736,8 +736,8 @@ function ModalCuenta({
                 <input
                   type="number"
                   className="form-control form-control-lg"
-                  name="saldo_actual"
-                  value={form.saldo_actual}
+                  name="saldo_inicial"
+                  value={form.saldo_inicial}
                   onChange={handleInput}
                   required
                   min="0"

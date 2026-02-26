@@ -22,7 +22,7 @@ const registrarBitacora = async (id_usuario, accion, detalle) => {
 const registrarMovimiento = async (id_cuenta, tipo, monto, descripcion) => {
   try {
     await pool.query(
-      `INSERT INTO movimientos_cuenta (id_cuenta, tipo, monto, descripcion, fecha) 
+      `INSERT INTO movimientos_cuenta (id_cuenta, tipo_movimiento, monto, descripcion, fecha) 
        VALUES (?, ?, ?, ?, NOW())`,
       [id_cuenta, tipo, monto, descripcion]
     );
@@ -235,7 +235,7 @@ router.post("/", async (req, res) => {
     // Si hay saldo inicial, registrar movimiento
     if (saldoInicial > 0) {
       await connection.query(
-        `INSERT INTO movimientos_cuenta (id_cuenta, tipo, monto, descripcion, fecha) 
+        `INSERT INTO movimientos_cuenta (id_cuenta, tipo_movimiento, monto, descripcion, fecha) 
          VALUES (?, 'aporte', ?, 'Saldo inicial de la cuenta', NOW())`,
         [nuevaCuentaId, saldoInicial]
       );
@@ -340,7 +340,7 @@ router.post("/:id/actualizar-saldo", async (req, res) => {
 
     // Registrar movimiento
     await connection.query(
-      `INSERT INTO movimientos_cuenta (id_cuenta, tipo, monto, descripcion, fecha) 
+      `INSERT INTO movimientos_cuenta (id_cuenta, tipo_movimiento, monto, descripcion, fecha) 
        VALUES (?, ?, ?, ?, NOW())`,
       [req.params.id, tipo, montoNum, descripcion || `${tipo.charAt(0).toUpperCase() + tipo.slice(1)} en cuenta`]
     );
@@ -458,13 +458,13 @@ router.post("/transferir", async (req, res) => {
     const desc = descripcion || 'Transferencia entre cuentas';
     
     await connection.query(
-      `INSERT INTO movimientos_cuenta (id_cuenta, tipo, monto, descripcion, fecha) 
+      `INSERT INTO movimientos_cuenta (id_cuenta, tipo_movimiento, monto, descripcion, fecha) 
        VALUES (?, 'transferencia', ?, ?, NOW())`,
       [id_cuenta_origen, montoNum, `${desc} - Enviado a ${cuentaDestino[0].tipo_cuenta}`]
     );
 
     await connection.query(
-      `INSERT INTO movimientos_cuenta (id_cuenta, tipo, monto, descripcion, fecha) 
+      `INSERT INTO movimientos_cuenta (id_cuenta, tipo_movimiento, monto, descripcion, fecha) 
        VALUES (?, 'transferencia', ?, ?, NOW())`,
       [id_cuenta_destino, montoNum, `${desc} - Recibido de ${cuentaOrigen[0].tipo_cuenta}`]
     );

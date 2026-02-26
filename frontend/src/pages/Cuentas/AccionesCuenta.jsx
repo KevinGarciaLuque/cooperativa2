@@ -21,7 +21,7 @@ export default function AccionesCuenta({
   fetchData,
 }) {
   const { token } = useAuth();
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
   const handleInput = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -45,7 +45,7 @@ export default function AccionesCuenta({
       setForm({
         id_usuario: "",
         tipo_cuenta: "",
-        saldo: "",
+        saldo_inicial: "",
         estado: "activa",
       });
       setEditCuenta(null);
@@ -88,15 +88,18 @@ export default function AccionesCuenta({
             <span className="input-group-text bg-light">
               <FaPiggyBank className="text-muted" />
             </span>
-            <input
-              type="text"
-              className="form-control"
+            <select
+              className="form-select"
               name="tipo_cuenta"
-              placeholder="Ej: Ahorro, Corriente"
               value={form.tipo_cuenta}
               onChange={handleInput}
               required
-            />
+            >
+              <option value="">Seleccione tipo</option>
+              <option value="Aportaciones">Aportaciones</option>
+              <option value="Vivienda">Vivienda</option>
+              <option value="Pensiones">Pensiones</option>
+            </select>
           </div>
         </div>
 
@@ -109,9 +112,9 @@ export default function AccionesCuenta({
             <input
               type="number"
               className="form-control"
-              name="saldo"
+              name="saldo_inicial"
               placeholder="0.00"
-              value={form.saldo}
+              value={form.saldo_inicial}
               onChange={handleInput}
               min={0}
               step="0.01"
@@ -164,7 +167,7 @@ export default function AccionesCuenta({
                 setForm({
                   id_usuario: "",
                   tipo_cuenta: "",
-                  saldo: "",
+                  saldo_inicial: "",
                   estado: "activa",
                 });
               }}

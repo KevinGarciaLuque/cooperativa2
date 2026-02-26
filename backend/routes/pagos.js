@@ -261,24 +261,35 @@ router.post("/", async (req, res) => {
       interesMoratorio = calcularInteresMoratorio(saldoActual, diasMora);
     }
 
-    // Calcular nuevo saldo
+    // ── Amortización francesa ──────────────────────────────────────────────
+    // La tasa_interes se almacena como valor anual → convertir a mensual
+    const tasaMensual = parseFloat(prestamoData.tasa_interes) / 100 / 12;
+
+    // Interés que corresponde a este período sobre el saldo actual
+    const interesDelPeriodo = parseFloat((saldoActual * tasaMensual).toFixed(2));
+
+    // El monto neto que se aplica al préstamo (descontando mora si aplica)
     let montoAplicado = montoPagadoNum;
-    
-    // Si hay interés moratorio, aplicarlo primero
     if (interesMoratorio > 0) {
       montoAplicado -= interesMoratorio;
     }
 
-    const nuevoSaldo = Math.max(0, saldoActual - montoAplicado);
+    // Capital = lo que queda después de cubrir el interés del período
+    const capitalDelPeriodo = parseFloat(Math.max(0, montoAplicado - interesDelPeriodo).toFixed(2));
+    // Interés efectivamente pagado (no puede superar el monto aplicado)
+    const interesEfectivo   = parseFloat(Math.min(montoAplicado, interesDelPeriodo).toFixed(2));
+
+    // Nuevo saldo = saldo anterior - capital amortizado (método francés)
+    const nuevoSaldo = parseFloat(Math.max(0, saldoActual - capitalDelPeriodo).toFixed(2));
     const prestamoLiquidado = nuevoSaldo <= 0.01; // Considerar liquidado si queda menos de 1 centavo
 
     await connection.beginTransaction();
 
     // Registrar el pago
     const [result] = await connection.query(
-      `INSERT INTO pagos_prestamo (id_prestamo, monto_pagado, metodo_pago, saldo_restante, fecha_pago) 
-       VALUES (?, ?, ?, ?, NOW())`,
-      [id_prestamo, montoPagadoNum, metodo_pago || 'Efectivo', nuevoSaldo]
+      `INSERT INTO pagos_prestamo (id_prestamo, monto_pagado, monto_capital, monto_interes, metodo_pago, saldo_restante, fecha_pago) 
+       VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+      [id_prestamo, montoPagadoNum, capitalDelPeriodo, interesEfectivo, metodo_pago || 'Efectivo', nuevoSaldo]
     );
 
     const nuevoPagoId = result.insertId;
@@ -328,6 +339,8 @@ router.post("/", async (req, res) => {
       id_pago: nuevoPagoId,
       detalles: {
         monto_pagado: montoPagadoNum,
+        monto_capital: capitalDelPeriodo,
+        monto_interes: interesEfectivo,
         saldo_anterior: saldoActual,
         saldo_nuevo: nuevoSaldo,
         cuota_mensual_esperada: parseFloat(cuotaMensual.toFixed(2)),
@@ -581,7 +594,9 @@ router.delete("/:id", async (req, res) => {
     await connection.beginTransaction();
 
     // Calcular nuevo saldo del préstamo (reversión)
-    const nuevoSaldo = parseFloat(pagoData.saldo_prestamo_actual) + parseFloat(pagoData.monto_pagado);
+    // Se restaura solo el capital amortizado, no el monto total del pago
+    const capitalAnulado = parseFloat(pagoData.monto_capital || pagoData.monto_pagado);
+    const nuevoSaldo = parseFloat(pagoData.saldo_prestamo_actual) + capitalAnulado;
 
     // Actualizar saldo del préstamo
     await connection.query(

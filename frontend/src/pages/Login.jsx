@@ -19,7 +19,12 @@ export default function Login() {
     setError(null);
     const ok = await login(dni, password);
     if (ok) {
-      navigate("/dashboard");
+      const storedUser = JSON.parse(localStorage.getItem("user"));
+      if (storedUser?.rol === "Socio") {
+        navigate("/perfil");
+      } else {
+        navigate("/dashboard");
+      }
     } else {
       setError("DNI o contraseña incorrectos");
     }

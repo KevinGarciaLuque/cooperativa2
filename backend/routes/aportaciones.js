@@ -242,7 +242,7 @@ router.post("/", async (req, res) => {
 
     // Registrar movimiento en la cuenta
     await connection.query(
-      `INSERT INTO movimientos_cuenta (id_cuenta, tipo, monto, descripcion, fecha) 
+      `INSERT INTO movimientos_cuenta (id_cuenta, tipo_movimiento, monto, descripcion, fecha) 
        VALUES (?, 'aporte', ?, ?, NOW())`,
       [cuentaDestino.id_cuenta, montoNum, descripcion || 'Aportación mensual']
     );
@@ -355,7 +355,7 @@ router.put("/:id", async (req, res) => {
 
         // Registrar movimiento de ajuste
         await connection.query(
-          `INSERT INTO movimientos_cuenta (id_cuenta, tipo, monto, descripcion, fecha) 
+          `INSERT INTO movimientos_cuenta (id_cuenta, tipo_movimiento, monto, descripcion, fecha) 
            VALUES (?, 'aporte', ?, ?, NOW())`,
           [
             cuenta[0].id_cuenta, 
@@ -440,7 +440,7 @@ router.delete("/:id", async (req, res) => {
 
       // Registrar movimiento de ajuste
       await connection.query(
-        `INSERT INTO movimientos_cuenta (id_cuenta, tipo, monto, descripcion, fecha) 
+        `INSERT INTO movimientos_cuenta (id_cuenta, tipo_movimiento, monto, descripcion, fecha) 
          VALUES (?, 'retiro', ?, ?, NOW())`,
         [
           cuenta[0].id_cuenta,

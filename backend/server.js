@@ -27,6 +27,7 @@ app.use("/api/bitacora", require("./routes/bitacora"));
 app.use("/api/actividades", require("./routes/actividades"));
 app.use("/api/liquidaciones", require("./routes/liquidaciones"));
 app.use("/api/reportes", require("./routes/reportes"));
+app.use("/api/dashboard", require("./routes/dashboard"));
 app.use("/api/roles", require("./routes/roles"));
 app.use("/api/recuperar", require("./routes/recuperar"));
 

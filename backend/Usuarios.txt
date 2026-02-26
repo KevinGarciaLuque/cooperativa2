@@ -5,3 +5,159 @@ Ana Gomez
 3223199220458
 123456789
 
+Stephany Mariel Carranza Banegas 
+0801199603011
+123456
+
+
+
+
+
+
+
+
+
+
+
+
+📋 PLAN DE TRABAJO MÓDULO POR MÓDULO
+FASE 1: Configuración y Base ⚙️
+✅ Variables de entorno y conexión DB
+✅ Autenticación y seguridad (JWT, bcrypt)
+✅ Middleware de autorización
+
+FASE 2: Módulos Core 👥
+Roles y permisos completos
+Usuarios/Socios (CRUD completo + perfil)
+Bitácora de acciones
+
+FASE 3: Módulos Financieros 💰
+Cuentas (Aportaciones, Vivienda, Pensiones)
+Aportaciones (registro y tracking)
+Préstamos (solicitud, aprobación, cálculo intereses)
+Pagos de préstamos (amortización)
+Movimientos de cuenta
+
+FASE 4: Módulos de Gestión 📊
+Actividades (rifas, ventas, intereses)
+Liquidaciones y repartos
+Reportes (Excel, PDF)
+Dashboard con métricas
+
+
+
+
+📋 PLAN DE IMPLEMENTACIÓN MODULAR
+MÓDULO 1: AUTENTICACIÓN Y SEGURIDAD 🔐
+✅ Login con JWT
+⚠️ Recuperación de contraseña (revisar)
+➕ Agregar bitácora automática en login/logout
+➕ Middleware de protección por roles
+MÓDULO 2: USUARIOS Y ROLES 👥
+✅ CRUD básico usuarios
+➕ Crear cuentas automáticamente al registrar socio
+➕ Validaciones profesionales (DNI hondureño, teléfono, email)
+➕ Sistema de permisos por rol
+MÓDULO 3: CUENTAS 💳
+✅ CRUD básico
+➕ Crear automáticamente 3 cuentas por socio (Aportaciones, Vivienda, Pensiones)
+➕ Actualización de saldos con transacciones
+➕ Estados de cuenta detallados
+MÓDULO 4: APORTACIONES 💰
+⚠️ CRUD básico (falta integración)
+➕ Actualizar saldo de cuenta automáticamente
+➕ Registro en bitácora
+➕ Validar límites mínimos/máximos
+MÓDULO 5: PRÉSTAMOS 📊
+⚠️ CRUD básico (falta lógica de negocio)
+➕ Cálculo de cuotas mensuales (capital + interés)
+➕ Tabla de amortización
+➕ Sistema de aprobación
+➕ Validar capacidad de pago
+➕ Estados: pendiente → aprobado → activo → pagado/mora
+MÓDULO 6: PAGOS DE PRÉSTAMOS 💵
+➕ Registro de pagos
+➕ Actualizar saldo restante
+➕ Calcular intereses e intereses moratorios
+➕ Detectar mora automática
+➕ Generar comprobantes
+MÓDULO 7: MOVIMIENTOS 📝
+➕ Registro automático de todos los movimientos
+➕ Filtros avanzados (por fecha, tipo, cuenta)
+➕ Conciliación bancaria
+MÓDULO 8: ACTIVIDADES E INGRESOS 🎯
+⚠️ CRUD básico
+➕ Rifas, ventas, intereses generados
+➕ Tracking de ingresos extra
+MÓDULO 9: LIQUIDACIONES 📈
+⚠️ Sistema básico
+➕ Cálculo automático de repartos
+➕ Distribución proporcional entre socios
+➕ Registro en cuentas individuales
+MÓDULO 10: REPORTES 📄
+➕ Estados de cuenta en PDF/Excel
+➕ Reporte de préstamos activos
+➕ Balance general
+➕ Flujo de caja
+➕ Mora y cobranza
+MÓDULO 11: BITÁCORA 📚
+⚠️ Tabla existe
+➕ Registro automático de todas las acciones
+➕ Auditoría completa
+MÓDULO 12: DASHBOARD 📊
+➕ Métricas en tiempo real
+➕ Gráficos de crecimiento
+➕ Alertas de mora
+➕ KPIs principales
+🚀 ¿POR DÓNDE EMPEZAMOS?
+Te recomiendo este orden:
+
+MÓDULO 2: Usuarios con creación automática de cuentas
+MÓDULO 3: Sistema de cuentas profesional
+MÓDULO 4: Aportaciones con actualización de saldos
+MÓDULO 5: Préstamos con cálculo de cuotas
+MÓDULO 6: Sistema de pagos completo
+MÓDULO 11: Bitácora automática
+MÓDULO 10: Reportes
+MÓDULO 12: Dashboard
+
+
+
+
+.env
+EMAIL_PORT=465
+EMAIL_HOST=smtp.gmail.com
+EMAIL_USER=kevinxgt90@gmail.com
+EMAIL_PASS=tbrvdassjzsnnuol
+FRONTEND_URL=http://localhost:5173
+JWT_SECRET=Cooperativa123SuperSecreto!@2024
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=123456789
+DB_NAME=cooperativa
+PORT=5000
+
+##################################
+
+#EMAIL_HOST=smtp.gmail.com
+#EMAIL_PORT=465
+#EMAIL_USER=kevinxgt90@gmail.com
+#EMAIL_PASS=tbrvdassjzsnnuol
+
+#FRONTEND_URL=http://localhost:5173
+#JWT_SECRET=Cooperativa123SuperSecreto!@#2024
+
+#DB_HOST=mysql.railway.internal
+#DB_USER=root
+#DB_PASSWORD=bMDQjjhSivCNvuPhIDbjtElvZEJMFocC
+#DB_NAME=railway
+#PORT=5000
+
+
+
+.env frontend 
+
+VITE_API_URL=http://localhost:5000/api
+#VITE_API_URL=https://cooperativa2-production.up.railway.app/api
+
+

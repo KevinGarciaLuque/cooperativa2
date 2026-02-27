@@ -789,6 +789,29 @@ function TablaPagos({
                         >
                           L. {parseFloat(pago.monto_pagado || pago.monto || 0).toFixed(2)}
                         </div>
+                        {/* Desglose capital / interés si existe */}
+                        {(pago.monto_interes != null || pago.monto_capital != null) && (
+                          <div className="d-flex gap-1 justify-content-center mt-1 flex-wrap">
+                            <span style={{
+                              fontSize: "0.68rem", fontWeight: 600,
+                              background: "rgba(230,126,34,0.12)",
+                              color: "#d35400",
+                              border: "1px solid #e67e22",
+                              borderRadius: 4, padding: "1px 5px",
+                            }}>
+                              Int. L.{parseFloat(pago.monto_interes || 0).toFixed(2)}
+                            </span>
+                            <span style={{
+                              fontSize: "0.68rem", fontWeight: 600,
+                              background: "rgba(39,174,96,0.12)",
+                              color: "#1e8449",
+                              border: "1px solid #27ae60",
+                              borderRadius: 4, padding: "1px 5px",
+                            }}>
+                              Cap. L.{parseFloat(pago.monto_capital || 0).toFixed(2)}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -989,6 +1012,18 @@ function ModalPago({
     ? usuarios.find((u) => u.id_usuario === prestamoSeleccionado.id_usuario)
     : null;
 
+  // Cálculos de interés / capital en tiempo real
+  const esIndefinido = parseInt(prestamoSeleccionado?.plazo_meses) === 0;
+  const saldoActualPrestamo = parseFloat(prestamoSeleccionado?.saldo_restante || 0);
+  const tasaMensual = prestamoSeleccionado
+    ? parseFloat(prestamoSeleccionado.tasa_interes) / 100 / 12
+    : 0;
+  const interesEsperado = parseFloat((saldoActualPrestamo * tasaMensual).toFixed(2));
+  const montoPagoIngresado = parseFloat(form.monto) || 0;
+  const interesDelPago = parseFloat(Math.min(montoPagoIngresado, interesEsperado).toFixed(2));
+  const capitalDelPago = parseFloat(Math.max(0, montoPagoIngresado - interesEsperado).toFixed(2));
+  const hayDesglose = prestamoSeleccionado && montoPagoIngresado > 0;
+
   return (
     <div
       className="modal show d-block"
@@ -1125,6 +1160,22 @@ function ModalPago({
                           {prestamoSeleccionado.estado}
                         </span>
                       </div>
+                      {esIndefinido && (
+                        <div className="col-12 mt-1">
+                          <div style={{
+                            background: "#fff3cd",
+                            border: "1px solid #ffc107",
+                            borderRadius: 8,
+                            padding: "6px 10px",
+                            fontSize: "0.82rem",
+                            color: "#856404",
+                          }}>
+                            ♾ <strong>Préstamo indefinido</strong> — Interés mensual esperado:
+                            {" "}<strong>L. {interesEsperado.toFixed(2)}</strong>.
+                            Cualquier monto mayor abona al capital.
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1150,7 +1201,7 @@ function ModalPago({
                   step="0.01"
                   placeholder="0.00"
                   max={
-                    prestamoSeleccionado
+                    prestamoSeleccionado && !esIndefinido
                       ? parseFloat(prestamoSeleccionado.saldo_restante || 0)
                       : undefined
                   }
@@ -1160,6 +1211,53 @@ function ModalPago({
                     padding: "12px 16px",
                   }}
                 />
+
+                {/* Desglose interés / capital en tiempo real */}
+                {hayDesglose && (
+                  <div className="mt-2 p-3" style={{
+                    background: capitalDelPago > 0 ? "rgba(39,174,96,0.07)" : "rgba(52,152,219,0.07)",
+                    border: `1.5px solid ${capitalDelPago > 0 ? "#27ae60" : "#3498db"}`,
+                    borderRadius: 10,
+                  }}>
+                    <div className="small fw-bold mb-2" style={{ color: "#2c3e50" }}>
+                      📊 Desglose del pago
+                    </div>
+                    <div className="d-flex justify-content-between small mb-1">
+                      <span style={{ color: "#7f8c8d" }}>Interés del período:</span>
+                      <strong style={{ color: "#e67e22" }}>L. {interesDelPago.toFixed(2)}</strong>
+                    </div>
+                    <div className="d-flex justify-content-between small mb-2">
+                      <span style={{ color: "#7f8c8d" }}>Abono a capital:</span>
+                      <strong style={{ color: capitalDelPago > 0 ? "#27ae60" : "#95a5a6" }}>
+                        L. {capitalDelPago.toFixed(2)}
+                      </strong>
+                    </div>
+                    {/* Barra visual */}
+                    <div style={{ height: 8, borderRadius: 4, background: "#e9ecef", overflow: "hidden" }}>
+                      <div style={{
+                        height: "100%",
+                        borderRadius: 4,
+                        width: montoPagoIngresado > 0 ? `${Math.min(100, interesDelPago / montoPagoIngresado * 100).toFixed(1)}%` : "0%",
+                        background: "linear-gradient(90deg, #e67e22, #f39c12)",
+                        transition: "width .35s",
+                      }} />
+                    </div>
+                    <div className="d-flex justify-content-between" style={{ fontSize: "0.72rem", color: "#aaa", marginTop: 3 }}>
+                      <span>🟠 Interés</span>
+                      <span>🟢 Capital</span>
+                    </div>
+                    {capitalDelPago > 0 && (
+                      <div className="small mt-2" style={{ color: "#27ae60" }}>
+                        ✔ Nuevo saldo estimado: <strong>L. {Math.max(0, saldoActualPrestamo - capitalDelPago).toFixed(2)}</strong>
+                      </div>
+                    )}
+                    {montoPagoIngresado < interesEsperado && esIndefinido && (
+                      <div className="small mt-1" style={{ color: "#e74c3c" }}>
+                        ⚠ El monto es menor al interés mensual (L. {interesEsperado.toFixed(2)})
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="col-md-6">

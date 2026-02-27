@@ -683,7 +683,7 @@ export default function SocioPerfil() {
 
           {/* Footer */}
           <div className="text-center mt-4 text-muted small" style={{ opacity: .6 }}>
-            Sistema Cooperativa © {new Date().getFullYear()} • Panel de Socio
+            Smart Coop © {new Date().getFullYear()} • Panel de Socio
           </div>
 
         </div>

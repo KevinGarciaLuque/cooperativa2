@@ -30,9 +30,9 @@ export default function AppLayout() {
       )}
       <main
         style={{
-          marginLeft: user && isDesktop ? (sidebarCollapsed ? 68 : 220) : 0,
+          marginLeft: user && isDesktop ? (sidebarCollapsed ? 70 : 240) : 0,
           paddingTop: 62,
-          transition: "margin 0.23s cubic-bezier(.39,1,.32,1)",
+          transition: "margin 0.25s cubic-bezier(.39,1,.32,1)",
           minHeight: "100vh",
         }}
       >

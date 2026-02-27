@@ -7,7 +7,12 @@ const pool = require("../db");
 // ============================================
 
 // Calcular cuota mensual (sistema francés de amortización)
+// plazoMeses === 0 → préstamo indefinido: solo pago de interés mensual
 const calcularCuotaMensual = (monto, tasaAnual, plazoMeses) => {
+  if (plazoMeses === 0) {
+    // Solo interés mensual, el capital no se amortiza
+    return monto * (tasaAnual / 100) / 12;
+  }
   const tasaMensual = (tasaAnual / 100) / 12;
   const cuota = monto * (tasaMensual * Math.pow(1 + tasaMensual, plazoMeses)) / 
                 (Math.pow(1 + tasaMensual, plazoMeses) - 1);
@@ -16,6 +21,7 @@ const calcularCuotaMensual = (monto, tasaAnual, plazoMeses) => {
 
 // Generar tabla de amortización
 const generarTablaAmortizacion = (monto, tasaAnual, plazoMeses, fechaOtorgado) => {
+  if (plazoMeses === 0) return []; // Préstamo indefinido: sin tabla de amortización fija
   const tasaMensual = (tasaAnual / 100) / 12;
   const cuotaMensual = calcularCuotaMensual(monto, tasaAnual, plazoMeses);
   let saldoRestante = monto;
@@ -753,8 +759,8 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ message: "El monto debe ser positivo" });
     if (isNaN(tasaNum) || tasaNum < 0 || tasaNum > 1000)
       return res.status(400).json({ message: "La tasa de interés debe ser un valor positivo" });
-    if (isNaN(plazoNum) || plazoNum <= 0 || plazoNum > 360)
-      return res.status(400).json({ message: "El plazo debe ser entre 1 y 360 meses" });
+    if (isNaN(plazoNum) || plazoNum < 0 || plazoNum > 360)
+      return res.status(400).json({ message: "El plazo debe ser entre 1 y 360 meses (0 = préstamo indefinido, solo intereses)" });
 
     const [usuario] = await connection.query(
       `SELECT * FROM usuarios WHERE id_usuario = ? AND estado = 'activo'`,
@@ -813,7 +819,10 @@ router.put("/:id", async (req, res) => {
 
     const montoNum = parseFloat(monto) || existing[0].monto;
     const tasaNum = parseFloat(tasa_interes) || existing[0].tasa_interes;
-    const plazoNum = parseInt(plazo_meses) || existing[0].plazo_meses;
+    // Usar !== undefined/null/'' para no pisar el valor 0 (indefinido)
+    const plazoNum = (plazo_meses !== undefined && plazo_meses !== null && plazo_meses !== '')
+      ? parseInt(plazo_meses)
+      : existing[0].plazo_meses;
     const nuevoEstado = estado || existing[0].estado;
     const nuevaFecha = fecha_otorgado || existing[0].fecha_otorgado;
     const tipoTasaGuardar = tipo_tasa || existing[0].tipo_tasa || "nominal_anual";

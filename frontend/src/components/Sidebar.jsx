@@ -16,13 +16,18 @@ import {
   FaChartPie,
   FaTimes,
   FaBars,
-  FaChevronLeft,
-  FaChevronRight,
   FaUserCircle,
+  FaAngleDoubleLeft,
+  FaAngleDoubleRight,
 } from "react-icons/fa";
+import LogoCoop from "./LogoCoop";
 
-const verde = "#768C42";
-const azul = "#434d57";
+const SIDEBAR_BG = "#1a2035";
+const SIDEBAR_BG2 = "#222d45";
+const ACCENT = "#a8cd3a";
+const TEXT_MUTED = "#8892a4";
+const SIDEBAR_WIDTH = 240;
+const SIDEBAR_COLLAPSED = 70;
 
 // Menú completo para Administrador
 const menuAdmin = [
@@ -68,255 +73,353 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
   if (user?.rol === "Administrador") menu = menuAdmin;
   else if (user?.rol === "Socio") menu = menuSocio;
 
-  const sidebarStyle = {
-    width: collapsed && isDesktop ? 68 : 220,
-    minWidth: collapsed && isDesktop ? 68 : 220,
-    top: 0,
-    left: 0,
-    bottom: 0,
-    zIndex: 1040,
-    borderRight: "1px solid #e5e7eb",
-    minHeight: "100vh",
-    background: "#fff",
-    boxShadow: "0 2px 12px 0 #434d5733",
-    transition:
-      "width 0.23s cubic-bezier(.39,1,.32,1), min-width 0.23s cubic-bezier(.39,1,.32,1)",
-  };
+  const w = collapsed && isDesktop ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH;
 
   return (
     <>
-      {/* Botón menú móvil */}
-      <button
-        className="btn btn-success position-fixed d-lg-none"
+      <style>{`
+        /* ── Sidebar global styles ── */
+        .sidebar-main {
+          background: linear-gradient(175deg, ${SIDEBAR_BG} 0%, ${SIDEBAR_BG2} 100%);
+          border-right: none !important;
+          box-shadow: 4px 0 24px 0 rgba(0,0,0,0.35);
+        }
+        .sidebar-logo-area {
+          display: flex;
+          align-items: center;
+          height: 64px;
+          padding: 0 16px;
+          border-bottom: 1px solid rgba(255,255,255,0.07);
+          overflow: hidden;
+          white-space: nowrap;
+        }
+        .sidebar-logo-img {
+          flex-shrink: 0;
+          display: block;
+        }
+        .sidebar-brand-text {
+          font-size: 0.95rem;
+          font-weight: 700;
+          color: #fff;
+          letter-spacing: 0.4px;
+          margin-left: 10px;
+          opacity: 1;
+          transition: opacity 0.2s;
+          white-space: nowrap;
+        }
+        .sidebar-section-label {
+          font-size: 0.65rem;
+          font-weight: 700;
+          letter-spacing: 1.4px;
+          text-transform: uppercase;
+          color: ${TEXT_MUTED};
+          padding: 18px 20px 6px;
+          overflow: hidden;
+          white-space: nowrap;
+          transition: opacity 0.2s;
+        }
+        .sidebar-link {
+          position: relative;
+          display: flex !important;
+          align-items: center;
+          margin: 2px 10px;
+          padding: 9px 12px !important;
+          border-radius: 10px !important;
+          color: ${TEXT_MUTED} !important;
+          font-size: 0.88rem !important;
+          font-weight: 500;
+          transition: background 0.2s, color 0.2s, box-shadow 0.2s !important;
+          text-decoration: none;
+          white-space: nowrap;
+          overflow: hidden;
+        }
+        .sidebar-link:hover {
+          background: rgba(255,255,255,0.07) !important;
+          color: #fff !important;
+        }
+        .sidebar-link:hover .sidebar-icon {
+          color: ${ACCENT} !important;
+          transform: scale(1.15);
+        }
+        .sidebar-link.active {
+          background: linear-gradient(90deg, ${ACCENT}22 0%, ${ACCENT}08 100%) !important;
+          color: ${ACCENT} !important;
+          box-shadow: inset 3px 0 0 ${ACCENT};
+        }
+        .sidebar-link.active .sidebar-icon {
+          color: ${ACCENT} !important;
+        }
+        .sidebar-link.active::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 20%;
+          height: 60%;
+          width: 3px;
+          background: ${ACCENT};
+          border-radius: 0 3px 3px 0;
+          box-shadow: 0 0 8px ${ACCENT};
+        }
+        .sidebar-icon {
+          font-size: 1.05em;
+          color: ${TEXT_MUTED};
+          flex-shrink: 0;
+          width: 20px;
+          text-align: center;
+          transition: color 0.2s, transform 0.2s;
+        }
+        .sidebar-label {
+          margin-left: 12px;
+          opacity: 1;
+          transition: opacity 0.15s, width 0.15s;
+          overflow: hidden;
+          white-space: nowrap;
+        }
+        /* Collapsed */
+        .sidebar-main.collapsed .sidebar-link {
+          justify-content: center;
+          padding: 10px 0 !important;
+          margin: 2px 8px;
+        }
+        .sidebar-main.collapsed .sidebar-label {
+          opacity: 0;
+          width: 0;
+          margin-left: 0;
+        }
+        .sidebar-main.collapsed .sidebar-section-label {
+          opacity: 0;
+          pointer-events: none;
+        }
+        .sidebar-main.collapsed .sidebar-brand-text {
+          opacity: 0;
+          width: 0;
+          margin-left: 0;
+        }
+        /* Tooltip on collapsed */
+        .sidebar-main.collapsed .sidebar-link[title]:hover::after {
+          content: attr(title);
+          position: absolute;
+          left: calc(100% + 14px);
+          top: 50%;
+          transform: translateY(-50%);
+          background: ${SIDEBAR_BG};
+          color: #fff;
+          padding: 5px 11px;
+          border-radius: 7px;
+          font-size: 0.82rem;
+          white-space: nowrap;
+          box-shadow: 0 4px 18px rgba(0,0,0,0.35);
+          border: 1px solid rgba(255,255,255,0.1);
+          z-index: 9999;
+          pointer-events: none;
+        }
+        /* Toggle button */
+        .sidebar-toggle-btn {
+          position: fixed;
+          top: 82px;
+          z-index: 1041;
+          width: 26px;
+          height: 26px;
+          background: ${SIDEBAR_BG2};
+          border: 1.5px solid rgba(168,205,58,0.45);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: left 0.25s cubic-bezier(.39,1,.32,1), background 0.2s, box-shadow 0.2s;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+        }
+        .sidebar-toggle-btn:hover {
+          background: ${ACCENT};
+          border-color: ${ACCENT};
+          box-shadow: 0 0 12px ${ACCENT}88;
+        }
+        .sidebar-toggle-btn:hover svg {
+          color: #1a2035 !important;
+        }
+        /* Mobile offcanvas sidebar */
+        .sidebar-offcanvas {
+          background: linear-gradient(175deg, ${SIDEBAR_BG} 0%, ${SIDEBAR_BG2} 100%) !important;
+          border-right: none !important;
+          box-shadow: 6px 0 32px rgba(0,0,0,0.45);
+        }
+        .sidebar-offcanvas .sidebar-link {
+          color: #8892a4 !important;
+        }
+        .sidebar-offcanvas .sidebar-link:hover {
+          color: #fff !important;
+        }
+        .sidebar-footer {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          padding: 14px 16px;
+          border-top: 1px solid rgba(255,255,255,0.07);
+          color: ${TEXT_MUTED};
+          font-size: 0.72rem;
+          text-align: center;
+          overflow: hidden;
+          white-space: nowrap;
+        }
+      `}</style>
+
+      {/* ── Botón toggle escritorio ── */}
+      {isDesktop && menu.length > 0 && (
+        <button
+          className="sidebar-toggle-btn d-none d-lg-flex"
+          style={{ left: w - 13, zIndex: 1041 }}
+          onClick={() => onCollapseChange && onCollapseChange(!collapsed)}
+          aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
+          title={collapsed ? "Expandir" : "Colapsar"}
+        >
+          {collapsed
+            ? <FaAngleDoubleRight size={12} style={{ color: ACCENT }} />
+            : <FaAngleDoubleLeft size={12} style={{ color: ACCENT }} />}
+        </button>
+      )}
+
+      {/* ── Sidebar escritorio ── */}
+      <aside
+        className={`d-none d-lg-flex flex-column position-fixed sidebar-main${collapsed ? " collapsed" : ""}`}
         style={{
-          top: 18,
-          left: 15,
+          width: w,
+          minWidth: w,
+          top: 0,
+          left: 0,
+          bottom: 0,
+          zIndex: 1040,
+          minHeight: "100vh",
+          transition: "width 0.25s cubic-bezier(.39,1,.32,1), min-width 0.25s cubic-bezier(.39,1,.32,1)",
+          overflow: "hidden",
+        }}
+      >
+        {/* Logo */}
+        <div className="sidebar-logo-area">
+          <LogoCoop size={68} />
+          {!collapsed && <span className="sidebar-brand-text">Smart Coop</span>}
+        </div>
+
+        {/* Navegación */}
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", paddingBottom: 60 }}>
+          {!collapsed && <div className="sidebar-section-label">Menú principal</div>}
+          <nav>
+            <ul className="nav flex-column" style={{ padding: "4px 0" }}>
+              {menu.map(({ to, icon, label }) => (
+                <li className="nav-item" key={to}>
+                  <NavLink
+                    to={to}
+                    title={collapsed ? label : undefined}
+                    className={({ isActive }) =>
+                      "sidebar-link" + (isActive ? " active" : "")
+                    }
+                  >
+                    <span className="sidebar-icon">{icon}</span>
+                    <span className="sidebar-label">{label}</span>
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
+
+        {/* Footer */}
+        {!collapsed && (
+          <div className="sidebar-footer">
+            v1.0 &mdash; {new Date().getFullYear()}
+          </div>
+        )}
+      </aside>
+
+      {/* ── Sidebar móvil (offcanvas) ── */}
+      <div
+        className={`offcanvas offcanvas-start d-lg-none sidebar-offcanvas${open ? " show" : ""}`}
+        tabIndex="-1"
+        style={{
+          visibility: open ? "visible" : "hidden",
+          width: SIDEBAR_WIDTH,
+          zIndex: 4000,
+          transition: "transform 0.25s cubic-bezier(.4,1,.7,1), visibility 0.25s",
+        }}
+        aria-modal="true"
+        role="dialog"
+      >
+        <div
+          className="offcanvas-header"
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.07)", height: 64 }}
+        >
+          <div className="d-flex align-items-center">
+            <LogoCoop size={68} />
+            <span className="sidebar-brand-text">Smart Coop</span>
+          </div>
+          <button
+            type="button"
+            className="btn"
+            style={{
+              color: TEXT_MUTED,
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: 8,
+              fontSize: 16,
+              padding: "4px 8px",
+              lineHeight: 1,
+            }}
+            onClick={() => setOpen(false)}
+            aria-label="Cerrar"
+          >
+            <FaTimes size={14} />
+          </button>
+        </div>
+        <div className="offcanvas-body px-0" style={{ overflowX: "hidden" }}>
+          <div className="sidebar-section-label">Menú principal</div>
+          <nav>
+            <ul className="nav flex-column" style={{ padding: "4px 0" }}>
+              {menu.map(({ to, icon, label }) => (
+                <li className="nav-item" key={to}>
+                  <NavLink
+                    to={to}
+                    className={({ isActive }) =>
+                      "sidebar-link" + (isActive ? " active" : "")
+                    }
+                    onClick={() => setOpen(false)}
+                  >
+                    <span className="sidebar-icon">{icon}</span>
+                    <span className="sidebar-label">{label}</span>
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
+      </div>
+
+      {/* Backdrop móvil */}
+      {open && (
+        <div
+          className="offcanvas-backdrop fade show d-lg-none"
+          style={{ zIndex: 3999 }}
+          onClick={() => setOpen(false)}
+        />
+      )}
+
+      {/* Botón hamburguesa móvil */}
+      <button
+        className="d-lg-none position-fixed"
+        style={{
+          top: 16,
+          left: 14,
           zIndex: 3000,
-          background: verde,
+          background: "transparent",
           border: "none",
-          boxShadow: "0 2px 7px #0001",
-          borderRadius: 10,
+          color: "#fff",
+          padding: 6,
+          lineHeight: 1,
         }}
         onClick={() => setOpen(true)}
         aria-label="Abrir menú"
       >
         <FaBars size={22} />
       </button>
-
-      {/* Botón colapsar en escritorio */}
-      {isDesktop && menu.length > 0 && (
-        <button
-          className="btn btn-light position-fixed d-none d-lg-flex align-items-center justify-content-center"
-          style={{
-            top: 24,
-            left: collapsed ? 72 : 218,
-            zIndex: 2001,
-            width: 32,
-            height: 32,
-            border: "1px solid #e5e7eb",
-            borderRadius: "50%",
-            boxShadow: "0 2px 7px #0001",
-            transition: "left 0.23s cubic-bezier(.39,1,.32,1)",
-            marginTop: "40px",
-          }}
-          onClick={() => onCollapseChange && onCollapseChange(!collapsed)}
-          aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
-        >
-          {collapsed ? (
-            <FaChevronRight size={18} />
-          ) : (
-            <FaChevronLeft size={18} />
-          )}
-        </button>
-      )}
-
-      {/* Sidebar escritorio */}
-      <aside
-        className={`d-none d-lg-block position-fixed sidebar-main${
-          collapsed ? " collapsed" : ""
-        }`}
-        style={sidebarStyle}
-      >
-        <div
-          className="text-center p-3 border-bottom fw-bold"
-          style={{
-            color: verde,
-            fontSize: 26,
-            letterSpacing: ".5px",
-            height: 58,
-          }}
-        >
-          <img
-            src="/logo-cooperativa.jpg"
-            alt="Logo"
-            style={{
-              maxWidth: 40,
-              borderRadius: 8,
-              marginRight: collapsed ? 0 : 10,
-              verticalAlign: "middle",
-              boxShadow: `0 2px 8px ${verde}22`,
-              border: `2px solid ${verde}`,
-              background: "#fff",
-              transition: "margin 0.2s",
-            }}
-          />
-        </div>
-        <nav>
-          <ul className="nav flex-column pt-2">
-            {menu.map(({ to, icon, label }) => (
-              <li className="nav-item" key={to}>
-                <NavLink
-                  to={to}
-                  className={({ isActive }) =>
-                    "nav-link d-flex align-items-center px-3 py-2 sidebar-link" +
-                    (isActive ? " active fw-bold" : " text-dark")
-                  }
-                  style={{
-                    fontSize: "1.09rem",
-                    color: azul,
-                    borderRadius: 10,
-                    transition: "background 0.25s, color 0.2s, box-shadow 0.2s",
-                    marginBottom: 3,
-                    justifyContent: collapsed ? "center" : "flex-start",
-                  }}
-                >
-                  <span
-                    className="me-2 sidebar-icon"
-                    style={{
-                      fontSize: "1.28em",
-                      color: verde,
-                      transition: "color 0.2s, transform 0.2s",
-                      marginRight: collapsed ? 0 : 12,
-                    }}
-                  >
-                    {icon}
-                  </span>
-                  {!collapsed && label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <style>{`
-          .sidebar-link:hover, .sidebar-link:focus {
-            background: #C5C8CC;
-            color: #222 !important;
-            box-shadow: 0 2px 10px #a8cd3a17;
-            transform: translateX(2px) scale(1.03);
-          }
-          .sidebar-link:hover .sidebar-icon,
-          .sidebar-link:focus .sidebar-icon {
-            color: #81a631 !important;
-            transform: scale(1.15) rotate(-7deg);
-          }
-          .sidebar-link.active, .sidebar-link.active:focus {
-            background: #a8cd3a18 !important;
-            color: #a8cd3a !important;
-            box-shadow: 0 2px 12px #a8cd3a18;
-          }
-          .sidebar-link.active .sidebar-icon {
-            color: #a8cd3a !important;
-            transform: scale(1.18) rotate(-3deg);
-          }
-          .sidebar-main.collapsed .nav-link {
-            padding-left: 0.2rem !important;
-            padding-right: 0.2rem !important;
-            justify-content: center !important;
-          }
-          .sidebar-main.collapsed .sidebar-icon {
-            margin-right: 0 !important;
-          }
-        `}</style>
-      </aside>
-
-      {/* Sidebar móvil/tablet como Offcanvas */}
-      <div
-        className={`offcanvas offcanvas-start d-lg-none${open ? " show" : ""}`}
-        tabIndex="-1"
-        style={{
-          visibility: open ? "visible" : "hidden",
-          width: 220,
-          zIndex: 4000,
-          background: "#000",
-          borderRight: "1px solid #e5e7eb",
-          transition: "all 0.21s cubic-bezier(.4,1,.7,1)",
-        }}
-        aria-modal="true"
-        role="dialog"
-      >
-        <div className="offcanvas-header border-bottom">
-          <h5 className="offcanvas-title" style={{ color: verde }}>
-            <img
-              src="/logo-cooperativa.jpg"
-              alt="Logo"
-              style={{
-                maxWidth: 32,
-                borderRadius: 8,
-                marginRight: 7,
-                border: `2px solid ${verde}`,
-                background: "#fff",
-              }}
-            />
-            Cooperativa
-          </h5>
-          <button
-            type="button"
-            className="btn"
-            style={{
-              color: verde,
-              border: "none",
-              fontSize: 22,
-            }}
-            onClick={() => setOpen(false)}
-            aria-label="Cerrar"
-          >
-            <FaTimes />
-          </button>
-        </div>
-        <div className="offcanvas-body px-0">
-          <ul className="nav flex-column pt-2">
-            {menu.map(({ to, icon, label }) => (
-              <li className="nav-item" key={to}>
-                <NavLink
-                  to={to}
-                  className={({ isActive }) =>
-                    "nav-link d-flex align-items-center px-3 py-2 sidebar-link" +
-                    (isActive ? " active fw-bold" : " text-white")
-                  }
-                  style={{
-                    fontSize: "1.07rem",
-                    color: azul,
-                    borderRadius: 10,
-                    transition: "background 0.2s, color 0.2s, box-shadow 0.2s",
-                    marginBottom: 3,
-                  }}
-                  onClick={() => setOpen(false)}
-                >
-                  <span
-                    className="me-2 sidebar-icon"
-                    style={{
-                      fontSize: "1.19em",
-                      color: "white",
-                      transition: "color 0.2s, transform 0.2s",
-                    }}
-                  >
-                    {icon}
-                  </span>
-                  {label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-      {/* Backdrop para móvil */}
-      {open && (
-        <div
-          className="offcanvas-backdrop fade show d-lg-none"
-          style={{ zIndex: 3999 }}
-          onClick={() => setOpen(false)}
-        ></div>
-      )}
     </>
   );
 }

@@ -758,7 +758,9 @@ function TablaPrestamos({
                               className="me-2"
                               style={{ fontSize: "12px", color: "#f39c12" }}
                             />
-                            {p.plazo_meses} meses
+                            {parseInt(p.plazo_meses) === 0 ? (
+                              <span style={{ color: "#e67e22", fontWeight: 600 }}>\u221e Indefinido</span>
+                            ) : `${p.plazo_meses} meses`}
                           </div>
                           <div className="d-flex align-items-center small text-muted">
                             <FaCalendarAlt
@@ -935,7 +937,9 @@ const calcularTasaAnual = (tasa, tipo) => {
 };
 
 const calcularCuotaSimulador = (monto, tasaAnual, plazo) => {
-  if (!monto || !tasaAnual || !plazo) return 0;
+  if (!monto || !tasaAnual) return 0;
+  if (plazo === 0) return monto * (tasaAnual / 100) / 12; // Indefinido: solo interés mensual
+  if (!plazo) return 0;
   const tm = tasaAnual / 100 / 12;
   if (tm === 0) return monto / plazo;
   return (monto * (tm * Math.pow(1 + tm, plazo))) / (Math.pow(1 + tm, plazo) - 1);
@@ -956,14 +960,15 @@ function ModalPrestamo({
   const tipoTasaInfo = TIPOS_TASA.find((t) => t.value === (form.tipo_tasa || "nominal_anual"));
   const tasaAnualEquiv = calcularTasaAnual(form.tasa_interes, form.tipo_tasa || "nominal_anual");
   const tasaMensualEquiv = tasaAnualEquiv / 12;
+  const esIndefinido = parseInt(form.plazo_meses) === 0;
   const cuotaSimulada = calcularCuotaSimulador(
     parseFloat(form.monto) || 0,
     tasaAnualEquiv,
-    parseInt(form.plazo_meses) || 0
+    esIndefinido ? 0 : (parseInt(form.plazo_meses) || 0)
   );
-  const totalPagar = cuotaSimulada * (parseInt(form.plazo_meses) || 0);
-  const totalIntereses = totalPagar - (parseFloat(form.monto) || 0);
-  const haySimulacion = form.monto && form.tasa_interes && form.plazo_meses && cuotaSimulada > 0;
+  const totalPagar = esIndefinido ? 0 : cuotaSimulada * (parseInt(form.plazo_meses) || 0);
+  const totalIntereses = esIndefinido ? 0 : totalPagar - (parseFloat(form.monto) || 0);
+  const haySimulacion = form.monto && form.tasa_interes && (esIndefinido || form.plazo_meses) && cuotaSimulada > 0;
 
   const fmt = (n) =>
     parseFloat(n || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1153,26 +1158,58 @@ function ModalPrestamo({
                       <label className="form-label fw-semibold small" style={{ color: "#2c3e50" }}>
                         <FaClock className="me-1 text-success" /> Plazo (meses)
                       </label>
+
+                      {/* Toggle indefinido */}
+                      <div className="form-check form-switch mb-2">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          id="plazo-indefinido-toggle"
+                          checked={esIndefinido}
+                          onChange={(e) =>
+                            handleInput({ target: { name: "plazo_meses", value: e.target.checked ? "0" : "" } })
+                          }
+                          style={{ cursor: "pointer" }}
+                        />
+                        <label
+                          className="form-check-label small fw-semibold"
+                          htmlFor="plazo-indefinido-toggle"
+                          style={{ color: esIndefinido ? "#e67e22" : "#64748b", cursor: "pointer" }}
+                        >
+                          ♾ Plazo indefinido (solo interés mensual)
+                        </label>
+                      </div>
+
                       <input
                         type="number"
                         className="form-control rounded-3"
                         name="plazo_meses"
-                        value={form.plazo_meses}
+                        value={esIndefinido ? "" : form.plazo_meses}
                         onChange={handleInput}
-                        required
+                        required={!esIndefinido}
+                        disabled={esIndefinido}
                         min="1"
                         max="360"
                         step="1"
-                        placeholder="Ej: 12"
+                        placeholder={esIndefinido ? "Sin plazo fijo" : "Ej: 12"}
                         list="plazo-opciones"
-                        style={{ border: "2px solid #e2e8f0", padding: "10px 14px" }}
+                        style={{
+                          border: `2px solid ${esIndefinido ? "#fbd38d" : "#e2e8f0"}`,
+                          padding: "10px 14px",
+                          background: esIndefinido ? "#fffaf0" : "white",
+                          color: esIndefinido ? "#c05621" : "#2c3e50",
+                        }}
                       />
                       <datalist id="plazo-opciones">
                         {[3,6,9,12,18,24,36,48,60,72,84,96,120].map(m => (
                           <option key={m} value={m}>{m} meses{m >= 12 ? ` (${m/12} año${m/12>1?"s":""})` : ""}</option>
                         ))}
                       </datalist>
-                      {form.plazo_meses > 0 && (
+                      {esIndefinido ? (
+                        <div className="small mt-1 fw-semibold" style={{ color: "#e67e22" }}>
+                          ♾ Sin fecha de vencimiento — pago mensual de intereses
+                        </div>
+                      ) : form.plazo_meses > 0 && (
                         <div className="small text-muted mt-1">
                           {form.plazo_meses >= 12
                             ? `${Math.floor(form.plazo_meses / 12)} año${Math.floor(form.plazo_meses/12)>1?"s":""} ${form.plazo_meses % 12 > 0 ? `y ${form.plazo_meses % 12} mes${form.plazo_meses%12>1?"es":""}` : ""}`
@@ -1230,12 +1267,16 @@ function ModalPrestamo({
                     <>
                       {/* Card principal */}
                       <div className="pmt-sim-card shadow-sm">
-                        <div className="small mb-1" style={{ opacity: .85 }}>Cuota mensual estimada</div>
+                        <div className="small mb-1" style={{ opacity: .85 }}>
+                          {esIndefinido ? "Interés mensual (solo intereses)" : "Cuota mensual estimada"}
+                        </div>
                         <div className="fw-bold" style={{ fontSize: "2rem", letterSpacing: "-.5px" }}>
                           L. {fmt(cuotaSimulada)}
                         </div>
                         <div className="small mt-1" style={{ opacity: .75 }}>
-                          Sistema francés · {form.plazo_meses} cuotas fijas
+                          {esIndefinido
+                            ? "♾ Préstamo indefinido · Capital no se amortiza"
+                            : `Sistema francés · ${form.plazo_meses} cuotas fijas`}
                         </div>
                       </div>
 
@@ -1253,36 +1294,56 @@ function ModalPrestamo({
                           <span className="small text-muted">Tasa mensual efectiva</span>
                           <strong style={{ color: "#2980b9" }}>{+tasaMensualEquiv.toFixed(4)}%</strong>
                         </div>
-                        <div className="pmt-sim-item" style={{ background: "#fff3cd", border: "1px solid #ffc107" }}>
-                          <span className="small" style={{ color: "#856404" }}>Total intereses</span>
-                          <strong style={{ color: "#b7791f" }}>L. {fmt(totalIntereses)}</strong>
-                        </div>
-                        <div className="pmt-sim-item" style={{ background: "#d4edda", border: "1px solid #28a745" }}>
-                          <span className="small" style={{ color: "#155724" }}>Total a pagar</span>
-                          <strong style={{ color: "#155724" }}>L. {fmt(totalPagar)}</strong>
-                        </div>
+                        {esIndefinido ? (
+                          <>
+                            <div className="pmt-sim-item" style={{ background: "#fff3cd", border: "1px solid #ffc107" }}>
+                              <span className="small" style={{ color: "#856404" }}>Interés anual estimado</span>
+                              <strong style={{ color: "#b7791f" }}>L. {fmt(cuotaSimulada * 12)}</strong>
+                            </div>
+                            <div className="pmt-sim-item" style={{ background: "#fde8d8", border: "1px solid #e67e22" }}>
+                              <span className="small" style={{ color: "#7d4e2e" }}>Capital adeudado (fijo)</span>
+                              <strong style={{ color: "#7d4e2e" }}>L. {fmt(form.monto)}</strong>
+                            </div>
+                            <div className="small px-1 mt-1" style={{ color: "#92400e", background: "#fef3c7", borderRadius: 6, padding: "6px 10px", border: "1px solid #fcd34d" }}>
+                              ℹ El socio paga solo el interés cada mes. El capital permanece sin cambio hasta que se cancele el préstamo.
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="pmt-sim-item" style={{ background: "#fff3cd", border: "1px solid #ffc107" }}>
+                              <span className="small" style={{ color: "#856404" }}>Total intereses</span>
+                              <strong style={{ color: "#b7791f" }}>L. {fmt(totalIntereses)}</strong>
+                            </div>
+                            <div className="pmt-sim-item" style={{ background: "#d4edda", border: "1px solid #28a745" }}>
+                              <span className="small" style={{ color: "#155724" }}>Total a pagar</span>
+                              <strong style={{ color: "#155724" }}>L. {fmt(totalPagar)}</strong>
+                            </div>
+                          </>
+                        )}
                       </div>
 
-                      {/* Barra costo del crédito */}
-                      <div>
-                        <div className="d-flex justify-content-between small text-muted mb-1">
-                          <span>Capital</span>
-                          <span>Intereses</span>
+                      {/* Barra costo del crédito (solo préstamo con plazo fijo) */}
+                      {!esIndefinido && (
+                        <div>
+                          <div className="d-flex justify-content-between small text-muted mb-1">
+                            <span>Capital</span>
+                            <span>Intereses</span>
+                          </div>
+                          <div style={{ height: 10, borderRadius: 6, background: "#e2e8f0", overflow: "hidden" }}>
+                            <div style={{
+                              height: "100%",
+                              width: `${totalPagar > 0 ? (parseFloat(form.monto) / totalPagar * 100) : 0}%`,
+                              background: "linear-gradient(90deg,#27ae60,#1e8449)",
+                              borderRadius: 6,
+                              transition: "width .4s"
+                            }} />
+                          </div>
+                          <div className="d-flex justify-content-between small text-muted mt-1">
+                            <span>{totalPagar > 0 ? (parseFloat(form.monto) / totalPagar * 100).toFixed(1) : 0}%</span>
+                            <span>{totalPagar > 0 ? (totalIntereses / totalPagar * 100).toFixed(1) : 0}%</span>
+                          </div>
                         </div>
-                        <div style={{ height: 10, borderRadius: 6, background: "#e2e8f0", overflow: "hidden" }}>
-                          <div style={{
-                            height: "100%",
-                            width: `${totalPagar > 0 ? (parseFloat(form.monto) / totalPagar * 100) : 0}%`,
-                            background: "linear-gradient(90deg,#27ae60,#1e8449)",
-                            borderRadius: 6,
-                            transition: "width .4s"
-                          }} />
-                        </div>
-                        <div className="d-flex justify-content-between small text-muted mt-1">
-                          <span>{totalPagar > 0 ? (parseFloat(form.monto) / totalPagar * 100).toFixed(1) : 0}%</span>
-                          <span>{totalPagar > 0 ? (totalIntereses / totalPagar * 100).toFixed(1) : 0}%</span>
-                        </div>
-                      </div>
+                      )}
                     </>
                   ) : (
                     <div className="text-center py-4" style={{ color: "#9ca3af" }}>

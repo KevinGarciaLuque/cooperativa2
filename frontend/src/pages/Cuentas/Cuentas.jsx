@@ -3,6 +3,7 @@ import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import { useAlerta } from "../../context/AlertaContext";
 import TablaCuenta from "./TablaCuenta";
+import ModalConfirmacion from "../../components/ModalConfirmacion";
 import {
   FaPiggyBank,
   FaSearch,
@@ -25,6 +26,8 @@ export default function Cuentas() {
   const [estadoFiltro, setEstadoFiltro] = useState("todos");
   const [showModal, setShowModal] = useState(false);
   const [editCuenta, setEditCuenta] = useState(null);
+  const [showConfirmEliminar, setShowConfirmEliminar] = useState(false);
+  const [cuentaAEliminar, setCuentaAEliminar] = useState(null);
   const [form, setForm] = useState({
     id_usuario: "",
     tipo_cuenta: "",
@@ -99,16 +102,26 @@ export default function Cuentas() {
     setShowModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("¿Seguro que deseas eliminar esta cuenta?")) return;
+  const handleDelete = (id) => {
+    setCuentaAEliminar(id);
+    setShowConfirmEliminar(true);
+  };
+
+  const confirmarEliminar = async () => {
+    setShowConfirmEliminar(false);
     try {
-      await axios.delete(`${API_URL}/cuentas/${id}`, {
+      await axios.delete(`${API_URL}/cuentas/${cuentaAEliminar}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       mostrarAlerta("Cuenta eliminada correctamente.", "success");
       fetchData();
     } catch (err) {
-      mostrarAlerta("Error al eliminar la cuenta.", "error");
+      mostrarAlerta(
+        err.response?.data?.message || "Error al eliminar la cuenta.",
+        "error"
+      );
+    } finally {
+      setCuentaAEliminar(null);
     }
   };
 
@@ -196,22 +209,22 @@ export default function Cuentas() {
 
   return (
     <div
-      className="container-fluid px-4 py-4"
+      className="container-fluid px-2 px-md-4 py-3 py-md-4"
       style={{ background: "#f8f9fa", minHeight: "100vh" }}
     >
       {/* Header */}
-      <div className="d-flex justify-content-between align-items-center mb-4">
+      <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <div>
-          <h2 className="mb-1 fw-bold" style={{ color: "#2c3e50" }}>
+          <h2 className="mb-1 fw-bold" style={{ color: "#2c3e50", fontSize: "clamp(1.2rem, 4vw, 1.75rem)" }}>
             <FaWallet className="me-2" style={{ color: "#3498db" }} />
             Gestión de Cuentas
           </h2>
-          <p className="text-muted mb-0">
+          <p className="text-muted mb-0 small">
             Administra las cuentas de los socios
           </p>
         </div>
         <button
-          className="btn btn-lg shadow-sm"
+          className="btn shadow-sm"
           onClick={openCrearModal}
           style={{
             background: "linear-gradient(135deg, #3498db 0%, #2980b9 100%)",
@@ -219,6 +232,8 @@ export default function Cuentas() {
             border: "none",
             borderRadius: "10px",
             fontWeight: "600",
+            fontSize: "14px",
+            padding: "8px 18px",
           }}
         >
           <FaPlus className="me-2" />
@@ -370,8 +385,8 @@ export default function Cuentas() {
       </div>
 
       <div className="row g-4 mb-4">
-        {/* Gráfico de Distribución */}
-        <div className="col-lg-4">
+        {/* Gráfico de Distribución — oculto en móvil */}
+        <div className="d-none d-lg-block col-lg-4">
           <div
             className="card border-0 shadow-sm h-100"
             style={{ borderRadius: "15px" }}
@@ -419,7 +434,7 @@ export default function Cuentas() {
         </div>
 
         {/* Filtros y Búsqueda */}
-        <div className="col-lg-8">
+        <div className="col-12 col-lg-8">
           <div
             className="card border-0 shadow-sm"
             style={{ borderRadius: "15px" }}
@@ -453,11 +468,12 @@ export default function Cuentas() {
                 </div>
 
                 {/* Filtro por Tipo */}
-                <div className="col-md-6">
+                <div className="col-12 col-md-6">
                   <label className="form-label fw-semibold small text-muted">
                     Tipo de Cuenta
                   </label>
-                  <div className="btn-group w-100" role="group">
+                  <div style={{ overflowX: "auto", paddingBottom: "4px" }}>
+                  <div className="btn-group flex-nowrap" role="group" style={{ minWidth: "max-content" }}>
                     <button
                       type="button"
                       className={`btn btn-sm ${
@@ -503,10 +519,11 @@ export default function Cuentas() {
                       Pensiones
                     </button>
                   </div>
+                  </div>
                 </div>
 
                 {/* Filtro por Estado */}
-                <div className="col-md-6">
+                <div className="col-12 col-md-6">
                   <label className="form-label fw-semibold small text-muted">
                     Estado
                   </label>
@@ -574,6 +591,17 @@ export default function Cuentas() {
           onDelete={handleDelete}
         />
       )}
+
+      {/* Modal Confirmación Eliminar */}
+      <ModalConfirmacion
+        show={showConfirmEliminar}
+        mensaje="¿Estás seguro que deseas eliminar esta cuenta? Esta acción no se puede deshacer."
+        onConfirm={confirmarEliminar}
+        onCancel={() => {
+          setShowConfirmEliminar(false);
+          setCuentaAEliminar(null);
+        }}
+      />
 
       {/* Modal */}
       {showModal && (

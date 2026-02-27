@@ -43,7 +43,7 @@ export default function Actividades() {
     nombre: "",
     tipo: "",
     fecha: new Date().toISOString().split("T")[0],
-    ingreso: "",
+    monto: "",
     descripcion: "",
   });
   const [loading, setLoading] = useState(true);
@@ -102,7 +102,7 @@ export default function Actividades() {
         nombre: "",
         tipo: "",
         fecha: new Date().toISOString().split("T")[0],
-        ingreso: "",
+        monto: "",
         descripcion: "",
       });
       setEditAct(null);
@@ -122,7 +122,7 @@ export default function Actividades() {
       nombre: act.nombre,
       tipo: act.tipo,
       fecha: act.fecha ? act.fecha.substring(0, 10) : new Date().toISOString().split("T")[0],
-      ingreso: act.ingreso,
+      monto: act.monto,
       descripcion: act.descripcion || "",
     });
     setShowModal(true);
@@ -134,7 +134,7 @@ export default function Actividades() {
       nombre: "",
       tipo: "",
       fecha: new Date().toISOString().split("T")[0],
-      ingreso: "",
+      monto: "",
       descripcion: "",
     });
     setShowModal(true);
@@ -167,7 +167,7 @@ export default function Actividades() {
   // Estadísticas
   const totalActividades = actividades.length;
   const ingresoTotal = actividades.reduce(
-    (sum, a) => sum + parseFloat(a.ingreso || 0),
+    (sum, a) => sum + parseFloat(a.monto || 0),
     0
   );
   const ingresoPromedio = totalActividades > 0 ? ingresoTotal / totalActividades : 0;
@@ -182,7 +182,7 @@ export default function Actividades() {
     return fecha.getMonth() === mesActual && fecha.getFullYear() === añoActual;
   });
   const ingresoEsteMes = actividadesEsteMes.reduce(
-    (sum, a) => sum + parseFloat(a.ingreso || 0),
+    (sum, a) => sum + parseFloat(a.monto || 0),
     0
   );
 
@@ -206,7 +206,7 @@ export default function Actividades() {
       });
 
       const ingreso = actsMes.reduce(
-        (sum, a) => sum + parseFloat(a.ingreso || 0),
+        (sum, a) => sum + parseFloat(a.monto || 0),
         0
       );
 
@@ -227,7 +227,7 @@ export default function Actividades() {
       if (!tipos[tipo]) {
         tipos[tipo] = { nombre: tipo, ingreso: 0, cantidad: 0 };
       }
-      tipos[tipo].ingreso += parseFloat(a.ingreso || 0);
+      tipos[tipo].ingreso += parseFloat(a.monto || 0);
       tipos[tipo].cantidad += 1;
     });
     return Object.values(tipos);
@@ -237,16 +237,17 @@ export default function Actividades() {
   const datosPorTipo = obtenerDatosPorTipo();
 
   const COLORS_TIPO = {
-    rifa: "#e67e22",
-    venta: "#3498db",
-    evento: "#9b59b6",
-    donacion: "#27ae60",
-    otro: "#95a5a6",
+    rifas: "#e67e22",
+    ventas: "#3498db",
+    intereses_ganados: "#9b59b6",
+    donaciones: "#27ae60",
+    alquileres: "#e74c3c",
+    otros_ingresos: "#95a5a6",
   };
 
   const getColorForTipo = (tipo) => {
-    const tipoLower = tipo?.toLowerCase() || "otro";
-    return COLORS_TIPO[tipoLower] || COLORS_TIPO.otro;
+    const tipoLower = tipo?.toLowerCase() || "otros_ingresos";
+    return COLORS_TIPO[tipoLower] || COLORS_TIPO.otros_ingresos;
   };
 
   return (
@@ -698,10 +699,11 @@ function TablaActividades({ actividades, onEdit, onDelete, getColorForTipo }) {
 
   const getTipoIcon = (tipo) => {
     const tipoLower = tipo?.toLowerCase() || "";
-    if (tipoLower.includes("rifa")) return FaTicketAlt;
-    if (tipoLower.includes("venta")) return FaShoppingCart;
-    if (tipoLower.includes("donacion")) return FaGift;
-    if (tipoLower.includes("evento")) return FaUsers;
+    if (tipoLower === "rifas") return FaTicketAlt;
+    if (tipoLower === "ventas") return FaShoppingCart;
+    if (tipoLower === "donaciones") return FaGift;
+    if (tipoLower === "intereses_ganados") return FaChartLine;
+    if (tipoLower === "alquileres") return FaUsers;
     return FaCalendarCheck;
   };
 
@@ -827,7 +829,7 @@ function TablaActividades({ actividades, onEdit, onDelete, getColorForTipo }) {
                         className="fw-bold"
                         style={{ fontSize: "18px", color: "#27ae60" }}
                       >
-                        L. {parseFloat(actividad.ingreso || 0).toFixed(2)}
+                        L. {parseFloat(actividad.monto || 0).toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -926,7 +928,7 @@ function TablaActividades({ actividades, onEdit, onDelete, getColorForTipo }) {
           Ingreso total: <span className="text-success fw-bold">
             L.{" "}
             {actividades
-              .reduce((sum, a) => sum + parseFloat(a.ingreso || 0), 0)
+              .reduce((sum, a) => sum + parseFloat(a.monto || 0), 0)
               .toFixed(2)}
           </span>
         </p>
@@ -1032,20 +1034,26 @@ function ModalActividad({
                   <FaTicketAlt className="me-2" style={{ color: "#e67e22" }} />
                   Tipo de Actividad
                 </label>
-                <input
-                  type="text"
-                  className="form-control form-control-lg"
+                <select
+                  className="form-select form-select-lg"
                   name="tipo"
                   value={form.tipo}
                   onChange={handleInput}
                   required
-                  placeholder="Ej: Rifa, Venta, Evento, Donación"
                   style={{
                     borderRadius: "10px",
                     border: "2px solid #e9ecef",
                     padding: "12px 16px",
                   }}
-                />
+                >
+                  <option value="">Seleccionar tipo...</option>
+                  <option value="rifas">🎟️ Rifas</option>
+                  <option value="ventas">🛒 Ventas</option>
+                  <option value="intereses_ganados">📈 Intereses Ganados</option>
+                  <option value="donaciones">🎁 Donaciones</option>
+                  <option value="alquileres">🏠 Alquileres</option>
+                  <option value="otros_ingresos">📋 Otros Ingresos</option>
+                </select>
               </div>
 
               <div className="col-md-6">
@@ -1083,11 +1091,11 @@ function ModalActividad({
                 <input
                   type="number"
                   className="form-control form-control-lg"
-                  name="ingreso"
-                  value={form.ingreso}
+                  name="monto"
+                  value={form.monto}
                   onChange={handleInput}
                   required
-                  min="0"
+                  min="0.01"
                   step="0.01"
                   placeholder="0.00"
                   style={{

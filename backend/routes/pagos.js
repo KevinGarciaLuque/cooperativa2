@@ -7,7 +7,11 @@ const pool = require("../db");
 // ============================================
 
 // Calcular cuota mensual (sistema francés)
+// plazoMeses === 0 → préstamo indefinido: solo interés mensual
 const calcularCuotaMensual = (monto, tasaAnual, plazoMeses) => {
+  if (plazoMeses === 0) {
+    return monto * (tasaAnual / 100) / 12;
+  }
   const tasaMensual = (tasaAnual / 100) / 12;
   const cuota = monto * (tasaMensual * Math.pow(1 + tasaMensual, plazoMeses)) / 
                 (Math.pow(1 + tasaMensual, plazoMeses) - 1);

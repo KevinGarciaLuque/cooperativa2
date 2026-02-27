@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { verificarToken, soloAdmin } = require("../middleware/auth");
 
 // ============================================
 // FUNCIONES AUXILIARES
@@ -629,6 +630,57 @@ router.get("/:id/estado-cuenta", async (req, res) => {
     res.status(500).json({ 
       message: "Error al obtener el estado de cuenta", 
       error: error.message 
+    });
+  }
+});
+
+// ============================================
+// ELIMINAR UNA CUENTA
+// ============================================
+router.delete("/:id", verificarToken, soloAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar que la cuenta existe
+    const [cuenta] = await pool.query(
+      `SELECT c.*, u.nombre_completo FROM cuentas c
+       INNER JOIN usuarios u ON c.id_usuario = u.id_usuario
+       WHERE c.id_cuenta = ?`,
+      [id]
+    );
+
+    if (cuenta.length === 0) {
+      return res.status(404).json({ message: "Cuenta no encontrada" });
+    }
+
+    // Eliminar movimientos asociados
+    await pool.query(
+      `DELETE FROM movimientos_cuenta WHERE id_cuenta = ?`,
+      [id]
+    );
+
+    // Eliminar la cuenta
+    await pool.query(
+      `DELETE FROM cuentas WHERE id_cuenta = ?`,
+      [id]
+    );
+
+    // Registrar en bitácora
+    await registrarBitacora(
+      cuenta[0].id_usuario,
+      "Cuenta eliminada",
+      `Cuenta #${id} de tipo ${cuenta[0].tipo_cuenta} eliminada. Socio: ${cuenta[0].nombre_completo}`
+    );
+
+    res.json({
+      success: true,
+      message: "Cuenta eliminada correctamente.",
+    });
+  } catch (error) {
+    console.error("ERROR AL ELIMINAR CUENTA:", error);
+    res.status(500).json({
+      message: "Error al eliminar la cuenta",
+      error: error.message,
     });
   }
 });

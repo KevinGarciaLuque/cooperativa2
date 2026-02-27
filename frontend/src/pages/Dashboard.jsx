@@ -127,7 +127,7 @@ export default function Dashboard() {
         <div>
           <h2 className="mb-1 fw-bold" style={{ color: "#2c3e50" }}>
             <FaChartLine className="me-2" style={{ color: "#667eea" }} />
-            Dashboard de Cooperativa
+            Dashboard de Smart Coop
           </h2>
           <p className="text-muted mb-0">
             Vista general del estado operativo y financiero

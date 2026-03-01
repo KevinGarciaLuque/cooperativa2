@@ -9,7 +9,29 @@ dotenv.config();
 const app = express();
 
 // Middlewares
-app.use(cors());
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://mellow-delight-production.up.railway.app",
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Permitir peticiones sin origin (Postman, mobile, etc.)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error("CORS no permitido para: " + origin));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+// Responder preflight OPTIONS en todas las rutas
+app.options("*", cors());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

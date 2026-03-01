@@ -11,7 +11,7 @@ const app = express();
 // Middlewares
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://mellow-delight-production.up.railway.app",
+  "https://smartcoop.up.railway.app",
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 

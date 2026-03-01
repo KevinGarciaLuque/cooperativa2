@@ -671,9 +671,22 @@ function TablaPagos({
     return montoPrestamo > 0 ? (montoPagado / montoPrestamo) * 100 : 0;
   };
 
+  const metodoBadgeMap = {
+    efectivo:            { label: "💵 Efectivo",      color: "#27ae60", bg: "rgba(39,174,96,0.1)" },
+    transferencia:       { label: "🏦 Transferencia", color: "#3498db", bg: "rgba(52,152,219,0.1)" },
+    cheque:              { label: "📋 Cheque",         color: "#9b59b6", bg: "rgba(155,89,182,0.1)" },
+    deposito:            { label: "🏧 Depósito",       color: "#e67e22", bg: "rgba(230,126,34,0.1)" },
+    "tarjeta de débito": { label: "💳 T. Débito",      color: "#e74c3c", bg: "rgba(231,76,60,0.1)" },
+    "pago móvil":        { label: "📱 Pago Móvil",     color: "#1abc9c", bg: "rgba(26,188,156,0.1)" },
+  };
+
+  const montoTotalFooter = pagos.reduce(
+    (sum, p) => sum + parseFloat(p.monto_pagado || p.monto || 0), 0
+  );
+
   return (
     <div className="card border-0 shadow-sm" style={{ borderRadius: "15px" }}>
-      {/* Header */}
+      {/* ── HEADER ── */}
       <div
         className="text-white p-3"
         style={{
@@ -681,93 +694,71 @@ function TablaPagos({
           borderRadius: "15px 15px 0 0",
         }}
       >
-        <div className="row g-2 align-items-center fw-semibold">
-          <div className="col-auto" style={{ width: "50px" }}>
-            #
-          </div>
-          <div className="col-3">Socio / Préstamo</div>
-          <div className="col-2 text-center">Monto Pagado</div>
-          <div className="col-2 text-center">Fecha / Método</div>
-          <div className="col-2 text-center">Progreso</div>
-          <div className="col text-center">Acciones</div>
+        {/* Solo visible en desktop */}
+        <div className="d-none d-lg-flex align-items-center fw-semibold" style={{ gap: 0 }}>
+          <div style={{ width: "44px" }}>#</div>
+          <div style={{ flex: "0 0 22%" }}>Socio / Préstamo</div>
+          <div style={{ flex: "0 0 18%", textAlign: "center" }}>Monto Pagado</div>
+          <div style={{ flex: "0 0 22%", textAlign: "center" }}>Fecha / Método</div>
+          <div style={{ flex: "0 0 22%", textAlign: "center" }}>Progreso</div>
+          <div style={{ flex: 1, textAlign: "center" }}>Acciones</div>
+        </div>
+        {/* Título en móvil/tablet */}
+        <div className="d-flex d-lg-none align-items-center gap-2 fw-semibold">
+          <FaMoneyCheckAlt style={{ fontSize: "18px" }} />
+          Listado de Pagos
         </div>
       </div>
 
-      {/* Body */}
+      {/* ── BODY ── */}
       <div className="card-body p-0">
-        <div style={{ maxHeight: "600px", overflowY: "auto" }}>
+        <div style={{ maxHeight: "680px", overflowY: "auto" }}>
           {pagos.map((pago, index) => {
             const prestamo = getPrestamo(pago.id_prestamo);
             const usuario = prestamo ? getUsuario(prestamo.id_usuario) : null;
             const progreso = calcularProgresoPrestamo(pago.id_prestamo);
             const fecha = (pago.fecha_pago || pago.fecha || "").substring(0, 10) || "-";
-
-            // Determinar estado del préstamo
             const saldoRestante = parseFloat(prestamo?.saldo_restante || 0);
             const completado = saldoRestante <= 0;
+            const monto = parseFloat(pago.monto_pagado || pago.monto || 0);
+            const m = metodoBadgeMap[(pago.metodo_pago || "").toLowerCase()] || {
+              label: pago.metodo_pago || "-", color: "#7f8c8d", bg: "#f1f1f1",
+            };
 
             return (
               <div
                 key={pago.id_pago}
                 className="border-bottom"
-                style={{
-                  transition: "all 0.3s ease",
-                  background: "white",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "#f8f9fa";
-                  e.currentTarget.style.transform = "scale(1.01)";
-                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "white";
-                  e.currentTarget.style.transform = "scale(1)";
-                  e.currentTarget.style.boxShadow = "none";
-                }}
+                style={{ transition: "background 0.2s", background: "white" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#f8f9fa")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "white")}
               >
-                <div className="row g-2 align-items-center p-3">
-                  {/* Número */}
-                  <div className="col-auto" style={{ width: "50px" }}>
+                {/* ══ DESKTOP (lg+) ══ */}
+                <div className="d-none d-lg-flex align-items-center px-3 py-2" style={{ gap: 0 }}>
+                  {/* # */}
+                  <div style={{ width: "44px" }}>
                     <div
                       className="rounded-circle d-flex align-items-center justify-content-center fw-bold"
-                      style={{
-                        width: "32px",
-                        height: "32px",
-                        background: "rgba(52, 152, 219, 0.1)",
-                        color: "#3498db",
-                        fontSize: "14px",
-                      }}
+                      style={{ width: 32, height: 32, background: "rgba(52,152,219,0.1)", color: "#3498db", fontSize: 13 }}
                     >
                       {index + 1}
                     </div>
                   </div>
 
-                  {/* Socio / Préstamo */}
-                  <div className="col-3">
+                  {/* Socio */}
+                  <div style={{ flex: "0 0 22%", minWidth: 0 }}>
                     <div className="d-flex align-items-center">
                       <div
-                        className="rounded-circle d-flex align-items-center justify-content-center me-2"
-                        style={{
-                          width: "40px",
-                          height: "40px",
-                          background: "linear-gradient(135deg, #3498db, #2980b9)",
-                          color: "white",
-                          flexShrink: 0,
-                        }}
+                        className="rounded-circle d-flex align-items-center justify-content-center me-2 flex-shrink-0"
+                        style={{ width: 38, height: 38, background: "linear-gradient(135deg,#3498db,#2980b9)", color: "white" }}
                       >
-                        <FaUser style={{ fontSize: "18px" }} />
+                        <FaUser style={{ fontSize: 16 }} />
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <div
-                          className="fw-semibold text-truncate"
-                          style={{ color: "#2c3e50", fontSize: "14px" }}
-                        >
+                        <div className="fw-semibold text-truncate" style={{ color: "#2c3e50", fontSize: 14 }}>
                           {usuario?.nombre_completo || "N/A"}
                         </div>
-                        <div
-                          className="text-muted small d-flex align-items-center"
-                          style={{ fontSize: "12px" }}
-                        >
+                        <div className="text-muted d-flex align-items-center" style={{ fontSize: 12 }}>
                           <FaFileInvoiceDollar className="me-1" />
                           Préstamo #{pago.id_prestamo}
                         </div>
@@ -775,195 +766,175 @@ function TablaPagos({
                     </div>
                   </div>
 
-                  {/* Monto Pagado */}
-                  <div className="col-2 text-center">
-                    <div className="d-flex align-items-center justify-content-center">
-                      <FaMoneyBillWave
-                        className="me-2"
-                        style={{ color: "#27ae60", fontSize: "20px" }}
-                      />
-                      <div>
-                        <div
-                          className="fw-bold"
-                          style={{ fontSize: "18px", color: "#27ae60" }}
-                        >
-                          L. {parseFloat(pago.monto_pagado || pago.monto || 0).toFixed(2)}
+                  {/* Monto */}
+                  <div style={{ flex: "0 0 18%", textAlign: "center" }}>
+                    <div className="fw-bold" style={{ fontSize: 17, color: "#27ae60" }}>
+                      L. {monto.toFixed(2)}
+                    </div>
+                    {(pago.monto_interes != null || pago.monto_capital != null) && (
+                      <div className="d-flex gap-1 justify-content-center mt-1 flex-wrap">
+                        <span style={{ fontSize: "0.67rem", fontWeight: 600, background: "rgba(230,126,34,0.12)", color: "#d35400", border: "1px solid #e67e22", borderRadius: 4, padding: "1px 5px" }}>
+                          Int. L.{parseFloat(pago.monto_interes || 0).toFixed(2)}
+                        </span>
+                        <span style={{ fontSize: "0.67rem", fontWeight: 600, background: "rgba(39,174,96,0.12)", color: "#1e8449", border: "1px solid #27ae60", borderRadius: 4, padding: "1px 5px" }}>
+                          Cap. L.{parseFloat(pago.monto_capital || 0).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Fecha / Método */}
+                  <div style={{ flex: "0 0 22%", textAlign: "center" }}>
+                    <div className="badge mb-1 d-inline-flex align-items-center"
+                      style={{ background: "rgba(155,89,182,0.1)", color: "#9b59b6", border: "2px solid #9b59b6", borderRadius: 10, fontSize: 12, fontWeight: 600, padding: "4px 10px" }}>
+                      <FaCalendarAlt className="me-1" />{fecha}
+                    </div>
+                    <div className="badge d-block"
+                      style={{ background: m.bg, color: m.color, border: `1.5px solid ${m.color}`, borderRadius: 8, fontSize: 11, fontWeight: 600 }}>
+                      {m.label}
+                    </div>
+                  </div>
+
+                  {/* Progreso */}
+                  <div style={{ flex: "0 0 22%" }}>
+                    <div className="d-flex align-items-center justify-content-center gap-2">
+                      <div style={{ width: 48, height: 48, flexShrink: 0 }}>
+                        <CircularProgressbar value={progreso} text={`${Math.round(progreso)}%`}
+                          styles={buildStyles({ textSize: "28px", pathColor: completado ? "#27ae60" : "#3498db", textColor: completado ? "#27ae60" : "#3498db", trailColor: "#e9ecef" })} />
+                      </div>
+                      {completado ? (
+                        <span className="badge" style={{ background: "rgba(39,174,96,0.1)", color: "#27ae60", border: "2px solid #27ae60", fontSize: 11, padding: "4px 8px" }}>
+                          <FaCheckCircle className="me-1" />Completado
+                        </span>
+                      ) : (
+                        <span className="badge" style={{ background: "rgba(52,152,219,0.1)", color: "#3498db", border: "2px solid #3498db", fontSize: 11, padding: "4px 8px" }}>
+                          <FaClock className="me-1" />En curso
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Acciones */}
+                  <div style={{ flex: 1, textAlign: "center" }}>
+                    <div className="btn-group">
+                      <button className="btn btn-sm" onClick={() => onEdit(pago)} title="Editar"
+                        style={{ background: "rgba(52,152,219,0.1)", color: "#3498db", border: "1px solid #3498db", borderRadius: "8px 0 0 8px" }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "#3498db"; e.currentTarget.style.color = "white"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(52,152,219,0.1)"; e.currentTarget.style.color = "#3498db"; }}>
+                        <FaEdit />
+                      </button>
+                      <button className="btn btn-sm" onClick={() => onDelete(pago.id_pago)} title="Eliminar"
+                        style={{ background: "rgba(231,76,60,0.1)", color: "#e74c3c", border: "1px solid #e74c3c", borderLeft: "none", borderRadius: "0 8px 8px 0" }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "#e74c3c"; e.currentTarget.style.color = "white"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(231,76,60,0.1)"; e.currentTarget.style.color = "#e74c3c"; }}>
+                        <FaTrash />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ══ MÓVIL / TABLET (< lg) — tarjeta ══ */}
+                <div className="d-flex d-lg-none flex-column p-3 gap-2">
+                  {/* Fila superior: número + socio + acciones */}
+                  <div className="d-flex align-items-center justify-content-between gap-2">
+                    <div className="d-flex align-items-center gap-2" style={{ minWidth: 0 }}>
+                      <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                        style={{ width: 30, height: 30, background: "rgba(52,152,219,0.1)", color: "#3498db", fontSize: 13 }}>
+                        {index + 1}
+                      </div>
+                      <div
+                        className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                        style={{ width: 38, height: 38, background: "linear-gradient(135deg,#3498db,#2980b9)", color: "white" }}>
+                        <FaUser style={{ fontSize: 16 }} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div className="fw-semibold text-truncate" style={{ color: "#2c3e50", fontSize: 14 }}>
+                          {usuario?.nombre_completo || "N/A"}
                         </div>
-                        {/* Desglose capital / interés si existe */}
+                        <div className="text-muted" style={{ fontSize: 12 }}>
+                          <FaFileInvoiceDollar className="me-1" />
+                          Préstamo #{pago.id_prestamo}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Acciones */}
+                    <div className="d-flex gap-1 flex-shrink-0">
+                      <button className="btn btn-sm" onClick={() => onEdit(pago)} title="Editar"
+                        style={{ background: "rgba(52,152,219,0.1)", color: "#3498db", border: "1px solid #3498db", borderRadius: 8, padding: "5px 10px" }}>
+                        <FaEdit />
+                      </button>
+                      <button className="btn btn-sm" onClick={() => onDelete(pago.id_pago)} title="Eliminar"
+                        style={{ background: "rgba(231,76,60,0.1)", color: "#e74c3c", border: "1px solid #e74c3c", borderRadius: 8, padding: "5px 10px" }}>
+                        <FaTrash />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Fila central: monto + fecha/método */}
+                  <div className="d-flex flex-wrap gap-2 align-items-start">
+                    {/* Monto */}
+                    <div className="d-flex align-items-center gap-1 flex-shrink-0"
+                      style={{ background: "rgba(39,174,96,0.08)", border: "1.5px solid #27ae60", borderRadius: 10, padding: "6px 12px" }}>
+                      <FaMoneyBillWave style={{ color: "#27ae60", fontSize: 16 }} />
+                      <div>
+                        <div className="fw-bold" style={{ fontSize: 16, color: "#27ae60", lineHeight: 1.2 }}>
+                          L. {monto.toFixed(2)}
+                        </div>
                         {(pago.monto_interes != null || pago.monto_capital != null) && (
-                          <div className="d-flex gap-1 justify-content-center mt-1 flex-wrap">
-                            <span style={{
-                              fontSize: "0.68rem", fontWeight: 600,
-                              background: "rgba(230,126,34,0.12)",
-                              color: "#d35400",
-                              border: "1px solid #e67e22",
-                              borderRadius: 4, padding: "1px 5px",
-                            }}>
+                          <div className="d-flex gap-1 flex-wrap mt-1">
+                            <span style={{ fontSize: "0.67rem", fontWeight: 600, background: "rgba(230,126,34,0.12)", color: "#d35400", border: "1px solid #e67e22", borderRadius: 4, padding: "1px 5px" }}>
                               Int. L.{parseFloat(pago.monto_interes || 0).toFixed(2)}
                             </span>
-                            <span style={{
-                              fontSize: "0.68rem", fontWeight: 600,
-                              background: "rgba(39,174,96,0.12)",
-                              color: "#1e8449",
-                              border: "1px solid #27ae60",
-                              borderRadius: 4, padding: "1px 5px",
-                            }}>
+                            <span style={{ fontSize: "0.67rem", fontWeight: 600, background: "rgba(39,174,96,0.12)", color: "#1e8449", border: "1px solid #27ae60", borderRadius: 4, padding: "1px 5px" }}>
                               Cap. L.{parseFloat(pago.monto_capital || 0).toFixed(2)}
                             </span>
                           </div>
                         )}
                       </div>
                     </div>
+
+                    {/* Fecha */}
+                    <span className="badge d-inline-flex align-items-center gap-1"
+                      style={{ background: "rgba(155,89,182,0.1)", color: "#9b59b6", border: "2px solid #9b59b6", borderRadius: 10, fontSize: 12, fontWeight: 600, padding: "6px 10px" }}>
+                      <FaCalendarAlt />{fecha}
+                    </span>
+
+                    {/* Método */}
+                    <span className="badge d-inline-flex align-items-center"
+                      style={{ background: m.bg, color: m.color, border: `1.5px solid ${m.color}`, borderRadius: 8, fontSize: 12, fontWeight: 600, padding: "6px 10px" }}>
+                      {m.label}
+                    </span>
                   </div>
 
-                  {/* Fecha + Método */}
-                  <div className="col-2 text-center">
-                    <div
-                      className="badge px-3 py-2 d-inline-flex align-items-center mb-1"
-                      style={{
-                        background: "rgba(155, 89, 182, 0.1)",
-                        color: "#9b59b6",
-                        fontWeight: "600",
-                        fontSize: "12px",
-                        border: "2px solid #9b59b6",
-                        borderRadius: "10px",
-                        display: "block",
-                      }}
-                    >
-                      <FaCalendarAlt className="me-1" />
-                      {fecha}
-                    </div>
-                    {pago.metodo_pago && (() => {
-                      const metodoBadge = {
-                        efectivo:          { label: "💵 Efectivo",      color: "#27ae60", bg: "rgba(39,174,96,0.1)" },
-                        transferencia:     { label: "🏦 Transferencia", color: "#3498db", bg: "rgba(52,152,219,0.1)" },
-                        cheque:            { label: "📋 Cheque",         color: "#9b59b6", bg: "rgba(155,89,182,0.1)" },
-                        deposito:          { label: "🏧 Depósito",       color: "#e67e22", bg: "rgba(230,126,34,0.1)" },
-                        "tarjeta de débito": { label: "💳 T. Débito",    color: "#e74c3c", bg: "rgba(231,76,60,0.1)" },
-                        "pago móvil":       { label: "📱 Pago Móvil",    color: "#1abc9c", bg: "rgba(26,188,156,0.1)" },
-                      };
-                      const m = metodoBadge[pago.metodo_pago.toLowerCase()] || { label: pago.metodo_pago, color: "#7f8c8d", bg: "#f1f1f1" };
-                      return (
-                        <div
-                          className="badge px-2 py-1"
-                          style={{
-                            background: m.bg,
-                            color: m.color,
-                            border: `1.5px solid ${m.color}`,
-                            borderRadius: "8px",
-                            fontSize: "11px",
-                            fontWeight: "600",
-                            display: "block",
-                          }}
-                        >
-                          {m.label}
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {/* Progreso */}
-                  <div className="col-2 text-center">
-                    <div className="d-flex align-items-center justify-content-center">
-                      <div style={{ width: "50px", height: "50px", marginRight: "12px" }}>
-                        <CircularProgressbar
-                          value={progreso}
-                          text={`${Math.round(progreso)}%`}
-                          styles={buildStyles({
-                            textSize: "28px",
-                            pathColor: completado ? "#27ae60" : "#3498db",
-                            textColor: completado ? "#27ae60" : "#3498db",
-                            trailColor: "#e9ecef",
-                            pathTransitionDuration: 0.5,
-                          })}
-                        />
-                      </div>
-                      <div>
+                  {/* Fila inferior: barra de progreso lineal + estado */}
+                  <div>
+                    <div className="d-flex justify-content-between align-items-center mb-1">
+                      <span style={{ fontSize: 12, color: "#7f8c8d" }}>Progreso del préstamo</span>
+                      <div className="d-flex align-items-center gap-1">
+                        <span className="fw-bold" style={{ fontSize: 13, color: completado ? "#27ae60" : "#3498db" }}>
+                          {Math.round(progreso)}%
+                        </span>
                         {completado ? (
-                          <span
-                            className="badge"
-                            style={{
-                              background: "rgba(39, 174, 96, 0.1)",
-                              color: "#27ae60",
-                              border: "2px solid #27ae60",
-                              fontSize: "11px",
-                              padding: "4px 8px",
-                            }}
-                          >
-                            <FaCheckCircle className="me-1" />
-                            Completado
+                          <span className="badge" style={{ background: "rgba(39,174,96,0.1)", color: "#27ae60", border: "1.5px solid #27ae60", fontSize: 11, padding: "3px 7px" }}>
+                            <FaCheckCircle className="me-1" />Completado
                           </span>
                         ) : (
-                          <span
-                            className="badge"
-                            style={{
-                              background: "rgba(52, 152, 219, 0.1)",
-                              color: "#3498db",
-                              border: "2px solid #3498db",
-                              fontSize: "11px",
-                              padding: "4px 8px",
-                            }}
-                          >
-                            <FaClock className="me-1" />
-                            En curso
+                          <span className="badge" style={{ background: "rgba(52,152,219,0.1)", color: "#3498db", border: "1.5px solid #3498db", fontSize: 11, padding: "3px 7px" }}>
+                            <FaClock className="me-1" />En curso
                           </span>
                         )}
                       </div>
                     </div>
-                  </div>
-
-                  {/* Acciones */}
-                  <div className="col text-center">
-                    <div className="btn-group" role="group">
-                      <button
-                        className="btn btn-sm"
-                        onClick={() => onEdit(pago)}
-                        style={{
-                          background: "rgba(52, 152, 219, 0.1)",
-                          color: "#3498db",
-                          border: "1px solid #3498db",
-                          borderRadius: "8px 0 0 8px",
-                          fontWeight: "600",
-                          transition: "all 0.3s ease",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = "#3498db";
-                          e.currentTarget.style.color = "white";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background =
-                            "rgba(52, 152, 219, 0.1)";
-                          e.currentTarget.style.color = "#3498db";
-                        }}
-                        title="Editar"
-                      >
-                        <FaEdit />
-                      </button>
-                      <button
-                        className="btn btn-sm"
-                        onClick={() => onDelete(pago.id_pago)}
-                        style={{
-                          background: "rgba(231, 76, 60, 0.1)",
-                          color: "#e74c3c",
-                          border: "1px solid #e74c3c",
-                          borderLeft: "none",
-                          borderRadius: "0 8px 8px 0",
-                          fontWeight: "600",
-                          transition: "all 0.3s ease",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = "#e74c3c";
-                          e.currentTarget.style.color = "white";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background =
-                            "rgba(231, 76, 60, 0.1)";
-                          e.currentTarget.style.color = "#e74c3c";
-                        }}
-                        title="Eliminar"
-                      >
-                        <FaTrash />
-                      </button>
+                    <div style={{ height: 8, background: "#e9ecef", borderRadius: 10, overflow: "hidden" }}>
+                      <div style={{
+                        height: "100%",
+                        width: `${Math.min(progreso, 100)}%`,
+                        background: completado
+                          ? "linear-gradient(90deg,#27ae60,#2ecc71)"
+                          : "linear-gradient(90deg,#3498db,#2980b9)",
+                        borderRadius: 10,
+                        transition: "width 0.5s ease",
+                      }} />
                     </div>
                   </div>
                 </div>
@@ -973,19 +944,17 @@ function TablaPagos({
         </div>
       </div>
 
-      {/* Footer */}
-      <div
-        className="card-footer bg-light border-top-0 text-center py-3"
-        style={{ borderRadius: "0 0 15px 15px" }}
-      >
-        <p className="text-muted mb-0 small fw-semibold">
-          <FaCheckCircle className="me-2 text-success" />
-          Total de pagos: <span className="text-primary fw-bold">{pagos.length}</span>
-          {" | "}
-          Monto total: <span className="text-success fw-bold">
-            L. {pagos.reduce((sum, p) => sum + parseFloat(p.monto_pagado || p.monto || 0), 0).toFixed(2)}
+      {/* ── FOOTER ── */}
+      <div className="card-footer bg-light border-top-0 py-3 px-3" style={{ borderRadius: "0 0 15px 15px" }}>
+        <div className="d-flex flex-wrap justify-content-center gap-3 text-center">
+          <span className="small fw-semibold text-muted">
+            <FaCheckCircle className="me-1 text-success" />
+            Total pagos: <span className="text-primary fw-bold">{pagos.length}</span>
           </span>
-        </p>
+          <span className="small fw-semibold text-muted">
+            Monto total: <span className="text-success fw-bold">L. {montoTotalFooter.toFixed(2)}</span>
+          </span>
+        </div>
       </div>
     </div>
   );

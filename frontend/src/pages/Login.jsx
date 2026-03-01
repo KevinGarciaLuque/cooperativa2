@@ -287,12 +287,37 @@ export default function Login() {
         /* Logo móvil */
         .login-logo-mobile {
           display: none;
-          flex-direction: column;
+          position: relative;
           align-items: center;
+          justify-content: center;
+          width: 100%;
           margin-bottom: 24px;
         }
+        .login-home-btn {
+          position: absolute;
+          right: 0;
+          top: -28px;
+          color: #a8cd3a;
+          font-size: 0.82rem;
+          font-weight: 500;
+          text-decoration: none;
+          transition: color 0.2s;
+        }
+        .login-home-btn:hover { color: #c8f050; }
+        .login-home-desktop {
+          position: absolute;
+          top: 36px;
+          right: 24px;
+          color: #a8cd3a;
+          font-size: 0.82rem;
+          font-weight: 500;
+          text-decoration: none;
+          transition: color 0.2s;
+        }
+        .login-home-desktop:hover { color: #c8f050; }
         /* Responsive: apila en móvil */
         @media (max-width: 768px) {
+          .login-home-desktop { display: none; }
           .login-left { display: none !important; }
           .login-right {
             width: 100%;
@@ -340,10 +365,12 @@ export default function Login() {
 
       {/* Panel derecho — formulario */}
       <div className="login-right">
+        <Link to="/" className="login-home-desktop">← Inicio</Link>
         <div className="login-card">
           {/* Logo solo visible en móvil/tablet */}
           <div className="login-logo-mobile">
             <LogoCoop size={120} />
+            <Link to="/" className="login-home-btn">← Inicio</Link>
           </div>
 
           <div className="login-title">Bienvenido</div>
@@ -414,6 +441,12 @@ export default function Login() {
               </Link>
             </div>
           </form>
+
+          {/* Créditos */}
+          <div className="text-center mt-4" style={{ color: "rgba(255,255,255,0.2)", fontSize: "0.75rem" }}>
+            © {new Date().getFullYear()} · Desarrollado por{" "}
+            <span style={{ color: ACCENT, fontWeight: 600 }}>Kevin Garcia</span>
+          </div>
         </div>
       </div>
     </div>

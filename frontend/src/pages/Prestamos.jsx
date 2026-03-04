@@ -573,6 +573,7 @@ export default function Prestamos() {
           getEstadoInfo={getEstadoInfo}
           token={token}
           apiUrl={API_URL}
+          onLiquidado={fetchData}
         />
       )}
 
@@ -955,6 +956,24 @@ function ModalPrestamo({
   onSubmit,
   handleInput,
 }) {
+  // ── Hooks antes del early return (regla de React) ──
+  const [busquedaSocio, setBusquedaSocio] = useState("");
+  const [dropdownSocioAbierto, setDropdownSocioAbierto] = useState(false);
+  const [montoDisplay, setMontoDisplay] = useState(() => {
+    if (!form.monto && form.monto !== 0) return "";
+    const parts = String(form.monto).split(".");
+    return parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (parts[1] !== undefined ? "." + parts[1] : "");
+  });
+
+  const handleMontoChange = (e) => {
+    const raw = e.target.value.replace(/,/g, "");
+    if (raw !== "" && !/^\d*\.?\d*$/.test(raw)) return;
+    const parts = raw.split(".");
+    const display = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (parts.length > 1 ? "." + parts[1] : "");
+    setMontoDisplay(display);
+    handleInput({ target: { name: "monto", value: raw } });
+  };
+
   if (!show) return null;
 
   const tipoTasaInfo = TIPOS_TASA.find((t) => t.value === (form.tipo_tasa || "nominal_anual"));
@@ -976,14 +995,14 @@ function ModalPrestamo({
   return (
     <>
       <style>{`
-        .pmt-tipo-btn { border: 2px solid #e2e8f0; border-radius: .75rem; padding: .65rem 1rem;
-          cursor: pointer; transition: all .18s; background: #fff; text-align:left; }
+        .pmt-tipo-btn { border: 1.5px solid #e2e8f0; border-radius: 2rem; padding: .25rem .75rem;
+          cursor: pointer; transition: all .15s; background: #fff; white-space: nowrap; }
         .pmt-tipo-btn:hover { border-color: #27ae60; background: #f0faf4; }
         .pmt-tipo-btn.selected { border-color: var(--tc); background: var(--tb); }
         .pmt-sim-card { background: linear-gradient(135deg,#27ae60,#1e8449);
-          border-radius: 1rem; color: #fff; padding: 1.25rem 1.5rem; }
-        .pmt-sim-item { background: rgba(255,255,255,.15); border-radius:.6rem;
-          padding:.55rem .9rem; display:flex; justify-content:space-between; align-items:center; }
+          border-radius: .75rem; color: #fff; padding: .9rem 1.1rem; }
+        .pmt-sim-item { background: rgba(255,255,255,.15); border-radius:.5rem;
+          padding:.4rem .75rem; display:flex; justify-content:space-between; align-items:center; }
       `}</style>
       <div
         className="modal show d-block"
@@ -991,129 +1010,198 @@ function ModalPrestamo({
         style={{
           background: "rgba(0,0,0,0.65)",
           backdropFilter: "blur(5px)",
-          zIndex: 1200,
+          zIndex: 5000,
           position: "fixed",
           top: 0, left: 0,
           width: "100vw", height: "100vh",
           overflowY: "auto",
         }}
-        onClick={onClose}
       >
         <div
-          className="modal-dialog modal-xl modal-dialog-centered"
-          style={{ maxWidth: 900 }}
+          className="modal-dialog modal-dialog-centered"
+          style={{ maxWidth: 760 }}
           onClick={(e) => e.stopPropagation()}
         >
           <form
             className="modal-content border-0 shadow-lg"
             onSubmit={onSubmit}
-            style={{ borderRadius: "1.25rem", overflow: "hidden" }}
+            style={{ borderRadius: "16px", overflow: "hidden" }}
           >
             {/* ── Header ── */}
             <div
-              className="modal-header border-0 text-white"
-              style={{
-                background: "linear-gradient(135deg,#27ae60 0%,#1a7a40 100%)",
-                padding: "22px 28px",
-              }}
+              className="d-flex align-items-center justify-content-between text-white px-4 py-3"
+              style={{ background: "linear-gradient(135deg,#27ae60 0%,#1a7a40 100%)" }}
             >
-              <div className="d-flex align-items-center gap-3">
-                <div style={{ background: "rgba(255,255,255,.18)", borderRadius: ".8rem", padding: ".65rem" }}>
-                  <FaMoneyBillWave size={22} />
-                </div>
+              <div className="d-flex align-items-center gap-2">
+                <FaMoneyBillWave style={{ fontSize: 18 }} />
                 <div>
-                  <h4 className="modal-title mb-0 fw-bold">
+                  <span className="fw-bold" style={{ fontSize: "1rem" }}>
                     {editPrestamo ? "Editar Préstamo" : "Nuevo Préstamo"}
-                  </h4>
-                  <div style={{ fontSize: ".8rem", opacity: .8 }}>
-                    Sistema de amortización francés (cuota fija)
-                  </div>
+                  </span>
+                  <div style={{ fontSize: ".75rem", opacity: .8 }}>Sistema francés · cuota fija</div>
                 </div>
               </div>
-              <button type="button" className="btn-close btn-close-white" onClick={onClose} />
+              <button type="button" className="btn-close btn-close-white btn-sm" onClick={onClose} />
             </div>
 
             {/* ── Body ── */}
-            <div className="modal-body p-0" style={{ background: "#f0f4f8" }}>
+            <div className="modal-body p-0" style={{ background: "#f8fafc" }}>
               <div className="row g-0">
 
                 {/* Columna izquierda – formulario */}
-                <div className="col-lg-7 p-4" style={{ background: "#f8fafc" }}>
+                <div className="col-lg-7 p-3 d-flex flex-column gap-2" style={{ borderRight: "1px solid #e2e8f0" }}>
 
                   {/* Socio */}
-                  <div className="mb-3">
+                  <div>
                     <label className="form-label fw-semibold small" style={{ color: "#2c3e50" }}>
                       <FaUserTie className="me-1 text-success" /> Socio
                     </label>
-                    <select
-                      className="form-select rounded-3"
-                      name="id_usuario"
-                      value={form.id_usuario}
-                      onChange={handleInput}
-                      required
-                      disabled={editPrestamo !== null}
-                      style={{ border: "2px solid #e2e8f0", padding: "10px 14px",
-                        background: editPrestamo ? "#e9ecef" : "white" }}
-                    >
-                      <option value="">Seleccionar socio...</option>
-                      {usuarios.map((u) => (
-                        <option key={u.id_usuario} value={u.id_usuario}>
-                          {u.nombre_completo} — {u.dni}
-                        </option>
-                      ))}
-                    </select>
+
+                    {editPrestamo !== null ? (
+                      /* En edición: solo mostrar el nombre, no se puede cambiar */
+                      <div style={{ border: "2px solid #e2e8f0", borderRadius: 8, padding: "10px 14px", background: "#e9ecef", fontSize: "0.9rem", color: "#2c3e50" }}>
+                        {usuarios.find((u) => u.id_usuario === parseInt(form.id_usuario))?.nombre_completo || "—"}
+                      </div>
+                    ) : (
+                      /* En creación: dropdown buscable */
+                      <div style={{ position: "relative" }}>
+                        <div
+                          onClick={() => { setDropdownSocioAbierto((v) => !v); setBusquedaSocio(""); }}
+                          style={{
+                            border: "2px solid #e2e8f0", borderRadius: 8,
+                            padding: "10px 14px", background: "white",
+                            cursor: "pointer", display: "flex",
+                            justifyContent: "space-between", alignItems: "center",
+                            userSelect: "none", fontSize: "0.9rem",
+                            color: form.id_usuario ? "#2c3e50" : "#94a3b8",
+                          }}
+                        >
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {form.id_usuario
+                              ? (() => { const u = usuarios.find((u) => u.id_usuario === parseInt(form.id_usuario)); return u ? `${u.nombre_completo} — ${u.dni}` : "Seleccionar socio..."; })()
+                              : "Seleccionar socio..."}
+                          </span>
+                          <span style={{ fontSize: "0.7rem", color: "#94a3b8", flexShrink: 0, marginLeft: 8 }}>{dropdownSocioAbierto ? "▲" : "▼"}</span>
+                        </div>
+                        <input type="hidden" name="id_usuario" value={form.id_usuario} required />
+
+                        {dropdownSocioAbierto && (
+                          <>
+                            <div style={{ position: "fixed", inset: 0, zIndex: 5998 }} onClick={() => setDropdownSocioAbierto(false)} />
+                            <div style={{
+                              position: "absolute", top: "100%", left: 0, right: 0,
+                              zIndex: 5999, background: "white",
+                              border: "2px solid #e2e8f0", borderRadius: 8,
+                              boxShadow: "0 8px 24px rgba(0,0,0,0.13)",
+                              marginTop: 2, overflow: "hidden",
+                            }}>
+                              <div style={{ padding: "8px 8px 4px" }}>
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  className="form-control form-control-sm"
+                                  placeholder="🔍 Buscar por nombre o DNI..."
+                                  value={busquedaSocio}
+                                  onChange={(e) => setBusquedaSocio(e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{ borderRadius: 6, fontSize: "0.82rem" }}
+                                />
+                              </div>
+                              <div style={{ maxHeight: 200, overflowY: "auto" }}>
+                                <div
+                                  onClick={() => { handleInput({ target: { name: "id_usuario", value: "" } }); setDropdownSocioAbierto(false); }}
+                                  style={{ padding: "7px 12px", fontSize: "0.82rem", color: "#94a3b8", cursor: "pointer", borderBottom: "1px solid #f1f5f9" }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = "#f8fafc")}
+                                  onMouseLeave={(e) => (e.currentTarget.style.background = "white")}
+                                >
+                                  — Seleccionar socio —
+                                </div>
+                                {usuarios
+                                  .filter((u) => {
+                                    if (!busquedaSocio) return true;
+                                    return `${u.nombre_completo} ${u.dni}`.toLowerCase().includes(busquedaSocio.toLowerCase());
+                                  })
+                                  .map((u) => {
+                                    const sel = parseInt(form.id_usuario) === u.id_usuario;
+                                    return (
+                                      <div
+                                        key={u.id_usuario}
+                                        onClick={() => { handleInput({ target: { name: "id_usuario", value: String(u.id_usuario) } }); setDropdownSocioAbierto(false); setBusquedaSocio(""); }}
+                                        style={{
+                                          padding: "8px 12px", fontSize: "0.82rem", cursor: "pointer",
+                                          background: sel ? "rgba(39,174,96,0.09)" : "white",
+                                          borderLeft: sel ? "3px solid #27ae60" : "3px solid transparent",
+                                          display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8,
+                                        }}
+                                        onMouseEnter={(e) => { if (!sel) e.currentTarget.style.background = "#f8fafc"; }}
+                                        onMouseLeave={(e) => { if (!sel) e.currentTarget.style.background = "white"; }}
+                                      >
+                                        <span style={{ fontWeight: sel ? 700 : 400, color: sel ? "#27ae60" : "#2c3e50" }}>{u.nombre_completo}</span>
+                                        <span style={{ color: "#94a3b8", fontSize: "0.78rem", whiteSpace: "nowrap" }}>{u.dni}</span>
+                                      </div>
+                                    );
+                                  })}
+                                {usuarios.filter((u) => {
+                                  if (!busquedaSocio) return true;
+                                  return `${u.nombre_completo} ${u.dni}`.toLowerCase().includes(busquedaSocio.toLowerCase());
+                                }).length === 0 && (
+                                  <div style={{ padding: "10px 12px", fontSize: "0.82rem", color: "#94a3b8", textAlign: "center" }}>
+                                    Sin resultados para "{busquedaSocio}"
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Monto */}
-                  <div className="mb-3">
+                  <div>
                     <label className="form-label fw-semibold small" style={{ color: "#2c3e50" }}>
                       <FaMoneyBillWave className="me-1 text-success" /> Monto del Préstamo (L.)
                     </label>
                     <div className="input-group">
                       <span className="input-group-text fw-bold" style={{ background: "#27ae60", color: "#fff", border: "2px solid #27ae60" }}>L.</span>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         className="form-control rounded-end"
                         name="monto"
-                        value={form.monto}
-                        onChange={handleInput}
+                        value={montoDisplay}
+                        onChange={handleMontoChange}
                         required
-                        min="100"
-                        step="0.01"
                         placeholder="0.00"
-                        style={{ border: "2px solid #e2e8f0", borderLeft: "none", padding: "10px 14px" }}
+                        style={{ border: "2px solid #e2e8f0", borderLeft: "none", padding: "6px 10px" }}
                       />
                     </div>
                   </div>
 
                   {/* Tipo de Tasa */}
-                  <div className="mb-3">
+                  <div>
                     <label className="form-label fw-semibold small d-flex align-items-center gap-1" style={{ color: "#2c3e50" }}>
                       <FaPercentage className="text-success" /> Tipo de Tasa de Interés
                       <span className="badge ms-1 px-2" style={{ background: tipoTasaInfo?.color, fontSize: ".7rem" }}>
                         {tipoTasaInfo?.abbr}
                       </span>
                     </label>
-                    <div className="row g-2 mb-2">
+                    <div className="d-flex flex-wrap gap-1 mb-2">
                       {TIPOS_TASA.map((t) => (
-                        <div className="col-6" key={t.value}>
-                          <button
-                            type="button"
-                            className={`pmt-tipo-btn w-100 ${(form.tipo_tasa || "nominal_anual") === t.value ? "selected" : ""}`}
-                            style={{
-                              "--tc": t.color,
-                              "--tb": t.color + "12",
-                              borderColor: (form.tipo_tasa || "nominal_anual") === t.value ? t.color : "#e2e8f0",
-                              background: (form.tipo_tasa || "nominal_anual") === t.value ? t.color + "12" : "#fff",
-                            }}
-                            onClick={() => handleInput({ target: { name: "tipo_tasa", value: t.value } })}
-                          >
-                            <div className="fw-bold" style={{ fontSize: ".82rem", color: t.color }}>{t.abbr}</div>
-                            <div style={{ fontSize: ".73rem", color: "#555", lineHeight: 1.3, marginTop: "2px" }}>
-                              {t.label.split("(")[0].trim()}
-                            </div>
-                          </button>
-                        </div>
+                        <button
+                          key={t.value}
+                          type="button"
+                          className={`pmt-tipo-btn ${(form.tipo_tasa || "nominal_anual") === t.value ? "selected" : ""}`}
+                          style={{
+                            "--tc": t.color,
+                            "--tb": t.color + "18",
+                            borderColor: (form.tipo_tasa || "nominal_anual") === t.value ? t.color : "#e2e8f0",
+                            background: (form.tipo_tasa || "nominal_anual") === t.value ? t.color + "18" : "#f8fafc",
+                          }}
+                          onClick={() => handleInput({ target: { name: "tipo_tasa", value: t.value } })}
+                        >
+                          <span className="fw-bold" style={{ fontSize: ".78rem", color: (form.tipo_tasa || "nominal_anual") === t.value ? t.color : "#475569" }}>{t.abbr}</span>
+                        </button>
                       ))}
                     </div>
                     {tipoTasaInfo && (
@@ -1124,7 +1212,7 @@ function ModalPrestamo({
                   </div>
 
                   {/* Valor de la Tasa */}
-                  <div className="mb-3">
+                  <div>
                     <label className="form-label fw-semibold small" style={{ color: "#2c3e50" }}>
                       Valor de la Tasa ({tipoTasaInfo?.abbr})
                     </label>
@@ -1140,7 +1228,7 @@ function ModalPrestamo({
                         max="100"
                         step="0.001"
                         placeholder={form.tipo_tasa === "nominal_mensual" || form.tipo_tasa === "efectiva_mensual" ? "2.00" : "24.00"}
-                        style={{ border: "2px solid #e2e8f0", padding: "10px 14px" }}
+                        style={{ border: "2px solid #e2e8f0", padding: "6px 10px" }}
                       />
                       <span className="input-group-text fw-bold" style={{ background: tipoTasaInfo?.color, color: "#fff", border: `2px solid ${tipoTasaInfo?.color}` }}>%</span>
                     </div>
@@ -1153,7 +1241,7 @@ function ModalPrestamo({
                   </div>
 
                   {/* Plazo y Fecha */}
-                  <div className="row g-3 mb-3">
+                  <div className="row g-2">
                     <div className="col-6">
                       <label className="form-label fw-semibold small" style={{ color: "#2c3e50" }}>
                         <FaClock className="me-1 text-success" /> Plazo (meses)
@@ -1195,7 +1283,7 @@ function ModalPrestamo({
                         list="plazo-opciones"
                         style={{
                           border: `2px solid ${esIndefinido ? "#fbd38d" : "#e2e8f0"}`,
-                          padding: "10px 14px",
+                          padding: "6px 10px",
                           background: esIndefinido ? "#fffaf0" : "white",
                           color: esIndefinido ? "#c05621" : "#2c3e50",
                         }}
@@ -1228,7 +1316,7 @@ function ModalPrestamo({
                         value={form.fecha_otorgado}
                         onChange={handleInput}
                         required
-                        style={{ border: "2px solid #e2e8f0", padding: "10px 14px" }}
+                        style={{ border: "2px solid #e2e8f0", padding: "6px 10px" }}
                       />
                     </div>
                   </div>
@@ -1244,7 +1332,7 @@ function ModalPrestamo({
                       value={form.estado}
                       onChange={handleInput}
                       required
-                      style={{ border: "2px solid #e2e8f0", padding: "10px 14px" }}
+                      style={{ border: "2px solid #e2e8f0", padding: "6px 10px" }}
                     >
                       <option value="pendiente">⏳ Pendiente de Aprobación</option>
                       <option value="aprobado">✅ Aprobado</option>
@@ -1257,8 +1345,8 @@ function ModalPrestamo({
                 </div>
 
                 {/* Columna derecha – simulador */}
-                <div className="col-lg-5 p-4 d-flex flex-column gap-3"
-                  style={{ background: "#edf2f7", borderLeft: "1px solid #e2e8f0" }}>
+                <div className="col-lg-5 p-3 d-flex flex-column gap-2"
+                  style={{ background: "#edf2f7" }}>
                   <div className="fw-bold" style={{ color: "#2c3e50", fontSize: ".95rem" }}>
                     📊 Simulador de Cuotas
                   </div>
@@ -1270,7 +1358,7 @@ function ModalPrestamo({
                         <div className="small mb-1" style={{ opacity: .85 }}>
                           {esIndefinido ? "Interés mensual (solo intereses)" : "Cuota mensual estimada"}
                         </div>
-                        <div className="fw-bold" style={{ fontSize: "2rem", letterSpacing: "-.5px" }}>
+                        <div className="fw-bold" style={{ fontSize: "1.7rem", letterSpacing: "-.5px" }}>
                           L. {fmt(cuotaSimulada)}
                         </div>
                         <div className="small mt-1" style={{ opacity: .75 }}>
@@ -1387,14 +1475,14 @@ function ModalPrestamo({
             </div>
 
             {/* ── Footer ── */}
-            <div className="modal-footer border-0 bg-white px-4 py-3 gap-2">
+            <div className="modal-footer border-0 bg-white px-3 py-2 gap-2">
               <button
                 type="submit"
-                className="btn btn-lg shadow-sm fw-semibold"
+                className="btn shadow-sm fw-semibold"
                 style={{
                   background: "linear-gradient(135deg,#27ae60,#1e8449)",
                   color: "white", border: "none",
-                  borderRadius: "10px", padding: "11px 32px",
+                  borderRadius: "8px", padding: "7px 22px", fontSize: ".9rem",
                 }}
               >
                 <FaCheckCircle className="me-2" />
@@ -1402,9 +1490,9 @@ function ModalPrestamo({
               </button>
               <button
                 type="button"
-                className="btn btn-lg btn-light shadow-sm fw-semibold"
+                className="btn btn-light shadow-sm fw-semibold"
                 onClick={onClose}
-                style={{ borderRadius: "10px", padding: "11px 28px" }}
+                style={{ borderRadius: "8px", padding: "7px 18px", fontSize: ".9rem" }}
               >
                 <FaTimesCircle className="me-2" />
                 Cancelar
@@ -1418,7 +1506,7 @@ function ModalPrestamo({
 }
 
 // ==================== COMPONENTE MODAL DETALLE PRÉSTAMO ====================
-function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo, token, apiUrl }) {
+function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo, token, apiUrl, onLiquidado }) {
   const [cuotaPersonalizada, setCuotaPersonalizada] = useState("");
   const [pagosPrestamo, setPagosPrestamo] = useState([]);
 
@@ -1560,9 +1648,48 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
   const cuotasAhorradas = tablaEstandar.length - tablaAmortizacion.length;
   const ahorroIntereses = interesesEstandar - interesesCustom;
 
-  const saldoRestante = parseFloat(prestamo.saldo_restante || prestamo.monto || 0);
+  // Usar null-check explícito para no confundir saldo_restante=0 con "no definido"
+  const saldoRestante = parseFloat(
+    prestamo.saldo_restante != null ? prestamo.saldo_restante : (prestamo.monto || 0)
+  );
   const monto = montoP;
-  const progreso = monto > 0 ? ((monto - saldoRestante) / monto) * 100 : 0;
+
+  // Total realmente pagado según los registros de pagos
+  const totalPagadoReal = pagosPrestamo.reduce(
+    (sum, p) => sum + parseFloat(p.monto_pagado || 0), 0
+  );
+
+  // El saldo_restante del ÚLTIMO pago es el indicador más fiable
+  const ultimoPago = pagosPrestamo.length > 0
+    ? pagosPrestamo[pagosPrestamo.length - 1]
+    : null;
+  const saldoUltimoPago = ultimoPago != null
+    ? parseFloat(ultimoPago.saldo_restante ?? 0)
+    : null;
+
+  // Capital amortizado real (suma de monto_capital de cada pago)
+  const capitalAmortizadoReal = pagosPrestamo.reduce(
+    (sum, p) => sum + parseFloat(p.monto_capital || 0), 0
+  );
+
+  // Está liquidado si cualquiera de estas condiciones aplica:
+  // 1. El estado en BD ya es 'pagado' (cualquier capitalización)
+  // 2. El saldo_restante en BD ya es 0 o negativo
+  // 3. El saldo_restante del último pago registrado es 0
+  // 4. El capital amortizado acumulado cubre el principal
+  const estaLiquidado =
+    (prestamo.estado || "").toLowerCase() === "pagado" ||
+    saldoRestante <= 0.01 ||
+    (saldoUltimoPago !== null && saldoUltimoPago <= 0.01) ||
+    (pagosPrestamo.length > 0 && capitalAmortizadoReal >= montoP - 0.01);
+
+  // Saldo y progreso corregidos — si está liquidado siempre 100%
+  const saldoMostrar = estaLiquidado ? 0 : saldoRestante;
+  const progreso = estaLiquidado
+    ? 100
+    : monto > 0
+    ? Math.min(99, ((monto - Math.max(0, saldoMostrar)) / monto) * 100)
+    : 0;
 
   const fmt = (n) =>
     parseFloat(n || 0).toLocaleString("es-HN", {
@@ -1570,18 +1697,14 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
       maximumFractionDigits: 2,
     });
 
-  // Timeline states
-  const getTimelineStates = () => {
-    const estado = prestamo.estado;
-    return {
-      solicitud: true,
-      aprobacion: ["aprobado", "activo", "mora", "pagado"].includes(estado),
-      desembolso: ["activo", "mora", "pagado"].includes(estado),
-      pago: estado === "pagado",
-    };
+  // Timeline states — usa estaLiquidado para el paso final
+  const estadoNorm = (prestamo.estado || "").toLowerCase();
+  const timeline = {
+    solicitud: true,
+    aprobacion: ["aprobado", "activo", "mora", "pagado"].includes(estadoNorm),
+    desembolso: ["activo", "mora", "pagado"].includes(estadoNorm),
+    pago: estaLiquidado,
   };
-
-  const timeline = getTimelineStates();
 
   return (
     <div
@@ -1590,7 +1713,7 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
       style={{
         background: "rgba(0, 0, 0, 0.6)",
         backdropFilter: "blur(4px)",
-        zIndex: 1200,
+        zIndex: 5000,
         position: "fixed",
         top: 0,
         left: 0,
@@ -1598,10 +1721,10 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
         height: "100vh",
         overflowY: "auto",
       }}
-      onClick={onClose}
     >
       <div
-        className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"
+        className="modal-dialog modal-dialog-centered modal-dialog-scrollable"
+        style={{ maxWidth: "980px" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div
@@ -1613,17 +1736,17 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
             className="modal-header border-0 text-white"
             style={{
               background: "linear-gradient(135deg, #27ae60 0%, #229954 100%)",
-              padding: "24px",
+              padding: "16px 24px",
             }}
           >
             <div>
-              <h4 className="modal-title mb-1 d-flex align-items-center fw-bold">
-                <FaMoneyBillWave className="me-3" style={{ fontSize: "24px" }} />
+              <h5 className="modal-title mb-0 d-flex align-items-center fw-bold">
+                <FaMoneyBillWave className="me-2" style={{ fontSize: "18px" }} />
                 Detalle del Préstamo
-              </h4>
-              <p className="mb-0 small" style={{ opacity: 0.9 }}>
-                Préstamo #{prestamo.id_prestamo}
-              </p>
+                <span className="ms-2 badge" style={{ background: "rgba(255,255,255,0.2)", fontSize: "0.75rem", borderRadius: 8, padding: "3px 8px" }}>
+                  #{prestamo.id_prestamo}
+                </span>
+              </h5>
             </div>
             <button
               type="button"
@@ -1636,32 +1759,25 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
           {/* Body */}
           <div
             className="modal-body"
-            style={{ padding: "32px", background: "#f8f9fa" }}
+            style={{ padding: "18px 24px", background: "#f8f9fa" }}
           >
             {/* Información del Socio y Estado */}
-            <div className="row g-4 mb-4">
+            <div className="row g-3 mb-3">
               <div className="col-md-6">
                 <div
                   className="card border-0 shadow-sm h-100"
-                  style={{ borderRadius: "15px" }}
+                  style={{ borderRadius: "12px" }}
                 >
-                  <div className="card-body">
-                    <h6 className="fw-bold mb-3" style={{ color: "#2c3e50" }}>
+                  <div className="card-body py-2 px-3">
+                    <h6 className="fw-bold mb-2" style={{ color: "#2c3e50", fontSize: "0.85rem" }}
+                    >
                       <FaUserTie className="me-2" style={{ color: "#3498db" }} />
                       Información del Socio
                     </h6>
-                    <div className="mb-2">
-                      <strong>Nombre:</strong> {usuario?.nombre_completo || "N/A"}
-                    </div>
-                    <div className="mb-2">
-                      <strong>DNI:</strong> {usuario?.dni || "N/A"}
-                    </div>
-                    <div className="mb-2">
-                      <strong>Teléfono:</strong> {usuario?.telefono || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Correo:</strong> {usuario?.correo || "N/A"}
-                    </div>
+                    <div className="mb-1 small"><strong>Nombre:</strong> {usuario?.nombre_completo || "N/A"}</div>
+                    <div className="mb-1 small"><strong>DNI:</strong> {usuario?.dni || "N/A"}</div>
+                    <div className="mb-1 small"><strong>Teléfono:</strong> {usuario?.telefono || "N/A"}</div>
+                    <div className="small"><strong>Correo:</strong> {usuario?.correo || "N/A"}</div>
                   </div>
                 </div>
               </div>
@@ -1669,33 +1785,37 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
               <div className="col-md-6">
                 <div
                   className="card border-0 shadow-sm h-100"
-                  style={{ borderRadius: "15px" }}
+                  style={{ borderRadius: "12px" }}
                 >
-                  <div className="card-body">
-                    <h6 className="fw-bold mb-3" style={{ color: "#2c3e50" }}>
+                  <div className="card-body py-2 px-3">
+                    <h6 className="fw-bold mb-2" style={{ color: "#2c3e50", fontSize: "0.85rem" }}>
                       <FaChartLine className="me-2" style={{ color: "#27ae60" }} />
                       Estado del Préstamo
                     </h6>
-                    <div className="d-flex align-items-center justify-content-between mb-3">
-                      <span
-                        className="badge px-3 py-2 d-inline-flex align-items-center"
-                        style={{
-                          background: estadoInfo.bg,
-                          color: estadoInfo.color,
-                          fontWeight: "600",
-                          borderRadius: "20px",
-                          fontSize: "14px",
-                        }}
-                      >
-                        <IconoEstado className="me-2" />
-                        {estadoInfo.label}
-                      </span>
-                      <div style={{ width: "80px", height: "80px" }}>
+                    <div className="d-flex align-items-center justify-content-between mb-2">
+                      <div className="d-flex flex-column gap-1">
+                        <span
+                          className="badge d-inline-flex align-items-center"
+                          style={{
+                            background: estaLiquidado ? "rgba(39,174,96,0.15)" : estadoInfo.bg,
+                            color: estaLiquidado ? "#27ae60" : estadoInfo.color,
+                            border: `1.5px solid ${estaLiquidado ? "#27ae60" : estadoInfo.color}`,
+                            fontWeight: "600",
+                            borderRadius: "20px",
+                            fontSize: "12px",
+                            padding: "4px 10px",
+                          }}
+                        >
+                          {estaLiquidado ? <FaCheckCircle className="me-1" /> : <IconoEstado className="me-1" />}
+                          {estaLiquidado ? "Pagado" : estadoInfo.label}
+                        </span>
+                      </div>
+                      <div style={{ width: "65px", height: "65px" }}>
                         <CircularProgressbar
                           value={progreso}
                           text={`${progreso.toFixed(0)}%`}
                           styles={buildStyles({
-                            textSize: "20px",
+                            textSize: "22px",
                             pathColor: progreso === 100 ? "#27ae60" : "#3498db",
                             textColor: "#2c3e50",
                             trailColor: "#ecf0f1",
@@ -1703,14 +1823,24 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
                         />
                       </div>
                     </div>
-                    <div className="mb-2">
+                    <div className="mb-1 small">
                       <strong>Monto Original:</strong> L.{" "}
                       {monto.toFixed(2)}
                     </div>
-                    <div>
+                    <div className="mb-1 small">
+                      <strong>Total Pagado:</strong>{" "}
+                      <span style={{ color: "#3498db", fontWeight: "bold" }}>
+                        L. {fmt(totalPagadoReal)}
+                      </span>
+                    </div>
+                    <div className="small">
                       <strong>Saldo Restante:</strong>{" "}
-                      <span style={{ color: "#27ae60", fontWeight: "bold" }}>
-                        L. {saldoRestante.toFixed(2)}
+                      <span style={{ color: estaLiquidado ? "#27ae60" : "#e74c3c", fontWeight: "bold" }}>
+                        {estaLiquidado ? (
+                          <><span style={{ fontSize: "0.85rem" }}>✅</span> L. 0.00 — Liquidado</>
+                        ) : (
+                          `L. ${saldoMostrar.toFixed(2)}`
+                        )}
                       </span>
                     </div>
                   </div>
@@ -1719,7 +1849,7 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
             </div>
 
             {/* Timeline del Proceso */}
-            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: "15px" }}>
+            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: "12px" }}>
               <div className="card-body">
                 <h6 className="fw-bold mb-4" style={{ color: "#2c3e50" }}>
                   <FaClock className="me-2" style={{ color: "#f39c12" }} />
@@ -1862,7 +1992,7 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
             </div>
 
             {/* Tabla de Amortización */}
-            <div className="card border-0 shadow-sm" style={{ borderRadius: "15px" }}>
+            <div className="card border-0 shadow-sm" style={{ borderRadius: "12px" }}>
               <div className="card-body">
                 {/* Encabezado + simulador de cuota */}
                 <div className="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
@@ -2079,7 +2209,9 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
                       </tr>
                     </thead>
                     <tbody>
-                      {tablaAmortizacion.map((fila) => {
+                      {tablaAmortizacion
+                        .filter((fila) => !estaLiquidado || !!pagoMap[fila.cuota])
+                        .map((fila) => {
                         const esUltima = fila.cuota === tablaAmortizacion.length;
                         const tieneExtra = fila.abonoExtra > 0.005;
                         const pagoReal = pagoMap[fila.cuota];
@@ -2231,9 +2363,15 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
                         )}
                         <td style={{ padding: "12px" }}>L. 0.00</td>
                         <td style={{ padding: "12px" }}>
-                          <span style={{ color: "#27ae60" }}>{pagosPrestamo.length} pagadas</span>
-                          {" / "}
-                          <span style={{ color: "#95a5a6" }}>{tablaAmortizacion.length - pagosPrestamo.length} pend.</span>
+                          {estaLiquidado ? (
+                            <span style={{ color: "#27ae60" }}>✅ {pagosPrestamo.length} pagadas — Liquidado</span>
+                          ) : (
+                            <>
+                              <span style={{ color: "#27ae60" }}>{pagosPrestamo.length} pagadas</span>
+                              {" / "}
+                              <span style={{ color: "#95a5a6" }}>{tablaAmortizacion.length - pagosPrestamo.length} pend.</span>
+                            </>
+                          )}
                         </td>
                         <td style={{ padding: "12px" }}>—</td>
                       </tr>
@@ -2248,15 +2386,48 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
           {/* Footer */}
           <div
             className="modal-footer border-0 bg-white"
-            style={{ padding: "20px 32px" }}
+            style={{ padding: "12px 24px" }}
           >
+            {estaLiquidado ? (
+              <span className="badge me-auto" style={{ background: "rgba(39,174,96,0.15)", color: "#27ae60", border: "1.5px solid #27ae60", borderRadius: 10, fontSize: 13, padding: "6px 14px", fontWeight: 700 }}>
+                ✅ Préstamo liquidado en su totalidad
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-sm me-auto fw-semibold"
+                style={{
+                  background: "rgba(39,174,96,0.12)",
+                  color: "#27ae60",
+                  border: "1.5px solid #27ae60",
+                  borderRadius: "8px",
+                  padding: "6px 16px",
+                }}
+                onClick={async () => {
+                  if (!window.confirm(`¿Marcar el préstamo #${prestamo.id_prestamo} como PAGADO/LIQUIDADO? Esto pondrá el saldo en L. 0.00.`)) return;
+                  try {
+                    await axios.patch(
+                      `${apiUrl}/prestamos/${prestamo.id_prestamo}/estado`,
+                      { estado: "pagado" },
+                      { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                    if (onLiquidado) onLiquidado();
+                    onClose();
+                  } catch (e) {
+                    alert("Error al actualizar el préstamo: " + (e?.response?.data?.message || e.message));
+                  }
+                }}
+              >
+                <FaCheckCircle className="me-1" /> Marcar como Liquidado
+              </button>
+            )}
             <button
               type="button"
-              className="btn btn-lg btn-light shadow-sm"
+              className="btn btn-sm btn-light shadow-sm"
               onClick={onClose}
               style={{
-                borderRadius: "10px",
-                padding: "12px 32px",
+                borderRadius: "8px",
+                padding: "8px 24px",
                 fontWeight: "600",
               }}
             >

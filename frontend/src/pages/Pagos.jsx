@@ -30,6 +30,9 @@ import {
 } from "recharts";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 
+const fmt = (n) =>
+  parseFloat(n || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 export default function Pagos() {
   const { token } = useAuth();
   const { mostrarAlerta } = useAlerta();
@@ -344,7 +347,7 @@ export default function Pagos() {
                 <div>
                   <p className="text-muted mb-1 small">Monto Total Pagado</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#27ae60" }}>
-                    L. {montoTotal.toFixed(2)}
+                    L. {fmt(montoTotal)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">Acumulado</p>
                 </div>
@@ -379,7 +382,7 @@ export default function Pagos() {
                 <div>
                   <p className="text-muted mb-1 small">Este Mes</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#9b59b6" }}>
-                    L. {montoMes.toFixed(2)}
+                    L. {fmt(montoMes)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
                     {pagosMes.length} pagos
@@ -414,7 +417,7 @@ export default function Pagos() {
                 <div>
                   <p className="text-muted mb-1 small">Promedio por Pago</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#f39c12" }}>
-                    L. {promedioPago.toFixed(2)}
+                    L. {fmt(promedioPago)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">Por transacción</p>
                 </div>
@@ -453,7 +456,7 @@ export default function Pagos() {
                     <XAxis dataKey="mes" stroke="#95a5a6" />
                     <YAxis stroke="#95a5a6" />
                     <Tooltip
-                      formatter={(value) => `L. ${value.toFixed(2)}`}
+                      formatter={(value) => `L. ${fmt(value)}`}
                       contentStyle={{
                         background: "white",
                         border: "1px solid #e9ecef",
@@ -697,10 +700,11 @@ function TablaPagos({
         {/* Solo visible en desktop */}
         <div className="d-none d-lg-flex align-items-center fw-semibold" style={{ gap: 0 }}>
           <div style={{ width: "44px" }}>#</div>
-          <div style={{ flex: "0 0 22%" }}>Socio / Préstamo</div>
-          <div style={{ flex: "0 0 18%", textAlign: "center" }}>Monto Pagado</div>
-          <div style={{ flex: "0 0 22%", textAlign: "center" }}>Fecha / Método</div>
-          <div style={{ flex: "0 0 22%", textAlign: "center" }}>Progreso</div>
+          <div style={{ flex: "0 0 18%" }}>Socio / Préstamo</div>
+          <div style={{ flex: "0 0 15%", textAlign: "center" }}>Monto Pagado</div>
+          <div style={{ flex: "0 0 18%", textAlign: "center" }}>Fecha / Método</div>
+          <div style={{ flex: "0 0 24%", textAlign: "center" }}>Período / Interés</div>
+          <div style={{ flex: "0 0 15%", textAlign: "center" }}>Progreso</div>
           <div style={{ flex: 1, textAlign: "center" }}>Acciones</div>
         </div>
         {/* Título en móvil/tablet */}
@@ -725,6 +729,25 @@ function TablaPagos({
               label: pago.metodo_pago || "-", color: "#7f8c8d", bg: "#f1f1f1",
             };
 
+            // ── Cálculo de período e interés generado ──────────────────────────
+            const fechaOtorgado = (prestamo?.fecha_otorgado || "").substring(0, 10);
+            const fechaPagoStr  = (pago.fecha_pago || pago.fecha || "").substring(0, 10);
+            const diasPeriodo = (fechaOtorgado && fechaPagoStr)
+              ? Math.max(1, Math.round(
+                  (new Date(fechaPagoStr + "T00:00:00") - new Date(fechaOtorgado + "T00:00:00"))
+                  / (1000 * 60 * 60 * 24)
+                ))
+              : null;
+            const tasaAnual   = parseFloat(prestamo?.tasa_interes || 0);
+            const tasaDiaria  = tasaAnual / 100 / 365;
+            const saldoBase   = parseFloat(prestamo?.saldo_restante || prestamo?.monto || 0);
+            const interesGenerado = diasPeriodo != null
+              ? parseFloat((saldoBase * tasaDiaria * diasPeriodo).toFixed(2))
+              : null;
+            const totalAPagar = interesGenerado != null
+              ? parseFloat((saldoBase + interesGenerado).toFixed(2))
+              : null;
+
             return (
               <div
                 key={pago.id_pago}
@@ -746,7 +769,7 @@ function TablaPagos({
                   </div>
 
                   {/* Socio */}
-                  <div style={{ flex: "0 0 22%", minWidth: 0 }}>
+                  <div style={{ flex: "0 0 18%", minWidth: 0 }}>
                     <div className="d-flex align-items-center">
                       <div
                         className="rounded-circle d-flex align-items-center justify-content-center me-2 flex-shrink-0"
@@ -767,24 +790,24 @@ function TablaPagos({
                   </div>
 
                   {/* Monto */}
-                  <div style={{ flex: "0 0 18%", textAlign: "center" }}>
+                  <div style={{ flex: "0 0 15%", textAlign: "center" }}>
                     <div className="fw-bold" style={{ fontSize: 17, color: "#27ae60" }}>
-                      L. {monto.toFixed(2)}
+                      L. {fmt(monto)}
                     </div>
                     {(pago.monto_interes != null || pago.monto_capital != null) && (
                       <div className="d-flex gap-1 justify-content-center mt-1 flex-wrap">
                         <span style={{ fontSize: "0.67rem", fontWeight: 600, background: "rgba(230,126,34,0.12)", color: "#d35400", border: "1px solid #e67e22", borderRadius: 4, padding: "1px 5px" }}>
-                          Int. L.{parseFloat(pago.monto_interes || 0).toFixed(2)}
+                          Int. L.{fmt(pago.monto_interes)}
                         </span>
                         <span style={{ fontSize: "0.67rem", fontWeight: 600, background: "rgba(39,174,96,0.12)", color: "#1e8449", border: "1px solid #27ae60", borderRadius: 4, padding: "1px 5px" }}>
-                          Cap. L.{parseFloat(pago.monto_capital || 0).toFixed(2)}
+                          Cap. L.{fmt(pago.monto_capital)}
                         </span>
                       </div>
                     )}
                   </div>
 
                   {/* Fecha / Método */}
-                  <div style={{ flex: "0 0 22%", textAlign: "center" }}>
+                  <div style={{ flex: "0 0 18%", textAlign: "center" }}>
                     <div className="badge mb-1 d-inline-flex align-items-center"
                       style={{ background: "rgba(155,89,182,0.1)", color: "#9b59b6", border: "2px solid #9b59b6", borderRadius: 10, fontSize: 12, fontWeight: 600, padding: "4px 10px" }}>
                       <FaCalendarAlt className="me-1" />{fecha}
@@ -795,8 +818,40 @@ function TablaPagos({
                     </div>
                   </div>
 
+                  {/* Período / Interés */}
+                  <div style={{ flex: "0 0 24%", textAlign: "center" }}>
+                    {diasPeriodo != null ? (
+                      <div className="d-flex flex-column align-items-center gap-1">
+                        <span style={{ fontSize: 11, color: "#7f8c8d", fontWeight: 500 }}>
+                          {fechaOtorgado} → {fechaPagoStr}
+                        </span>
+                        <span
+                          className="badge"
+                          style={{ background: "rgba(52,152,219,0.1)", color: "#2980b9", border: "1.5px solid #3498db", borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "3px 8px" }}
+                        >
+                          <FaClock className="me-1" style={{ fontSize: 10 }} />
+                          {diasPeriodo} día{diasPeriodo !== 1 ? "s" : ""}
+                        </span>
+                        <span
+                          className="badge"
+                          style={{ background: "rgba(230,126,34,0.1)", color: "#d35400", border: "1.5px solid #e67e22", borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "3px 8px" }}
+                        >
+                          Int. L.{fmt(interesGenerado)}
+                        </span>
+                        <span
+                          className="badge"
+                          style={{ background: "rgba(39,174,96,0.12)", color: "#1e8449", border: "1.5px solid #27ae60", borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "3px 8px" }}
+                        >
+                          Total: L.{fmt(totalAPagar)}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-muted" style={{ fontSize: 12 }}>—</span>
+                    )}
+                  </div>
+
                   {/* Progreso */}
-                  <div style={{ flex: "0 0 22%" }}>
+                  <div style={{ flex: "0 0 15%" }}>
                     <div className="d-flex align-items-center justify-content-center gap-2">
                       <div style={{ width: 48, height: 48, flexShrink: 0 }}>
                         <CircularProgressbar value={progreso} text={`${Math.round(progreso)}%`}
@@ -878,15 +933,15 @@ function TablaPagos({
                       <FaMoneyBillWave style={{ color: "#27ae60", fontSize: 16 }} />
                       <div>
                         <div className="fw-bold" style={{ fontSize: 16, color: "#27ae60", lineHeight: 1.2 }}>
-                          L. {monto.toFixed(2)}
+                          L. {fmt(monto)}
                         </div>
                         {(pago.monto_interes != null || pago.monto_capital != null) && (
                           <div className="d-flex gap-1 flex-wrap mt-1">
                             <span style={{ fontSize: "0.67rem", fontWeight: 600, background: "rgba(230,126,34,0.12)", color: "#d35400", border: "1px solid #e67e22", borderRadius: 4, padding: "1px 5px" }}>
-                              Int. L.{parseFloat(pago.monto_interes || 0).toFixed(2)}
+                              Int. L.{fmt(pago.monto_interes)}
                             </span>
                             <span style={{ fontSize: "0.67rem", fontWeight: 600, background: "rgba(39,174,96,0.12)", color: "#1e8449", border: "1px solid #27ae60", borderRadius: 4, padding: "1px 5px" }}>
-                              Cap. L.{parseFloat(pago.monto_capital || 0).toFixed(2)}
+                              Cap. L.{fmt(pago.monto_capital)}
                             </span>
                           </div>
                         )}
@@ -905,6 +960,27 @@ function TablaPagos({
                       {m.label}
                     </span>
                   </div>
+
+                  {/* Período e interés — tarjeta móvil */}
+                  {diasPeriodo != null && (
+                    <div
+                      className="d-flex flex-wrap gap-2 align-items-center"
+                      style={{ background: "rgba(52,152,219,0.05)", border: "1px solid #d6eaf8", borderRadius: 10, padding: "8px 12px" }}
+                    >
+                      <span style={{ fontSize: 12, color: "#5d6d7e", fontWeight: 500 }}>
+                        📅 {fechaOtorgado} → {fechaPagoStr}
+                      </span>
+                      <span className="badge" style={{ background: "rgba(52,152,219,0.1)", color: "#2980b9", border: "1.5px solid #3498db", borderRadius: 7, fontSize: 11, fontWeight: 700, padding: "3px 8px" }}>
+                        <FaClock className="me-1" style={{ fontSize: 10 }} />{diasPeriodo} día{diasPeriodo !== 1 ? "s" : ""}
+                      </span>
+                      <span className="badge" style={{ background: "rgba(230,126,34,0.1)", color: "#d35400", border: "1.5px solid #e67e22", borderRadius: 7, fontSize: 11, fontWeight: 700, padding: "3px 8px" }}>
+                        Int. L.{fmt(interesGenerado)}
+                      </span>
+                      <span className="badge" style={{ background: "rgba(39,174,96,0.12)", color: "#1e8449", border: "1.5px solid #27ae60", borderRadius: 7, fontSize: 11, fontWeight: 700, padding: "3px 8px" }}>
+                        Total: L.{fmt(totalAPagar)}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Fila inferior: barra de progreso lineal + estado */}
                   <div>
@@ -952,7 +1028,7 @@ function TablaPagos({
             Total pagos: <span className="text-primary fw-bold">{pagos.length}</span>
           </span>
           <span className="small fw-semibold text-muted">
-            Monto total: <span className="text-success fw-bold">L. {montoTotalFooter.toFixed(2)}</span>
+            Monto total: <span className="text-success fw-bold">L. {fmt(montoTotalFooter)}</span>
           </span>
         </div>
       </div>
@@ -971,23 +1047,79 @@ function ModalPago({
   onSubmit,
   handleInput,
 }) {
-  if (!show) return null;
+  // ── Hooks SIEMPRE antes del early return (regla de React) ────────────
+  const [fechaReferencia, setFechaReferencia] = useState("");
+  const [busquedaPrestamo, setBusquedaPrestamo] = useState("");
+  const [dropdownAbierto, setDropdownAbierto] = useState(false);
 
-  // Obtener info del préstamo seleccionado
+  // Estado local para mostrar el monto con comas mientras se escribe
+  const [montoDisplay, setMontoDisplay] = useState(() => {
+    if (!form.monto && form.monto !== 0) return "";
+    const raw = String(form.monto);
+    const parts = raw.split(".");
+    const intFmt = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.length > 1 ? intFmt + "." + parts[1] : intFmt;
+  });
+
+  const handleMontoChange = (e) => {
+    const raw = e.target.value.replace(/,/g, ""); // quitar comas
+    if (raw !== "" && !/^\d*\.?\d*$/.test(raw)) return; // solo números
+    // Formatear parte entera con comas
+    const parts = raw.split(".");
+    const intFmt = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    const display = parts.length > 1 ? intFmt + "." + parts[1] : intFmt;
+    setMontoDisplay(display);
+    handleInput({ target: { name: "monto", value: raw } });
+  };
+
+  // Préstamo seleccionado (necesario para useEffect)
   const prestamoSeleccionado = prestamos.find(
     (p) => p.id_prestamo === parseInt(form.id_prestamo)
   );
+
+  // Cuando cambia el préstamo: inicio del período = fecha_otorgado del préstamo
+  useEffect(() => {
+    if (prestamoSeleccionado?.fecha_otorgado) {
+      setFechaReferencia(prestamoSeleccionado.fecha_otorgado.substring(0, 10));
+    } else {
+      setFechaReferencia("");
+    }
+  // eslint-disable-next-line
+  }, [prestamoSeleccionado?.id_prestamo]);
+
+  // Cuando cambia la fecha del pago: recalcular días (sin tocar fechaReferencia)
+  // Se fuerza re-render natural — diasTranscurridos se recalcula automáticamente
+
+  if (!show) return null;
+
   const usuarioSeleccionado = prestamoSeleccionado
     ? usuarios.find((u) => u.id_usuario === prestamoSeleccionado.id_usuario)
     : null;
 
-  // Cálculos de interés / capital en tiempo real
+  // ── Cálculo de interés proporcional por días ─────────────────────────
   const esIndefinido = parseInt(prestamoSeleccionado?.plazo_meses) === 0;
   const saldoActualPrestamo = parseFloat(prestamoSeleccionado?.saldo_restante || 0);
+
+  // Tasa mensual (la BD guarda tasa anual / 12)
   const tasaMensual = prestamoSeleccionado
     ? parseFloat(prestamoSeleccionado.tasa_interes) / 100 / 12
     : 0;
-  const interesEsperado = parseFloat((saldoActualPrestamo * tasaMensual).toFixed(2));
+
+  // Días transcurridos entre la fecha de referencia y la fecha del pago
+  const calcularDias = () => {
+    if (!fechaReferencia || !form.fecha) return 30;
+    const ref  = new Date(fechaReferencia + "T00:00:00");
+    const pago = new Date(form.fecha      + "T00:00:00");
+    const diff = Math.round((pago - ref) / (1000 * 60 * 60 * 24));
+    return diff >= 1 ? diff : 1; // mínimo 1 día
+  };
+  const diasTranscurridos = prestamoSeleccionado ? calcularDias() : 30;
+  const tasaDiaria = tasaMensual / 30;                       // tasa diaria = mensual / 30
+  const interesEsperado = parseFloat(
+    (saldoActualPrestamo * tasaDiaria * diasTranscurridos).toFixed(2)
+  );
+  const interesBase30 = parseFloat((saldoActualPrestamo * tasaMensual).toFixed(2)); // referencia mes completo
+
   const montoPagoIngresado = parseFloat(form.monto) || 0;
   const interesDelPago = parseFloat(Math.min(montoPagoIngresado, interesEsperado).toFixed(2));
   const capitalDelPago = parseFloat(Math.max(0, montoPagoIngresado - interesEsperado).toFixed(2));
@@ -998,366 +1130,483 @@ function ModalPago({
       className="modal show d-block"
       tabIndex="-1"
       style={{
-        background: "rgba(0, 0, 0, 0.6)",
+        background: "rgba(0,0,0,0.65)",
         backdropFilter: "blur(4px)",
-        zIndex: 1200,
+        zIndex: 5000,
         position: "fixed",
-        top: 0,
-        left: 0,
-        width: "100vw",
-        height: "100vh",
+        top: 0, left: 0,
+        width: "100vw", height: "100vh",
         overflowY: "auto",
       }}
-      onClick={onClose}
     >
       <div
-        className="modal-dialog modal-lg modal-dialog-centered"
+        className="modal-dialog modal-dialog-centered"
+        style={{ maxWidth: 760 }}
         onClick={(e) => e.stopPropagation()}
       >
         <form
           className="modal-content border-0 shadow-lg"
           onSubmit={onSubmit}
-          style={{ borderRadius: "20px", overflow: "hidden" }}
+          style={{ borderRadius: "16px", overflow: "hidden" }}
         >
-          {/* Header */}
+          {/* ── Header ── */}
           <div
-            className="modal-header border-0 text-white"
-            style={{
-              background: "linear-gradient(135deg, #3498db 0%, #2980b9 100%)",
-              padding: "24px",
-            }}
+            className="d-flex align-items-center justify-content-between text-white px-4 py-3"
+            style={{ background: "linear-gradient(135deg,#3498db 0%,#2980b9 100%)" }}
           >
-            <h4 className="modal-title mb-0 d-flex align-items-center fw-bold">
-              <FaMoneyCheckAlt className="me-3" style={{ fontSize: "24px" }} />
-              {editPago ? "Editar Pago" : "Registrar Pago"}
-            </h4>
-            <button
-              type="button"
-              className="btn-close btn-close-white"
-              onClick={onClose}
-              style={{ filter: "brightness(0) invert(1)" }}
-            ></button>
+            <div className="d-flex align-items-center gap-2">
+              <FaMoneyBillWave style={{ fontSize: 18 }} />
+              <span className="fw-bold" style={{ fontSize: "1rem" }}>
+                {editPago ? "Editar Pago" : "Registrar Pago"}
+              </span>
+            </div>
+            <button type="button" className="btn-close btn-close-white btn-sm" onClick={onClose} />
           </div>
 
-          {/* Body */}
-          <div
-            className="modal-body"
-            style={{ padding: "32px", background: "#f8f9fa" }}
-          >
-            <div className="row g-4">
-              {/* Préstamo */}
-              <div className="col-12">
-                <label
-                  className="form-label fw-semibold d-flex align-items-center"
-                  style={{ color: "#2c3e50" }}
-                >
-                  <FaFileInvoiceDollar
-                    className="me-2"
-                    style={{ color: "#3498db" }}
-                  />
-                  Préstamo
-                </label>
-                <select
-                  className="form-select form-select-lg"
-                  name="id_prestamo"
-                  value={form.id_prestamo}
-                  onChange={handleInput}
-                  required
-                  style={{
-                    borderRadius: "10px",
-                    border: "2px solid #e9ecef",
-                    padding: "12px 16px",
-                  }}
-                >
-                  <option value="">Seleccionar préstamo...</option>
-                  {prestamos.map((pr) => {
-                    const usuario = usuarios.find(
-                      (u) => u.id_usuario === pr.id_usuario
-                    );
-                    const saldo = parseFloat(pr.saldo_restante || 0);
-                    return (
-                      <option key={pr.id_prestamo} value={pr.id_prestamo}>
-                        #{pr.id_prestamo} - {usuario?.nombre_completo || "N/A"} -
-                        Saldo: L.{saldo.toFixed(2)}
-                      </option>
-                    );
-                  })}
-                </select>
+          {/* ── Body: 2 columnas ── */}
+          <div className="modal-body p-0" style={{ background: "#f8fafc" }}>
+            <div className="row g-0">
 
-                {/* Info del préstamo seleccionado */}
-                {prestamoSeleccionado && (
+              {/* Columna izquierda — formulario */}
+              <div className="col-lg-7 p-3 d-flex flex-column gap-3" style={{ borderRight: "1px solid #e2e8f0" }}>
+
+                {/* Préstamo — dropdown con búsqueda */}
+                <div style={{ position: "relative" }}>
+                  <label className="form-label fw-semibold small mb-1" style={{ color: "#2c3e50" }}>
+                    <FaFileInvoiceDollar className="me-1" style={{ color: "#3498db" }} /> Préstamo
+                  </label>
+
+                  {/* Campo que muestra el préstamo elegido y abre el dropdown */}
                   <div
-                    className="mt-3 p-3"
+                    onClick={() => { setDropdownAbierto((v) => !v); setBusquedaPrestamo(""); }}
                     style={{
-                      background: "rgba(52, 152, 219, 0.1)",
-                      borderRadius: "10px",
-                      border: "2px solid rgba(52, 152, 219, 0.3)",
+                      borderRadius: 8,
+                      border: "1.5px solid #e2e8f0",
+                      fontSize: "0.85rem",
+                      padding: "6px 10px",
+                      background: "white",
+                      cursor: "pointer",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      userSelect: "none",
+                      color: prestamoSeleccionado ? "#2c3e50" : "#94a3b8",
                     }}
                   >
-                    <div className="row g-2 small">
-                      <div className="col-6">
-                        <strong>Socio:</strong> {usuarioSeleccionado?.nombre_completo}
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {prestamoSeleccionado
+                        ? `#${prestamoSeleccionado.id_prestamo} · ${
+                            usuarios.find((u) => u.id_usuario === prestamoSeleccionado.id_usuario)?.nombre_completo || "N/A"
+                          } · L.${fmt(prestamoSeleccionado.saldo_restante)}`
+                        : "Seleccionar préstamo..."}
+                    </span>
+                    <span style={{ fontSize: "0.7rem", color: "#94a3b8", flexShrink: 0, marginLeft: 6 }}>{dropdownAbierto ? "▲" : "▼"}</span>
+                  </div>
+
+                  {/* input hidden para required */}
+                  <input type="hidden" name="id_prestamo" value={form.id_prestamo} required />
+
+                  {/* Panel desplegable */}
+                  {dropdownAbierto && (
+                    <>
+                    {/* Backdrop para cerrar al hacer clic afuera */}
+                    <div
+                      style={{ position: "fixed", inset: 0, zIndex: 9998 }}
+                      onClick={() => setDropdownAbierto(false)}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: 0,
+                        right: 0,
+                        zIndex: 9999,
+                        background: "white",
+                        border: "1.5px solid #e2e8f0",
+                        borderRadius: 8,
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.13)",
+                        marginTop: 2,
+                        overflow: "hidden",
+                      }}
+                    >
+                      {/* Input de búsqueda */}
+                      <div style={{ padding: "8px 8px 4px" }}>
+                        <input
+                          autoFocus
+                          type="text"
+                          className="form-control form-control-sm"
+                          placeholder="🔍 Buscar por nombre o #..."
+                          value={busquedaPrestamo}
+                          onChange={(e) => setBusquedaPrestamo(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ borderRadius: 6, fontSize: "0.82rem" }}
+                        />
                       </div>
-                      <div className="col-6">
-                        <strong>Monto Préstamo:</strong> L.
-                        {parseFloat(prestamoSeleccionado.monto).toFixed(2)}
-                      </div>
-                      <div className="col-6">
-                        <strong>Saldo Restante:</strong>{" "}
-                        <span style={{ color: "#e74c3c", fontWeight: "bold" }}>
-                          L.
-                          {parseFloat(
-                            prestamoSeleccionado.saldo_restante || 0
-                          ).toFixed(2)}
-                        </span>
-                      </div>
-                      <div className="col-6">
-                        <strong>Estado:</strong>{" "}
-                        <span
-                          className="badge"
-                          style={{
-                            background:
-                              prestamoSeleccionado.estado === "activo"
-                                ? "rgba(39, 174, 96, 0.2)"
-                                : "rgba(149, 165, 166, 0.2)",
-                            color:
-                              prestamoSeleccionado.estado === "activo"
-                                ? "#27ae60"
-                                : "#95a5a6",
+
+                      {/* Lista filtrada */}
+                      <div style={{ maxHeight: 200, overflowY: "auto" }}>
+                        {/* Opción vacía */}
+                        <div
+                          onClick={() => {
+                            handleInput({ target: { name: "id_prestamo", value: "" } });
+                            setDropdownAbierto(false);
                           }}
-                        >
-                          {prestamoSeleccionado.estado}
-                        </span>
-                      </div>
-                      {esIndefinido && (
-                        <div className="col-12 mt-1">
-                          <div style={{
-                            background: "#fff3cd",
-                            border: "1px solid #ffc107",
-                            borderRadius: 8,
-                            padding: "6px 10px",
+                          style={{
+                            padding: "7px 12px",
                             fontSize: "0.82rem",
-                            color: "#856404",
-                          }}>
-                            ♾ <strong>Préstamo indefinido</strong> — Interés mensual esperado:
-                            {" "}<strong>L. {interesEsperado.toFixed(2)}</strong>.
-                            Cualquier monto mayor abona al capital.
-                          </div>
+                            color: "#94a3b8",
+                            cursor: "pointer",
+                            borderBottom: "1px solid #f1f5f9",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "#f8fafc")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "white")}
+                        >
+                          — Seleccionar préstamo —
                         </div>
+
+                        {prestamos
+                          .filter((pr) => {
+                            if (!busquedaPrestamo) return true;
+                            const u = usuarios.find((u) => u.id_usuario === pr.id_usuario);
+                            const texto = `${pr.id_prestamo} ${u?.nombre_completo || ""}`.toLowerCase();
+                            return texto.includes(busquedaPrestamo.toLowerCase());
+                          })
+                          .map((pr) => {
+                            const u = usuarios.find((u) => u.id_usuario === pr.id_usuario);
+                            const seleccionado = parseInt(form.id_prestamo) === pr.id_prestamo;
+                            return (
+                              <div
+                                key={pr.id_prestamo}
+                                onClick={() => {
+                                  handleInput({ target: { name: "id_prestamo", value: String(pr.id_prestamo) } });
+                                  setDropdownAbierto(false);
+                                  setBusquedaPrestamo("");
+                                }}
+                                style={{
+                                  padding: "8px 12px",
+                                  fontSize: "0.82rem",
+                                  cursor: "pointer",
+                                  background: seleccionado ? "rgba(52,152,219,0.09)" : "white",
+                                  borderLeft: seleccionado ? "3px solid #3498db" : "3px solid transparent",
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  gap: 8,
+                                }}
+                                onMouseEnter={(e) => { if (!seleccionado) e.currentTarget.style.background = "#f8fafc"; }}
+                                onMouseLeave={(e) => { if (!seleccionado) e.currentTarget.style.background = "white"; }}
+                              >
+                                <span>
+                                  <span style={{ fontWeight: 600, color: "#3498db" }}>#{pr.id_prestamo}</span>
+                                  {" · "}
+                                  <span style={{ color: "#2c3e50" }}>{u?.nombre_completo || "N/A"}</span>
+                                </span>
+                                <span style={{ color: "#e74c3c", fontWeight: 600, whiteSpace: "nowrap", fontSize: "0.78rem" }}>
+                                  L.{fmt(pr.saldo_restante)}
+                                </span>
+                              </div>
+                            );
+                          })}
+
+                        {prestamos.filter((pr) => {
+                          if (!busquedaPrestamo) return true;
+                          const u = usuarios.find((u) => u.id_usuario === pr.id_usuario);
+                          const texto = `${pr.id_prestamo} ${u?.nombre_completo || ""}`.toLowerCase();
+                          return texto.includes(busquedaPrestamo.toLowerCase());
+                        }).length === 0 && (
+                          <div style={{ padding: "10px 12px", fontSize: "0.82rem", color: "#94a3b8", textAlign: "center" }}>
+                            Sin resultados para "{busquedaPrestamo}"
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Info compacta del préstamo */}
+                {prestamoSeleccionado && (
+                    <div className="mt-2 px-2 py-1 d-flex flex-wrap gap-2 small"
+                      style={{ background: "rgba(52,152,219,0.07)", borderRadius: 8, border: "1px solid rgba(52,152,219,0.2)" }}>
+                      <span><strong>{usuarioSeleccionado?.nombre_completo}</strong></span>
+                      <span className="text-muted">·</span>
+                      <span>Préstamo: <strong>L. {fmt(prestamoSeleccionado.monto)}</strong></span>
+                      <span className="text-muted">·</span>
+                      <span>Saldo: <strong style={{ color: "#e74c3c" }}>L. {fmt(prestamoSeleccionado.saldo_restante)}</strong></span>
+                      <span className="text-muted">·</span>
+                      <span className="badge" style={{
+                        background: prestamoSeleccionado.estado === "activo" ? "rgba(39,174,96,0.15)" : "rgba(149,165,166,0.15)",
+                        color: prestamoSeleccionado.estado === "activo" ? "#27ae60" : "#95a5a6",
+                        fontSize: "0.72rem",
+                      }}>{prestamoSeleccionado.estado}</span>
+                      {esIndefinido && (
+                        <span style={{ color: "#e67e22", fontSize: "0.72rem" }}>♾ Indefinido · base 30d: L.{fmt(interesBase30)}</span>
                       )}
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
 
-              {/* Monto y Fecha */}
-              <div className="col-md-6">
-                <label
-                  className="form-label fw-semibold d-flex align-items-center"
-                  style={{ color: "#2c3e50" }}
-                >
-                  <FaMoneyBillWave className="me-2" style={{ color: "#27ae60" }} />
-                  Monto del Pago (L.)
-                </label>
-                <input
-                  type="number"
-                  className="form-control form-control-lg"
-                  name="monto"
-                  value={form.monto}
-                  onChange={handleInput}
-                  required
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  max={
-                    prestamoSeleccionado && !esIndefinido
-                      ? parseFloat(prestamoSeleccionado.saldo_restante || 0)
-                      : undefined
-                  }
-                  style={{
-                    borderRadius: "10px",
-                    border: "2px solid #e9ecef",
-                    padding: "12px 16px",
-                  }}
-                />
-
-                {/* Desglose interés / capital en tiempo real */}
-                {hayDesglose && (
-                  <div className="mt-2 p-3" style={{
-                    background: capitalDelPago > 0 ? "rgba(39,174,96,0.07)" : "rgba(52,152,219,0.07)",
-                    border: `1.5px solid ${capitalDelPago > 0 ? "#27ae60" : "#3498db"}`,
-                    borderRadius: 10,
-                  }}>
-                    <div className="small fw-bold mb-2" style={{ color: "#2c3e50" }}>
-                      📊 Desglose del pago
-                    </div>
-                    <div className="d-flex justify-content-between small mb-1">
-                      <span style={{ color: "#7f8c8d" }}>Interés del período:</span>
-                      <strong style={{ color: "#e67e22" }}>L. {interesDelPago.toFixed(2)}</strong>
-                    </div>
-                    <div className="d-flex justify-content-between small mb-2">
-                      <span style={{ color: "#7f8c8d" }}>Abono a capital:</span>
-                      <strong style={{ color: capitalDelPago > 0 ? "#27ae60" : "#95a5a6" }}>
-                        L. {capitalDelPago.toFixed(2)}
-                      </strong>
-                    </div>
-                    {/* Barra visual */}
-                    <div style={{ height: 8, borderRadius: 4, background: "#e9ecef", overflow: "hidden" }}>
-                      <div style={{
-                        height: "100%",
-                        borderRadius: 4,
-                        width: montoPagoIngresado > 0 ? `${Math.min(100, interesDelPago / montoPagoIngresado * 100).toFixed(1)}%` : "0%",
-                        background: "linear-gradient(90deg, #e67e22, #f39c12)",
-                        transition: "width .35s",
-                      }} />
-                    </div>
-                    <div className="d-flex justify-content-between" style={{ fontSize: "0.72rem", color: "#aaa", marginTop: 3 }}>
-                      <span>🟠 Interés</span>
-                      <span>🟢 Capital</span>
-                    </div>
-                    {capitalDelPago > 0 && (
-                      <div className="small mt-2" style={{ color: "#27ae60" }}>
-                        ✔ Nuevo saldo estimado: <strong>L. {Math.max(0, saldoActualPrestamo - capitalDelPago).toFixed(2)}</strong>
-                      </div>
-                    )}
-                    {montoPagoIngresado < interesEsperado && esIndefinido && (
-                      <div className="small mt-1" style={{ color: "#e74c3c" }}>
-                        ⚠ El monto es menor al interés mensual (L. {interesEsperado.toFixed(2)})
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="col-md-6">
-                <label
-                  className="form-label fw-semibold d-flex align-items-center"
-                  style={{ color: "#2c3e50" }}
-                >
-                  <FaCalendarAlt className="me-2" style={{ color: "#3498db" }} />
-                  Fecha del Pago
-                </label>
-                <input
-                  type="date"
-                  className="form-control form-control-lg"
-                  name="fecha"
-                  value={form.fecha}
-                  onChange={handleInput}
-                  required
-                  style={{
-                    borderRadius: "10px",
-                    border: "2px solid #e9ecef",
-                    padding: "12px 16px",
-                  }}
-                />
-              </div>
-
-              {/* Método de Pago */}
-              <div className="col-12">
-                <label
-                  className="form-label fw-semibold d-flex align-items-center"
-                  style={{ color: "#2c3e50" }}
-                >
-                  <FaMoneyCheckAlt className="me-2" style={{ color: "#27ae60" }} />
-                  Método de Pago
-                </label>
+                {/* Monto + Fecha en fila */}
                 <div className="row g-2">
-                  {[
-                    { value: "Efectivo",           icon: "💵",  color: "#27ae60", bg: "rgba(39,174,96,0.08)",  border: "#27ae60" },
-                    { value: "Transferencia",      icon: "🏦",  color: "#3498db", bg: "rgba(52,152,219,0.08)", border: "#3498db" },
-                    { value: "Cheque",             icon: "📋",  color: "#9b59b6", bg: "rgba(155,89,182,0.08)", border: "#9b59b6" },
-                    { value: "Deposito",           icon: "🏧",  color: "#e67e22", bg: "rgba(230,126,34,0.08)", border: "#e67e22" },
-                    { value: "Tarjeta de débito", icon: "💳",  color: "#e74c3c", bg: "rgba(231,76,60,0.08)",  border: "#e74c3c" },
-                    { value: "Pago móvil",         icon: "📱",  color: "#1abc9c", bg: "rgba(26,188,156,0.08)", border: "#1abc9c" },
-                  ].map(({ value, icon, color, bg, border }) => (
-                    <div className="col-6 col-md-4" key={value}>
-                      <button
-                        type="button"
-                        onClick={() => handleInput({ target: { name: "metodo_pago", value } })}
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          borderRadius: "10px",
-                          border: `2px solid ${form.metodo_pago === value ? border : "#e9ecef"}`,
-                          background: form.metodo_pago === value ? bg : "white",
-                          color: form.metodo_pago === value ? color : "#7f8c8d",
-                          fontWeight: form.metodo_pago === value ? "700" : "500",
-                          fontSize: "13px",
-                          textAlign: "left",
-                          transition: "all 0.2s ease",
-                          cursor: "pointer",
-                        }}
-                      >
-                        <span className="me-2" style={{ fontSize: "16px" }}>{icon}</span>
-                        {value}
-                        {form.metodo_pago === value && (
-                          <span className="float-end" style={{ color }}>✓</span>
-                        )}
-                      </button>
+                  <div className="col-7">
+                    <label className="form-label fw-semibold small mb-1" style={{ color: "#2c3e50" }}>
+                      <FaMoneyBillWave className="me-1" style={{ color: "#27ae60" }} /> Monto (L.)
+                    </label>
+                    <div className="input-group input-group-sm">
+                      <span className="input-group-text fw-bold"
+                        style={{ background: "#27ae60", color: "#fff", border: "1.5px solid #27ae60", borderRight: "none" }}>L.</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className="form-control"
+                        name="monto"
+                        value={montoDisplay}
+                        onChange={handleMontoChange}
+                        required
+                        placeholder="0.00"
+                        style={{ borderRadius: "0 6px 6px 0", border: "1.5px solid #e2e8f0", borderLeft: "none" }}
+                      />
                     </div>
-                  ))}
+                  </div>
+                  <div className="col-5">
+                    <label className="form-label fw-semibold small mb-1" style={{ color: "#2c3e50" }}>
+                      <FaCalendarAlt className="me-1" style={{ color: "#3498db" }} /> Fecha
+                    </label>
+                    <input
+                      type="date"
+                      className="form-control form-control-sm"
+                      name="fecha"
+                      value={form.fecha}
+                      onChange={handleInput}
+                      required
+                      style={{ borderRadius: 8, border: "1.5px solid #e2e8f0" }}
+                    />
+                  </div>
+                </div>
+
+                {/* Método de pago — píldoras compactas */}
+                <div>
+                  <label className="form-label fw-semibold small mb-1" style={{ color: "#2c3e50" }}>
+                    <FaMoneyCheckAlt className="me-1" style={{ color: "#27ae60" }} /> Método de Pago
+                  </label>
+                  <div className="d-flex flex-wrap gap-1">
+                    {[
+                      { value: "Efectivo",          icon: "💵", color: "#27ae60" },
+                      { value: "Transferencia",     icon: "🏦", color: "#3498db" },
+                      { value: "Cheque",            icon: "📋", color: "#9b59b6" },
+                      { value: "Deposito",          icon: "🏧", color: "#e67e22" },
+                      { value: "Tarjeta de débito", icon: "💳", color: "#e74c3c" },
+                      { value: "Pago móvil",        icon: "📱", color: "#1abc9c" },
+                    ].map(({ value, icon, color }) => {
+                      const sel = form.metodo_pago === value;
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => handleInput({ target: { name: "metodo_pago", value } })}
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: 20,
+                            border: `1.5px solid ${sel ? color : "#e2e8f0"}`,
+                            background: sel ? color + "18" : "white",
+                            color: sel ? color : "#64748b",
+                            fontWeight: sel ? 700 : 500,
+                            fontSize: "0.75rem",
+                            cursor: "pointer",
+                            transition: "all .15s",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {icon} {value} {sel && "✓"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Descripción */}
+                <div>
+                  <label className="form-label fw-semibold small mb-1" style={{ color: "#2c3e50" }}>
+                    Descripción <span style={{ color: "#94a3b8", fontWeight: 400 }}>(opcional)</span>
+                  </label>
+                  <textarea
+                    className="form-control form-control-sm"
+                    name="descripcion"
+                    value={form.descripcion}
+                    onChange={handleInput}
+                    rows="2"
+                    maxLength="200"
+                    placeholder="Ej: Pago cuota mensual, abono adelantado…"
+                    style={{ borderRadius: 8, border: "1.5px solid #e2e8f0", resize: "none" }}
+                  />
                 </div>
               </div>
 
-              {/* Descripción */}
-              <div className="col-12">
-                <label
-                  className="form-label fw-semibold d-flex align-items-center"
-                  style={{ color: "#2c3e50" }}
-                >
-                  <FaFileInvoiceDollar
-                    className="me-2"
-                    style={{ color: "#3498db" }}
-                  />
-                  Descripción (Opcional)
-                </label>
-                <textarea
-                  className="form-control form-control-lg"
-                  name="descripcion"
-                  value={form.descripcion}
-                  onChange={handleInput}
-                  rows="3"
-                  maxLength="200"
-                  placeholder="Ej: Pago de cuota mensual, pago adelantado, etc."
-                  style={{
-                    borderRadius: "10px",
-                    border: "2px solid #e9ecef",
-                    padding: "12px 16px",
-                  }}
-                />
+              {/* Columna derecha — desglose */}
+              <div className="col-lg-5 p-3 d-flex flex-column gap-2" style={{ background: "#edf2f7" }}>
+                <div className="fw-bold small" style={{ color: "#2c3e50" }}>📊 Desglose del pago</div>
+
+                {prestamoSeleccionado ? (
+                  <>
+                    {/* ── Período: inicio → fecha pago ── */}
+                    <div style={{ background: "rgba(52,152,219,0.07)", border: "1px solid #d6eaf8", borderRadius: 10, padding: "10px 12px" }}>
+                      <div className="fw-semibold mb-2" style={{ fontSize: "0.72rem", color: "#2980b9" }}>
+                        <FaCalendarAlt className="me-1" /> Período del préstamo
+                      </div>
+
+                      {/* Ajustar inicio del período manualmente */}
+                      <label style={{ fontSize: "0.7rem", color: "#64748b", display: "block", marginBottom: 3 }}>
+                        Inicio del período
+                      </label>
+                      <input
+                        type="date"
+                        className="form-control form-control-sm mb-2"
+                        value={fechaReferencia}
+                        onChange={(e) => setFechaReferencia(e.target.value)}
+                        style={{ borderRadius: 6, border: "1.5px solid #cbd5e1", fontSize: "0.8rem" }}
+                      />
+
+                      {/* Línea de período con flecha */}
+                      <div className="d-flex align-items-center justify-content-between gap-1 flex-wrap">
+                        <span className="badge" style={{ background: "rgba(155,89,182,0.12)", color: "#8e44ad", border: "1.5px solid #9b59b6", borderRadius: 7, fontSize: 11, fontWeight: 700, padding: "4px 8px" }}>
+                          📅 {fechaReferencia || "—"}
+                        </span>
+                        <span style={{ color: "#94a3b8", fontSize: 13, fontWeight: 700 }}>→</span>
+                        <span className="badge" style={{ background: "rgba(155,89,182,0.12)", color: "#8e44ad", border: "1.5px solid #9b59b6", borderRadius: 7, fontSize: 11, fontWeight: 700, padding: "4px 8px" }}>
+                          📅 {form.fecha || "—"}
+                        </span>
+                      </div>
+
+                      {/* Días transcurridos */}
+                      <div className="d-flex justify-content-center mt-2">
+                        <span className="badge" style={{ background: "rgba(52,152,219,0.13)", color: "#2980b9", border: "1.5px solid #3498db", borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "5px 14px" }}>
+                          <FaClock className="me-1" style={{ fontSize: 11 }} />
+                          {diasTranscurridos} día{diasTranscurridos !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* ── Saldo actual ── */}
+                    <div className="d-flex justify-content-between align-items-center small px-2 py-1"
+                      style={{ background: "white", borderRadius: 7, border: "1px solid #e2e8f0" }}>
+                      <span style={{ color: "#7f8c8d" }}>Saldo actual:</span>
+                      <strong style={{ color: "#e74c3c" }}>L. {fmt(saldoActualPrestamo)}</strong>
+                    </div>
+
+                    {/* ── Interés generado ── */}
+                    <div className="d-flex justify-content-between align-items-center small px-2 py-1"
+                      style={{ background: "rgba(230,126,34,0.08)", borderRadius: 7, border: "1.5px solid #e67e22" }}>
+                      <span style={{ color: "#d35400", fontWeight: 600 }}>
+                        Interés ({diasTranscurridos}d):
+                      </span>
+                      <strong style={{ color: "#d35400", fontSize: "0.9rem" }}>
+                        + L. {fmt(interesEsperado)}
+                      </strong>
+                    </div>
+
+                    {/* Referencia 30 días */}
+                    {diasTranscurridos !== 30 && (
+                      <div className="d-flex justify-content-between small" style={{ color: "#94a3b8", paddingLeft: 4 }}>
+                        <span>(30 días serían):</span>
+                        <span>L. {fmt(interesBase30)}</span>
+                      </div>
+                    )}
+
+                    {/* ── Total a pagar (saldo + interés) ── */}
+                    <div className="d-flex justify-content-between align-items-center px-2 py-2 fw-bold"
+                      style={{ background: "rgba(39,174,96,0.1)", borderRadius: 8, border: "2px solid #27ae60" }}>
+                      <span style={{ color: "#1e8449", fontSize: "0.82rem" }}>
+                        💰 Total a pagar ({diasTranscurridos}d):
+                      </span>
+                      <strong style={{ color: "#1e8449", fontSize: "1rem" }}>
+                        L. {fmt(saldoActualPrestamo + interesEsperado)}
+                      </strong>
+                    </div>
+
+                    <hr className="my-0" style={{ borderColor: "#cbd5e1" }} />
+
+                    {/* ── Desglose del monto ingresado ── */}
+                    {montoPagoIngresado > 0 && (
+                      <>
+                        <div className="d-flex justify-content-between small">
+                          <span style={{ color: "#7f8c8d" }}>De ese monto — Interés:</span>
+                          <strong style={{ color: "#e67e22" }}>L. {fmt(interesDelPago)}</strong>
+                        </div>
+                        <div className="d-flex justify-content-between small">
+                          <span style={{ color: "#7f8c8d" }}>Abono a capital:</span>
+                          <strong style={{ color: capitalDelPago > 0 ? "#27ae60" : "#94a3b8" }}>
+                            L. {fmt(capitalDelPago)}
+                          </strong>
+                        </div>
+
+                        {/* Barra interés / capital */}
+                        <div>
+                          <div style={{ height: 7, borderRadius: 4, background: "#e2e8f0", overflow: "hidden" }}>
+                            <div style={{
+                              height: "100%", borderRadius: 4,
+                              width: `${Math.min(100, (interesDelPago / montoPagoIngresado) * 100).toFixed(1)}%`,
+                              background: "linear-gradient(90deg,#e67e22,#f39c12)",
+                              transition: "width .35s",
+                            }} />
+                          </div>
+                          <div className="d-flex justify-content-between" style={{ fontSize: "0.68rem", color: "#aaa", marginTop: 2 }}>
+                            <span>🟠 Interés</span>
+                            <span>🟢 Capital</span>
+                          </div>
+                        </div>
+
+                        {/* Nuevo saldo */}
+                        {capitalDelPago > 0 && (
+                          <div className="small px-2 py-1 fw-semibold"
+                            style={{ background: "rgba(39,174,96,0.1)", borderRadius: 6, color: "#27ae60", border: "1px solid #27ae60" }}>
+                            ✔ Nuevo saldo estimado: <strong>L. {fmt(Math.max(0, saldoActualPrestamo - capitalDelPago))}</strong>
+                          </div>
+                        )}
+
+                        {/* Aviso si monto < interés */}
+                        {montoPagoIngresado < interesEsperado && (
+                          <div className="small px-2 py-1"
+                            style={{ background: "rgba(231,76,60,0.08)", borderRadius: 6, color: "#e74c3c", border: "1px solid #e74c3c" }}>
+                            ⚠ Monto menor al interés generado (L. {fmt(interesEsperado)})
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {!montoPagoIngresado && (
+                      <div className="small text-center text-muted mt-1" style={{ opacity: 0.6 }}>
+                        Ingresa un monto para ver el desglose
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-4 text-muted small" style={{ opacity: 0.5 }}>
+                    <FaMoneyCheckAlt size={28} className="mb-2 d-block mx-auto" />
+                    Selecciona un préstamo
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Footer */}
-          <div
-            className="modal-footer border-0 bg-white"
-            style={{ padding: "20px 32px" }}
-          >
+          {/* ── Footer ── */}
+          <div className="modal-footer border-0 bg-white px-3 py-2 gap-2">
             <button
               type="submit"
-              className="btn btn-lg shadow-sm"
+              className="btn btn-sm shadow-sm fw-semibold"
               style={{
-                background: "linear-gradient(135deg, #3498db 0%, #2980b9 100%)",
-                color: "white",
-                border: "none",
-                borderRadius: "10px",
-                padding: "12px 32px",
-                fontWeight: "600",
+                background: "linear-gradient(135deg,#3498db,#2980b9)",
+                color: "white", border: "none",
+                borderRadius: 8, padding: "7px 22px",
               }}
             >
-              <FaMoneyCheckAlt className="me-2" />
+              <FaMoneyCheckAlt className="me-1" />
               {editPago ? "Guardar Cambios" : "Registrar Pago"}
             </button>
             <button
               type="button"
-              className="btn btn-lg btn-light shadow-sm"
+              className="btn btn-sm btn-light shadow-sm fw-semibold"
               onClick={onClose}
-              style={{
-                borderRadius: "10px",
-                padding: "12px 32px",
-                fontWeight: "600",
-              }}
+              style={{ borderRadius: 8, padding: "7px 18px" }}
             >
               Cancelar
             </button>

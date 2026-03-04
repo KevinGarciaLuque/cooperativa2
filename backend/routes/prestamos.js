@@ -506,16 +506,26 @@ router.patch("/:id/estado", async (req, res) => {
       return res.status(404).json({ message: "Préstamo no encontrado" });
     }
 
-    await pool.query(
-      `UPDATE prestamos SET estado = ? WHERE id_prestamo = ?`,
-      [estado, req.params.id]
-    );
+    // Si se marca como pagado, también poner saldo_restante en 0
+    if (estado === 'pagado') {
+      await pool.query(
+        `UPDATE prestamos SET estado = 'pagado', saldo_restante = 0.00 WHERE id_prestamo = ?`,
+        [req.params.id]
+      );
+    } else {
+      await pool.query(
+        `UPDATE prestamos SET estado = ? WHERE id_prestamo = ?`,
+        [estado, req.params.id]
+      );
+    }
 
     // Registrar en bitácora
     await registrarBitacora(
       prestamo[0].id_usuario,
       "Cambio de estado de préstamo",
-      `Préstamo #${req.params.id} cambió de estado a: ${estado}`
+      `Préstamo #${req.params.id} cambió de estado a: ${estado}${
+        estado === 'pagado' ? ' — saldo_restante puesto en 0 manualmente' : ''
+      }`
     );
 
     res.json({

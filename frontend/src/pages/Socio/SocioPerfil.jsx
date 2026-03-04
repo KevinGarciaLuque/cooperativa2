@@ -395,15 +395,33 @@ export default function SocioPerfil() {
                 const pagos        = pagosData[p.id_prestamo] || [];
                 const loadingPagos = pagosLoading[p.id_prestamo];
 
+                const estaPagado = (p.estado || "").toLowerCase() === "pagado" || saldo <= 0.01;
+                // Forzar progreso al 100% si el préstamo está pagado,
+                // independientemente del saldo_restante que haya en BD
+                const progresoFinal = estaPagado ? 100 : progreso;
+
                 return (
                   <div key={p.id_prestamo} className="card border-0 shadow-sm rounded-4" style={{ overflow: "hidden" }}>
+                    {/* Banner liquidado */}
+                    {estaPagado && (
+                      <div style={{
+                        background: "linear-gradient(90deg, #065f46, #059669)",
+                        color: "#fff", padding: "8px 20px",
+                        display: "flex", alignItems: "center", gap: 8,
+                        fontSize: ".88rem", fontWeight: 700, letterSpacing: ".3px",
+                      }}>
+                        <FaCheckCircle size={14} /> ¡Préstamo completamente liquidado!
+                      </div>
+                    )}
                     {/* Cabecera del préstamo */}
                     <div className="card-body p-4">
                       {/* Fila superior: número + estado */}
                       <div className="d-flex justify-content-between align-items-start mb-3">
                         <div className="d-flex align-items-center gap-2">
                           <div style={{
-                            background: "linear-gradient(135deg, #2c3e50, #3d5166)",
+                            background: estaPagado
+                              ? "linear-gradient(135deg, #065f46, #059669)"
+                              : "linear-gradient(135deg, #2c3e50, #3d5166)",
                             color: "#fff", borderRadius: ".7rem",
                             width: 38, height: 38,
                             display: "flex", alignItems: "center", justifyContent: "center",
@@ -444,9 +462,16 @@ export default function SocioPerfil() {
                           </div>
                         </div>
                         <div className="col-6 col-md-3">
-                          <div className="rounded-3 p-2 text-center" style={{ background: "#f0f4f8" }}>
+                          <div className="rounded-3 p-2 text-center" style={{ background: estaPagado ? "#d1fae5" : "#f0f4f8" }}>
                             <div className="small text-muted mb-1">Saldo restante</div>
-                            <div className="fw-bold" style={{ color: saldo > 0 ? "#92400e" : "#065f46", fontSize: ".95rem" }}>L. {fmt(saldo)}</div>
+                            {estaPagado ? (
+                              <div className="fw-bold d-flex align-items-center justify-content-center gap-1"
+                                style={{ color: "#065f46", fontSize: ".95rem" }}>
+                                <FaCheckCircle size={13} /> Liquidado
+                              </div>
+                            ) : (
+                              <div className="fw-bold" style={{ color: "#92400e", fontSize: ".95rem" }}>L. {fmt(saldo)}</div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -455,14 +480,17 @@ export default function SocioPerfil() {
                       <div className="mb-3">
                         <div className="d-flex justify-content-between small text-muted mb-1">
                           <span>Capital amortizado: <strong style={{ color: "#065f46" }}>L. {fmt(capitalAmortizado)}</strong></span>
-                          <span><strong>{progreso.toFixed(1)}%</strong></span>
+                          <span><strong style={{ color: estaPagado ? "#065f46" : "inherit" }}>{progresoFinal.toFixed(1)}%</strong></span>
                         </div>
                         <div className="sp-progress-bar" style={{ height: 10 }}>
-                          <div className="sp-progress-fill" style={{ width: `${progreso}%` }} />
+                          <div className="sp-progress-fill" style={{ width: `${progresoFinal}%`, background: estaPagado ? "linear-gradient(90deg, #059669, #065f46)" : undefined }} />
                         </div>
                         <div className="d-flex justify-content-between small text-muted mt-1">
                           <span>Total pagado (c+i): <strong>L. {fmt(totalPagado)}</strong></span>
-                          <span>Principal: L. {fmt(monto)}</span>
+                          {estaPagado
+                            ? <span className="fw-semibold" style={{ color: "#065f46" }}><FaCheckCircle className="me-1" size={11} />Pagado en su totalidad</span>
+                            : <span>Principal: L. {fmt(monto)}</span>
+                          }
                         </div>
                       </div>
 

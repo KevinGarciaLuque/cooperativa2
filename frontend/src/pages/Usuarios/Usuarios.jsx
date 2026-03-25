@@ -30,7 +30,7 @@ export default function Usuarios() {
   const fetchUsuarios = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_URL}/usuarios`, {
+      const res = await axios.get(`${API_URL}/usuarios?limit=1000`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUsuarios(res.data.data || []);

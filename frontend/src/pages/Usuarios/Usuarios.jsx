@@ -23,6 +23,10 @@ export default function Usuarios() {
     show: false,
     id: null,
   });
+  const [confirmForzado, setConfirmForzado] = useState({
+    show: false,
+    id: null,
+  });
   const [deleting, setDeleting] = useState(false);
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -59,17 +63,40 @@ export default function Usuarios() {
 
   const confirmarEliminar = async () => {
     setDeleting(true);
+    const id = confirmModal.id;
     try {
-      await axios.delete(`${API_URL}/usuarios/${confirmModal.id}`, {
+      await axios.delete(`${API_URL}/usuarios/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      mostrarAlerta("Usuario eliminado correctamente.", "success");
+      mostrarAlerta("Usuario desactivado correctamente.", "success");
       fetchUsuarios();
+      setConfirmModal({ show: false, id: null });
     } catch (err) {
-      mostrarAlerta("Error al eliminar el usuario.", "error");
+      setConfirmModal({ show: false, id: null });
+      if (err.response?.status === 400) {
+        // Tiene préstamos activos → ofrecer eliminación forzada
+        setConfirmForzado({ show: true, id });
+      } else {
+        mostrarAlerta(err.response?.data?.message || "Error al eliminar el usuario.", "error");
+      }
     } finally {
       setDeleting(false);
-      setConfirmModal({ show: false, id: null });
+    }
+  };
+
+  const confirmarEliminarForzado = async () => {
+    setDeleting(true);
+    try {
+      await axios.delete(`${API_URL}/usuarios/${confirmForzado.id}?force=true`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      mostrarAlerta("Usuario desactivado correctamente.", "success");
+      fetchUsuarios();
+    } catch (err) {
+      mostrarAlerta(err.response?.data?.message || "Error al eliminar el usuario.", "error");
+    } finally {
+      setDeleting(false);
+      setConfirmForzado({ show: false, id: null });
     }
   };
 
@@ -275,9 +302,17 @@ export default function Usuarios() {
 
       <ModalConfirmacion
         show={confirmModal.show}
-        mensaje="¿Estás seguro de eliminar este usuario?"
+        mensaje="¿Estás seguro de eliminar este usuario? Se desactivará su cuenta."
         onConfirm={confirmarEliminar}
         onCancel={() => setConfirmModal({ show: false, id: null })}
+        loading={deleting}
+      />
+
+      <ModalConfirmacion
+        show={confirmForzado.show}
+        mensaje="⚠️ Este usuario tiene préstamos activos o en mora. ¿Deseas desactivarlo de todas formas? Sus cuentas serán cerradas."
+        onConfirm={confirmarEliminarForzado}
+        onCancel={() => setConfirmForzado({ show: false, id: null })}
         loading={deleting}
       />
     </div>

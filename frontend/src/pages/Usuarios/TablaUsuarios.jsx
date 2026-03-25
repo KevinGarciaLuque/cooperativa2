@@ -30,8 +30,9 @@ export default function TablaUsuarios({ usuarios, onEdit, onDelete }) {
     <>
       {/* ── TABLA: pantallas lg+ ── */}
       <div className="card border-0 shadow-sm d-none d-lg-block" style={{ borderRadius: "15px", overflow: "hidden" }}>
+        <div style={{ maxHeight: "520px", overflowY: "auto" }}>
         <table className="table table-hover align-middle mb-0">
-          <thead style={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", color: "white" }}>
+          <thead style={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", color: "white", position: "sticky", top: 0, zIndex: 1 }}>
             <tr>
               <th style={{ padding: "14px 12px", borderBottom: "none", width: "48px" }}>#</th>
               <th style={{ padding: "14px 12px", borderBottom: "none" }}>Nombre Completo</th>
@@ -145,6 +146,7 @@ export default function TablaUsuarios({ usuarios, onEdit, onDelete }) {
             })}
           </tbody>
         </table>
+        </div>
         <div className="bg-light text-center py-2 border-top">
           <small className="text-muted">
             Mostrando <strong>{usuarios.length}</strong> usuario{usuarios.length !== 1 ? "s" : ""}

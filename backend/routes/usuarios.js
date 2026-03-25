@@ -515,6 +515,8 @@ router.put("/:id", async (req, res) => {
 // ============================================
 router.delete("/:id", async (req, res) => {
   try {
+    const { force } = req.query;
+
     // Verificar que el usuario existe
     const [usuario] = await pool.query(
       `SELECT * FROM usuarios WHERE id_usuario = ?`,
@@ -525,17 +527,19 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json({ message: "Usuario no encontrado" });
     }
 
-    // No permitir eliminar si tiene préstamos activos
-    const [prestamosActivos] = await pool.query(
-      `SELECT COUNT(*) as total FROM prestamos 
-       WHERE id_usuario = ? AND estado IN ('activo', 'mora')`,
-      [req.params.id]
-    );
+    // No permitir eliminar si tiene préstamos activos (a menos que sea forzado)
+    if (!force) {
+      const [prestamosActivos] = await pool.query(
+        `SELECT COUNT(*) as total FROM prestamos 
+         WHERE id_usuario = ? AND estado IN ('activo', 'mora')`,
+        [req.params.id]
+      );
 
-    if (prestamosActivos[0].total > 0) {
-      return res.status(400).json({ 
-        message: "No se puede eliminar el usuario. Tiene préstamos activos o en mora." 
-      });
+      if (prestamosActivos[0].total > 0) {
+        return res.status(400).json({ 
+          message: "No se puede eliminar el usuario. Tiene préstamos activos o en mora." 
+        });
+      }
     }
 
     const [result] = await pool.query(

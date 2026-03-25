@@ -57,7 +57,7 @@ export default function Prestamos() {
         axios.get(`${API_URL}/prestamos`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/usuarios`, {
+        axios.get(`${API_URL}/usuarios?limit=1000`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -623,12 +623,15 @@ function TablaPrestamos({
             </p>
           </div>
         ) : (
-          <div className="table-responsive">
+          <div style={{ maxHeight: "520px", overflowY: "auto" }}>
             <table className="table table-hover align-middle mb-0">
               <thead
                 style={{
                   background: "linear-gradient(135deg, #27ae60 0%, #229954 100%)",
                   color: "white",
+                  position: "sticky",
+                  top: 0,
+                  zIndex: 1,
                 }}
               >
                 <tr>
@@ -667,6 +670,8 @@ function TablaPrestamos({
               <tbody>
                 {prestamos.map((p, i) => {
                   const usuario = usuarios.find((u) => u.id_usuario === p.id_usuario);
+                  const nombreSocio = p.nombre_completo || usuario?.nombre_completo || "Desconocido";
+                  const dniSocio = p.dni || usuario?.dni || "N/A";
                   const estadoInfo = getEstadoInfo(p.estado);
                   const IconoEstado = estadoInfo.icon;
                   const progreso = calcularProgreso(p);
@@ -717,10 +722,10 @@ function TablaPrestamos({
                           </div>
                           <div>
                             <div className="fw-bold" style={{ color: "#2c3e50" }}>
-                              {usuario?.nombre_completo || "Desconocido"}
+                              {nombreSocio}
                             </div>
                             <div className="small text-muted">
-                              DNI: {usuario?.dni || "N/A"}
+                              DNI: {dniSocio}
                             </div>
                           </div>
                         </div>

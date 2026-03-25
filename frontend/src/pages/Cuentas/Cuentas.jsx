@@ -45,7 +45,7 @@ export default function Cuentas() {
         axios.get(`${API_URL}/cuentas`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_URL}/usuarios`, {
+        axios.get(`${API_URL}/usuarios?limit=1000`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -610,6 +610,7 @@ export default function Cuentas() {
           editCuenta={editCuenta}
           form={form}
           usuarios={usuarios}
+          cuentas={cuentas}
           onClose={() => setShowModal(false)}
           onSubmit={handleSubmit}
           handleInput={handleInput}
@@ -625,10 +626,15 @@ function ModalCuenta({
   editCuenta,
   form,
   usuarios,
+  cuentas,
   onClose,
   onSubmit,
   handleInput,
 }) {
+  // Tipos que el socio seleccionado ya tiene (solo aplica al crear)
+  const tiposOcupados = !editCuenta && form.id_usuario
+    ? (cuentas || []).filter(c => c.id_usuario === parseInt(form.id_usuario)).map(c => c.tipo_cuenta)
+    : [];
   if (!show) return null;
 
   const getTipoCuentaInfo = (tipo) => {
@@ -739,16 +745,20 @@ function ModalCuenta({
                   value={form.tipo_cuenta}
                   onChange={handleInput}
                   required
+                  disabled={editCuenta !== null}
                   style={{
                     borderRadius: "10px",
                     border: "2px solid #e9ecef",
                     padding: "12px 16px",
+                    background: editCuenta ? "#e9ecef" : "white",
                   }}
                 >
                   <option value="">Seleccionar tipo...</option>
-                  <option value="Aportaciones">💰 Aportaciones</option>
-                  <option value="Vivienda">🏠 Vivienda</option>
-                  <option value="Pensiones">👴 Pensiones</option>
+                  {[["Aportaciones","💰 Aportaciones"],["Vivienda","🏠 Vivienda"],["Pensiones","👴 Pensiones"]].map(([tipo, label]) => (
+                    <option key={tipo} value={tipo} disabled={tiposOcupados.includes(tipo)}>
+                      {label}{tiposOcupados.includes(tipo) ? " (ya existe)" : ""}
+                    </option>
+                  ))}
                 </select>
               </div>
 

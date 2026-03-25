@@ -172,6 +172,8 @@ export default function SocioPerfil() {
         .sp-empty svg { font-size:2.8rem; margin-bottom:.6rem; opacity:.4; }
         .sp-progress-bar { height: 7px; border-radius: 4px; background: #e5e7eb; overflow: hidden; }
         .sp-progress-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, ${VERDE}, #7db200); transition: width .6s; }
+        .sp-collapsible { overflow: hidden; max-height: 0; opacity: 0; transform: translateY(-6px); transition: max-height .35s ease, opacity .3s ease, transform .3s ease; }
+        .sp-collapsible.open { max-height: 3000px; opacity: 1; transform: translateY(0); }
       `}</style>
 
       <div style={{ background: GRIS_FONDO, minHeight: "100vh", fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
@@ -457,7 +459,7 @@ export default function SocioPerfil() {
                         </div>
                         <div className="col-6 col-md-3">
                           <div className="rounded-3 p-2 text-center" style={{ background: "#f0f4f8" }}>
-                            <div className="small text-muted mb-1">Cuota mín. (francés)</div>
+                            <div className="small text-muted mb-1">Cuota mínima</div>
                             <div className="fw-bold" style={{ color: "#065f46", fontSize: ".95rem" }}>L. {fmt(cuotaCalcSocio)}</div>
                           </div>
                         </div>
@@ -486,7 +488,7 @@ export default function SocioPerfil() {
                           <div className="sp-progress-fill" style={{ width: `${progresoFinal}%`, background: estaPagado ? "linear-gradient(90deg, #059669, #065f46)" : undefined }} />
                         </div>
                         <div className="d-flex justify-content-between small text-muted mt-1">
-                          <span>Total pagado (c+i): <strong>L. {fmt(totalPagado)}</strong></span>
+                          <span>Total pagado: <strong>L. {fmt(totalPagado)}</strong></span>
                           {estaPagado
                             ? <span className="fw-semibold" style={{ color: "#065f46" }}><FaCheckCircle className="me-1" size={11} />Pagado en su totalidad</span>
                             : <span>Principal: L. {fmt(monto)}</span>
@@ -518,8 +520,7 @@ export default function SocioPerfil() {
                     </div>
 
                     {/* Panel de pagos expandible */}
-                    {abierto && (
-                      <div style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+                    <div className={`sp-collapsible${abierto ? " open" : ""}`} style={{ background: "#f8fafc", borderTop: abierto ? "1px solid #e2e8f0" : "none" }}>
                         {loadingPagos ? (
                           <div className="text-center py-4">
                             <div className="spinner-border spinner-border-sm text-success" />
@@ -594,7 +595,6 @@ export default function SocioPerfil() {
                           </div>
                         )}
                       </div>
-                    )}
                   </div>
                 );
               })}

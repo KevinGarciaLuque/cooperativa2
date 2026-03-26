@@ -84,15 +84,12 @@ router.get("/kpis", async (req, res) => {
        WHERE YEAR(fecha) = YEAR(CURRENT_DATE())`
     );
 
-    // Calcular intereses generados estimados (monto pagado - saldo amortizado)
+    // Intereses generados reales (suma directa de monto_interes en pagos)
     const [interesesGenerados] = await pool.query(
-      `SELECT 
-       IFNULL(SUM(monto_pagado), 0) as total_pagado,
-       (SELECT IFNULL(SUM(monto), 0) FROM prestamos WHERE estado = 'pagado') as total_prestado
-       FROM pagos_prestamo`
+      `SELECT IFNULL(SUM(monto_interes), 0) as total_intereses FROM pagos_prestamo`
     );
     
-    const interesesTotales = parseFloat(interesesGenerados[0].total_pagado) - parseFloat(interesesGenerados[0].total_prestado || 0);
+    const interesesTotales = parseFloat(interesesGenerados[0].total_intereses);
 
     res.json({
       socios: {
@@ -117,7 +114,7 @@ router.get("/kpis", async (req, res) => {
         })),
         ingresosMesActual: ingresosTotalesMes,
         liquidacionesAnioActual: parseFloat(liquidaciones[0].total_distribuido),
-        interesesGeneradosTotales: Math.max(0, interesesTotales)
+        interesesGeneradosTotales: interesesTotales
       }
     });
   } catch (error) {
@@ -673,6 +670,29 @@ router.get("/rankings", async (req, res) => {
       [parseInt(limite)]
     );
 
+    // Top socios por intereses generados
+    const [topIntereses] = await pool.query(
+      `SELECT 
+       u.id_usuario,
+       u.nombre_completo,
+       IFNULL(SUM(pp.monto_interes), 0) as intereses_generados,
+       COUNT(DISTINCT p.id_prestamo) as total_prestamos
+       FROM usuarios u
+       INNER JOIN prestamos p ON u.id_usuario = p.id_usuario
+       INNER JOIN pagos_prestamo pp ON p.id_prestamo = pp.id_prestamo
+       WHERE u.estado = 'activo'
+       GROUP BY u.id_usuario, u.nombre_completo
+       ORDER BY intereses_generados DESC
+       LIMIT ?`,
+      [parseInt(limite)]
+    );
+
+    // Total general de intereses generados por todos los usuarios
+    const [totalInteresesGlobal] = await pool.query(
+      `SELECT IFNULL(SUM(pp.monto_interes), 0) as total_global
+       FROM pagos_prestamo pp`
+    );
+
     res.json({
       topAportadores: topAportadores.map(s => ({
         id_usuario: s.id_usuario,
@@ -698,7 +718,14 @@ router.get("/rankings", async (req, res) => {
         nombre: a.nombre,
         monto: parseFloat(a.monto),
         fecha: a.fecha
-      }))
+      })),
+      topInteresesPorUsuario: topIntereses.map(s => ({
+        id_usuario: s.id_usuario,
+        nombre: s.nombre_completo,
+        intereses_generados: parseFloat(s.intereses_generados),
+        total_prestamos: s.total_prestamos
+      })),
+      totalInteresesGlobal: parseFloat(totalInteresesGlobal[0].total_global)
     });
   } catch (error) {
     console.error("ERROR AL OBTENER RANKINGS:", error);

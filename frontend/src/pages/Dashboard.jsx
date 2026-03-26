@@ -1181,6 +1181,119 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+
+            {/* TOP INTERESES POR USUARIO */}
+            <div className="col-12">
+              <div className="card border-0 shadow-sm" style={{ borderRadius: "15px" }}>
+                <div
+                  className="card-header text-white fw-bold d-flex align-items-center justify-content-between"
+                  style={{
+                    background: "linear-gradient(135deg, #9b59b6 0%, #6c3483 100%)",
+                    borderRadius: "15px 15px 0 0",
+                    padding: "16px 20px",
+                  }}
+                >
+                  <span>
+                    <FaMoneyBillWave className="me-2" />
+                    Top 5 Socios — Intereses Generados
+                  </span>
+                  <span
+                    className="badge"
+                    style={{
+                      background: "rgba(255,255,255,0.25)",
+                      color: "white",
+                      padding: "6px 14px",
+                      borderRadius: "20px",
+                      fontWeight: "600",
+                    }}
+                  >
+                    Total: {formatCurrency(rankings.totalInteresesGlobal ?? 0)}
+                  </span>
+                </div>
+                <div className="card-body p-0">
+                  <div className="table-responsive">
+                    <table className="table table-hover mb-0">
+                      <thead style={{ background: "#f8f9fa" }}>
+                        <tr>
+                          <th className="py-3 ps-4" style={{ width: "60px" }}>#</th>
+                          <th className="py-3">Socio</th>
+                          <th className="py-3 text-center">Préstamos</th>
+                          <th className="py-3 text-end pe-4">Interés Generado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {!rankings.topInteresesPorUsuario || rankings.topInteresesPorUsuario.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="text-center text-muted py-4">
+                              No hay datos de intereses registrados
+                            </td>
+                          </tr>
+                        ) : (
+                          rankings.topInteresesPorUsuario.map((s, idx) => (
+                            <tr key={idx}>
+                              <td className="ps-4">
+                                <div
+                                  className="rounded-circle d-flex align-items-center justify-content-center fw-bold"
+                                  style={{
+                                    width: "32px",
+                                    height: "32px",
+                                    background:
+                                      idx === 0
+                                        ? "linear-gradient(135deg, #f39c12 0%, #e67e22 100%)"
+                                        : idx === 1
+                                        ? "linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%)"
+                                        : idx === 2
+                                        ? "linear-gradient(135deg, #e67e22 0%, #d35400 100%)"
+                                        : `${COLORS.purple}20`,
+                                    color: idx < 3 ? "white" : COLORS.purple,
+                                    fontSize: "14px",
+                                  }}
+                                >
+                                  {idx + 1}
+                                </div>
+                              </td>
+                              <td>
+                                <div className="d-flex align-items-center">
+                                  <div
+                                    className="rounded-circle d-flex align-items-center justify-content-center me-3 text-white fw-bold"
+                                    style={{
+                                      width: "36px",
+                                      height: "36px",
+                                      background: "linear-gradient(135deg, #9b59b6 0%, #6c3483 100%)",
+                                      fontSize: "14px",
+                                    }}
+                                  >
+                                    {s.nombre?.charAt(0).toUpperCase() || "?"}
+                                  </div>
+                                  <span className="fw-semibold">{s.nombre}</span>
+                                </div>
+                              </td>
+                              <td className="text-center">
+                                <span
+                                  className="badge"
+                                  style={{
+                                    background: `${COLORS.info}20`,
+                                    color: COLORS.info,
+                                    padding: "6px 12px",
+                                    borderRadius: "10px",
+                                    fontWeight: "600",
+                                  }}
+                                >
+                                  {s.total_prestamos}
+                                </span>
+                              </td>
+                              <td className="text-end pe-4 fw-bold" style={{ color: COLORS.purple }}>
+                                {formatCurrency(s.intereses_generados)}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </>
       )}

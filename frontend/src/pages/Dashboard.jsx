@@ -1069,20 +1069,7 @@ export default function Dashboard() {
                               </div>
                             </td>
                             <td>
-                              <div className="d-flex align-items-center">
-                                <div
-                                  className="rounded-circle d-flex align-items-center justify-content-center me-3 text-white fw-bold"
-                                  style={{
-                                    width: "36px",
-                                    height: "36px",
-                                    background: "linear-gradient(135deg, #27ae60 0%, #229954 100%)",
-                                    fontSize: "14px",
-                                  }}
-                                >
-                                  {s.nombre?.charAt(0).toUpperCase() || "?"}
-                                </div>
-                                <span className="fw-semibold">{s.nombre}</span>
-                              </div>
+                              <span className="fw-semibold">{s.nombre}</span>
                             </td>
                             <td className="text-end pe-4 fw-bold" style={{ color: COLORS.success }}>
                               {formatCurrency(s.saldo)}
@@ -1140,35 +1127,20 @@ export default function Dashboard() {
                               </div>
                             </td>
                             <td>
-                              <div className="d-flex align-items-center">
-                                <div
-                                  className="rounded-circle d-flex align-items-center justify-content-center me-3 text-white fw-bold"
+                              <span className="fw-semibold">{s.nombre}</span>
+                              {s.estado === 'mora' && (
+                                <span
+                                  className="badge ms-2"
                                   style={{
-                                    width: "36px",
-                                    height: "36px",
-                                    background: "linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)",
-                                    fontSize: "14px",
+                                    background: COLORS.danger,
+                                    color: "white",
+                                    fontSize: "10px",
+                                    padding: "4px 8px",
                                   }}
                                 >
-                                  {s.nombre?.charAt(0).toUpperCase() || "?"}
-                                </div>
-                                <div>
-                                  <span className="fw-semibold">{s.nombre}</span>
-                                  {s.estado === 'mora' && (
-                                    <span
-                                      className="badge ms-2"
-                                      style={{
-                                        background: COLORS.danger,
-                                        color: "white",
-                                        fontSize: "10px",
-                                        padding: "4px 8px",
-                                      }}
-                                    >
-                                      MORA
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
+                                  MORA
+                                </span>
+                              )}
                             </td>
                             <td className="text-end pe-4 fw-bold" style={{ color: COLORS.danger }}>
                               {formatCurrency(s.saldo_pendiente)}
@@ -1253,20 +1225,7 @@ export default function Dashboard() {
                                 </div>
                               </td>
                               <td>
-                                <div className="d-flex align-items-center">
-                                  <div
-                                    className="rounded-circle d-flex align-items-center justify-content-center me-3 text-white fw-bold"
-                                    style={{
-                                      width: "36px",
-                                      height: "36px",
-                                      background: "linear-gradient(135deg, #9b59b6 0%, #6c3483 100%)",
-                                      fontSize: "14px",
-                                    }}
-                                  >
-                                    {s.nombre?.charAt(0).toUpperCase() || "?"}
-                                  </div>
-                                  <span className="fw-semibold">{s.nombre}</span>
-                                </div>
+                                <span className="fw-semibold">{s.nombre}</span>
                               </td>
                               <td className="text-center">
                                 <span

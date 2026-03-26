@@ -23,6 +23,8 @@ import {
   FaChevronUp,
   FaHistory,
   FaCreditCard,
+  FaCamera,
+  FaUpload,
 } from "react-icons/fa";
 
 const VERDE = "#a8cd3a";
@@ -66,10 +68,35 @@ export default function SocioPerfil() {
   const [pagosExpandidos, setPagosExpandidos] = useState({});
   const [pagosData, setPagosData]       = useState({});
   const [pagosLoading, setPagosLoading] = useState({});
+  const [showFotoModal, setShowFotoModal] = useState(false);
+  const [fotoSubiendo, setFotoSubiendo]   = useState(false);
+  const [fotoError, setFotoError]         = useState("");
 
   const TIPOS_TASA_LABEL = {
     nominal_anual: "TNA", nominal_mensual: "TNM",
     efectiva_anual: "TEA", efectiva_mensual: "TEM",
+  };
+
+  const handleFotoChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setFotoSubiendo(true);
+    setFotoError("");
+    try {
+      const formData = new FormData();
+      formData.append("foto", file);
+      const res = await axios.put(
+        `${API_URL}/usuarios/${user.id_usuario}/foto`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data", Authorization: `Bearer ${token}` } }
+      );
+      updateUser({ foto: res.data.foto });
+    } catch (err) {
+      setFotoError(err.response?.data?.message || "Error al subir la foto.");
+    } finally {
+      setFotoSubiendo(false);
+      e.target.value = "";
+    }
   };
 
   const togglePagos = async (idPrestamo) => {
@@ -182,6 +209,24 @@ export default function SocioPerfil() {
         .sp-progress-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, ${VERDE}, #7db200); transition: width .6s; }
         .sp-collapsible { overflow: hidden; max-height: 0; opacity: 0; transform: translateY(-6px); transition: max-height .35s ease, opacity .3s ease, transform .3s ease; }
         .sp-collapsible.open { max-height: 3000px; opacity: 1; transform: translateY(0); }
+        .sp-foto-btn { cursor: pointer; transition: transform .2s, box-shadow .2s; }
+        .sp-foto-btn:hover { transform: scale(1.07); box-shadow: 0 6px 24px #a8cd3a88 !important; }
+        .sp-foto-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:9999;
+          display:flex; align-items:center; justify-content:center;
+          animation: fadeInOverlay .2s ease; }
+        @keyframes fadeInOverlay { from { opacity:0; } to { opacity:1; } }
+        .sp-foto-modal-content { position:relative; animation: scaleIn .22s ease; }
+        @keyframes scaleIn { from { transform:scale(.85); opacity:0; } to { transform:scale(1); opacity:1; } }
+        .sp-foto-close { position:absolute; top:-14px; right:-14px; background:#fff;
+          border:none; border-radius:50%; width:32px; height:32px; font-size:1.1rem;
+          display:flex; align-items:center; justify-content:center;
+          cursor:pointer; box-shadow:0 2px 8px #0005; color:#333; }
+        .sp-foto-actions { display:flex; gap:.6rem; justify-content:center; flex-wrap:wrap; margin-top:.9rem; }
+        .sp-foto-action-btn { display:inline-flex; align-items:center; gap:.4rem;
+          padding:.45rem 1.1rem; border-radius:2rem; border:none; font-size:.85rem;
+          font-weight:600; cursor:pointer; transition:opacity .15s, transform .15s; }
+        .sp-foto-action-btn:hover:not(:disabled) { opacity:.88; transform:scale(1.04); }
+        .sp-foto-action-btn:disabled { opacity:.55; cursor:not-allowed; }
       `}</style>
 
       <div style={{ background: GRIS_FONDO, minHeight: "100vh", fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
@@ -191,15 +236,19 @@ export default function SocioPerfil() {
           <div className="sp-hero rounded-4 shadow-lg mb-4 p-4 p-md-5 text-white">
             <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
               <div className="d-flex align-items-center gap-4">
-                <div style={{
-                  width: 80, height: 80, borderRadius: "50%",
-                  background: user.foto ? "transparent" : "linear-gradient(135deg,#a8cd3a,#7db200)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "2.2rem", fontWeight: 700, color: "#1a2a00", flexShrink: 0,
-                  boxShadow: "0 4px 16px #a8cd3a55",
-                  overflow: "hidden",
-                  border: user.foto ? "3px solid #a8cd3a" : "none",
-                }}>
+                <div
+                  className="sp-foto-btn"
+                  onClick={() => setShowFotoModal(true)}
+                  title="Ver foto"
+                  style={{
+                    width: 80, height: 80, borderRadius: "50%",
+                    background: user.foto ? "transparent" : "linear-gradient(135deg,#a8cd3a,#7db200)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "2.2rem", fontWeight: 700, color: "#1a2a00", flexShrink: 0,
+                    boxShadow: "0 4px 16px #a8cd3a55",
+                    overflow: "hidden",
+                    border: user.foto ? "3px solid #a8cd3a" : "none",
+                  }}>
                   {user.foto ? (
                     <img
                       src={`${API_URL.replace("/api", "")}${user.foto}`}
@@ -786,6 +835,98 @@ export default function SocioPerfil() {
                 </div>
               </form>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL FOTO PERFIL ===== */}
+      {showFotoModal && user.foto && (
+        <div
+          className="sp-foto-overlay"
+          onClick={() => { if (!fotoSubiendo) { setShowFotoModal(false); setFotoError(""); } }}
+        >
+          <div className="sp-foto-modal-content" onClick={(e) => e.stopPropagation()}
+            style={{ textAlign: "center" }}>
+
+            {/* Imagen grande */}
+            <div style={{ position: "relative", display: "inline-block" }}>
+              <img
+                src={`${API_URL.replace("/api", "")}${user.foto}`}
+                alt={user.nombre_completo}
+                style={{
+                  maxWidth: "88vw",
+                  maxHeight: "72vh",
+                  borderRadius: "1rem",
+                  boxShadow: "0 20px 60px rgba(0,0,0,0.55)",
+                  objectFit: "contain",
+                  display: "block",
+                }}
+              />
+              {fotoSubiendo && (
+                <div style={{
+                  position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  borderRadius: "1rem",
+                }}>
+                  <div className="spinner-border text-light" />
+                </div>
+              )}
+              <button
+                className="sp-foto-close"
+                onClick={() => { setShowFotoModal(false); setFotoError(""); }}
+                title="Cerrar"
+                disabled={fotoSubiendo}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Controles de cambio de foto */}
+            <div className="sp-foto-actions">
+              {/* Inputs ocultos */}
+              <input
+                id="sp-input-galeria"
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={handleFotoChange}
+              />
+              <input
+                id="sp-input-camara"
+                type="file"
+                accept="image/*"
+                capture="user"
+                style={{ display: "none" }}
+                onChange={handleFotoChange}
+              />
+
+              <button
+                className="sp-foto-action-btn"
+                style={{ background: VERDE, color: "#1a2a00" }}
+                disabled={fotoSubiendo}
+                onClick={() => document.getElementById("sp-input-galeria").click()}
+              >
+                <FaUpload size={13} />
+                Elegir foto
+              </button>
+
+              <button
+                className="sp-foto-action-btn"
+                style={{ background: AZUL_CLARO, color: "#fff" }}
+                disabled={fotoSubiendo}
+                onClick={() => document.getElementById("sp-input-camara").click()}
+              >
+                <FaCamera size={13} />
+                Tomar foto
+              </button>
+            </div>
+
+            {fotoError && (
+              <div className="mt-2 small px-3 py-2 rounded-3"
+                style={{ background: "#fee2e2", color: "#991b1b", display: "inline-block" }}>
+                {fotoError}
+              </div>
+            )}
           </div>
         </div>
       )}

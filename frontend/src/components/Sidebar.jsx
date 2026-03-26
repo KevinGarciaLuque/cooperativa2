@@ -19,6 +19,7 @@ import {
   FaUserCircle,
   FaAngleDoubleLeft,
   FaAngleDoubleRight,
+  FaDatabase,
 } from "react-icons/fa";
 import LogoCoop from "./LogoCoop";
 
@@ -43,6 +44,7 @@ const menuAdmin = [
   { to: "/actividades", icon: <FaTasks />, label: "Actividades" },
   { to: "/liquidaciones", icon: <FaChartPie />, label: "Liquidaciones" },
   { to: "/bitacora", icon: <FaClipboardList />, label: "Bitácora" },
+  { to: "/basedatos", icon: <FaDatabase />, label: "Base de Datos" },
 ];
 
 // Menú para Socio

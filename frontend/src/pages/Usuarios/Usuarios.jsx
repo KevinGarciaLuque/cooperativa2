@@ -23,7 +23,7 @@ export default function Usuarios() {
     show: false,
     id: null,
   });
-  const [confirmForzado, setConfirmForzado] = useState({
+  const [confirmFinal, setConfirmFinal] = useState({
     show: false,
     id: null,
   });
@@ -61,42 +61,27 @@ export default function Usuarios() {
     setConfirmModal({ show: true, id });
   };
 
-  const confirmarEliminar = async () => {
-    setDeleting(true);
+  // Paso 1: cerrar primer modal y abrir el segundo (confirmación definitiva)
+  const confirmarPaso1 = () => {
     const id = confirmModal.id;
-    try {
-      await axios.delete(`${API_URL}/usuarios/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      mostrarAlerta("Usuario desactivado correctamente.", "success");
-      fetchUsuarios();
-      setConfirmModal({ show: false, id: null });
-    } catch (err) {
-      setConfirmModal({ show: false, id: null });
-      if (err.response?.status === 400) {
-        // Tiene préstamos activos → ofrecer eliminación forzada
-        setConfirmForzado({ show: true, id });
-      } else {
-        mostrarAlerta(err.response?.data?.message || "Error al eliminar el usuario.", "error");
-      }
-    } finally {
-      setDeleting(false);
-    }
+    setConfirmModal({ show: false, id: null });
+    setConfirmFinal({ show: true, id });
   };
 
-  const confirmarEliminarForzado = async () => {
+  // Paso 2: ejecutar eliminación real con cascade
+  const confirmarEliminarDefinitivo = async () => {
     setDeleting(true);
     try {
-      await axios.delete(`${API_URL}/usuarios/${confirmForzado.id}?force=true`, {
+      await axios.delete(`${API_URL}/usuarios/${confirmFinal.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      mostrarAlerta("Usuario desactivado correctamente.", "success");
+      mostrarAlerta("Usuario y todos sus datos eliminados correctamente.", "success");
       fetchUsuarios();
     } catch (err) {
       mostrarAlerta(err.response?.data?.message || "Error al eliminar el usuario.", "error");
     } finally {
       setDeleting(false);
-      setConfirmForzado({ show: false, id: null });
+      setConfirmFinal({ show: false, id: null });
     }
   };
 
@@ -300,19 +285,24 @@ export default function Usuarios() {
         onRefresh={fetchUsuarios}
       />
 
+      {/* Modal paso 1: primera advertencia */}
       <ModalConfirmacion
         show={confirmModal.show}
-        mensaje="¿Estás seguro de eliminar este usuario? Se desactivará su cuenta."
-        onConfirm={confirmarEliminar}
+        mensaje="¿Estás seguro de que deseas eliminar este usuario? Esta acción requiere doble confirmación."
+        onConfirm={confirmarPaso1}
         onCancel={() => setConfirmModal({ show: false, id: null })}
-        loading={deleting}
+        confirmText="Sí, continuar"
+        variant="warning"
       />
 
+      {/* Modal paso 2: confirmación definitiva e irreversible */}
       <ModalConfirmacion
-        show={confirmForzado.show}
-        mensaje="⚠️ Este usuario tiene préstamos activos o en mora. ¿Deseas desactivarlo de todas formas? Sus cuentas serán cerradas."
-        onConfirm={confirmarEliminarForzado}
-        onCancel={() => setConfirmForzado({ show: false, id: null })}
+        show={confirmFinal.show}
+        mensaje="⚠️ ATENCIÓN: Esta acción es IRREVERSIBLE. Se eliminarán permanentemente el usuario y TODOS sus datos relacionados: cuentas, préstamos, pagos y aportaciones. ¿Confirmas la eliminación definitiva?"
+        onConfirm={confirmarEliminarDefinitivo}
+        onCancel={() => setConfirmFinal({ show: false, id: null })}
+        confirmText="Sí, eliminar definitivamente"
+        variant="danger"
         loading={deleting}
       />
     </div>

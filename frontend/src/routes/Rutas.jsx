@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 // Admin y otras vistas protegidas
 import Actividades from "../pages/Actividades";
 import Aportaciones from "../pages/Aportaciones/Aportaciones";
+import BaseDatos from "../pages/BaseDatos";
 import Bitacora from "../pages/Bitacora";
 import Cuentas from "../pages/Cuentas/Cuentas";
 import Dashboard from "../pages/Dashboard";
@@ -151,6 +152,14 @@ export default function Rutas() {
             element={
               <PrivateRoute>
                 <Liquidaciones />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/basedatos"
+            element={
+              <PrivateRoute>
+                <BaseDatos />
               </PrivateRoute>
             }
           />

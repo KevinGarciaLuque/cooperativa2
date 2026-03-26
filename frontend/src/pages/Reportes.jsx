@@ -38,7 +38,7 @@ export default function Reportes() {
     const fetchUsuarios = async () => {
       try {
         setLoading(true);
-        const res = await axios.get(`${API_URL}/usuarios`, {
+        const res = await axios.get(`${API_URL}/usuarios?limit=1000`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setUsuarios(res.data.data || res.data || []);
@@ -135,6 +135,29 @@ export default function Reportes() {
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", `estado_cuenta_${nombre}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      mostrarAlerta("Reporte descargado correctamente.", "success");
+    } catch (err) {
+      mostrarAlerta("Error al descargar el reporte.", "error");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  // Descargar reporte general (sin necesidad de socio)
+  const descargarReporteGeneral = async (tipo, nombreArchivo) => {
+    setDownloading(true);
+    try {
+      const res = await axios.get(`${API_URL}/reportes/${tipo}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "blob",
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `${nombreArchivo}_${new Date().toISOString().split("T")[0]}.xlsx`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -572,9 +595,11 @@ export default function Reportes() {
             style={{
               borderRadius: "15px",
               transition: "all 0.3s ease",
-              cursor: "pointer",
-              opacity: 0.6,
+              cursor: downloading ? "not-allowed" : "pointer",
             }}
+            onClick={() => !downloading && descargarReporteGeneral("prestamos-activos", "prestamos_activos")}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 8px 25px rgba(230,126,34,0.2)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = ""; }}
           >
             <div className="card-body text-center p-4">
               <div
@@ -588,12 +613,14 @@ export default function Reportes() {
                 <FaFileInvoiceDollar style={{ fontSize: "36px", color: "white" }} />
               </div>
               <h6 className="fw-bold mb-2" style={{ color: "#2c3e50" }}>
-                Préstamos
+                Préstamos Activos
               </h6>
               <p className="text-muted small mb-0">
                 Detalle de préstamos activos y pagos registrados
               </p>
-              <span className="badge bg-secondary mt-2">Próximamente</span>
+              <span className="badge mt-2" style={{ background: "rgba(230,126,34,0.15)", color: "#d35400", border: "1px solid #e67e22" }}>
+                <FaDownload className="me-1" />Descargar Excel
+              </span>
             </div>
           </div>
         </div>
@@ -605,9 +632,11 @@ export default function Reportes() {
             style={{
               borderRadius: "15px",
               transition: "all 0.3s ease",
-              cursor: "pointer",
-              opacity: 0.6,
+              cursor: downloading ? "not-allowed" : "pointer",
             }}
+            onClick={() => !downloading && descargarReporteGeneral("aportaciones", "reporte_aportaciones")}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 8px 25px rgba(52,152,219,0.2)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = ""; }}
           >
             <div className="card-body text-center p-4">
               <div
@@ -624,23 +653,27 @@ export default function Reportes() {
                 Aportaciones
               </h6>
               <p className="text-muted small mb-0">
-                Historial completo de aportaciones del socio
+                Historial completo de aportaciones por socio
               </p>
-              <span className="badge bg-secondary mt-2">Próximamente</span>
+              <span className="badge mt-2" style={{ background: "rgba(52,152,219,0.15)", color: "#2980b9", border: "1px solid #3498db" }}>
+                <FaDownload className="me-1" />Descargar Excel
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Reporte de Movimientos */}
+        {/* Reporte Balance General */}
         <div className="col-md-6 col-lg-3">
           <div
             className="card border-0 shadow-sm h-100"
             style={{
               borderRadius: "15px",
               transition: "all 0.3s ease",
-              cursor: "pointer",
-              opacity: 0.6,
+              cursor: downloading ? "not-allowed" : "pointer",
             }}
+            onClick={() => !downloading && descargarReporteGeneral("balance-general", "balance_general")}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 8px 25px rgba(155,89,182,0.2)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = ""; }}
           >
             <div className="card-body text-center p-4">
               <div
@@ -654,12 +687,14 @@ export default function Reportes() {
                 <FaExchangeAlt style={{ fontSize: "36px", color: "white" }} />
               </div>
               <h6 className="fw-bold mb-2" style={{ color: "#2c3e50" }}>
-                Movimientos
+                Balance General
               </h6>
               <p className="text-muted small mb-0">
-                Reporte detallado de movimientos en cuentas
+                Balance general de activos, pasivos y patrimonio
               </p>
-              <span className="badge bg-secondary mt-2">Próximamente</span>
+              <span className="badge mt-2" style={{ background: "rgba(155,89,182,0.15)", color: "#8e44ad", border: "1px solid #9b59b6" }}>
+                <FaDownload className="me-1" />Descargar Excel
+              </span>
             </div>
           </div>
         </div>

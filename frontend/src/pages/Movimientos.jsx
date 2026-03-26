@@ -97,8 +97,7 @@ export default function Movimientos() {
 
   // Filtrar movimientos
   const movimientosFiltrados = movimientos.filter((m) => {
-    const usuario = getUsuarioCuenta(m.id_cuenta);
-    const nombreUsuario = usuario?.nombre_completo?.toLowerCase() || "";
+    const nombreUsuario = (m.nombre_completo || getUsuarioCuenta(m.id_cuenta)?.nombre_completo || "").toLowerCase();
     const coincideBusqueda = nombreUsuario.includes(filtro.toLowerCase());
 
     const coincideTipo = tipoFiltro === "todos" || m.tipo === tipoFiltro;
@@ -507,16 +506,11 @@ export default function Movimientos() {
                     style={{ borderRadius: "10px" }}
                   >
                     <option value="">Todas las cuentas</option>
-                    {cuentas.map((c) => {
-                      const usuario = usuarios.find(
-                        (u) => u.id_usuario === c.id_usuario
-                      );
-                      return (
-                        <option key={c.id_cuenta} value={c.id_cuenta}>
-                          {c.tipo_cuenta} - {usuario?.nombre_completo || "N/A"}
-                        </option>
-                      );
-                    })}
+                    {cuentas.map((c) => (
+                      <option key={c.id_cuenta} value={c.id_cuenta}>
+                        {c.tipo_cuenta} - {c.nombre_completo || "N/A"}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -805,7 +799,7 @@ function TablaMovimientos({
                           className="fw-semibold text-truncate"
                           style={{ color: "#2c3e50", fontSize: "14px" }}
                         >
-                          {usuario?.nombre_completo || "N/A"}
+                          {movimiento?.nombre_completo || cuenta?.nombre_completo || usuario?.nombre_completo || "N/A"}
                         </div>
                         <div
                           className="text-muted small d-flex align-items-center"
@@ -1050,17 +1044,12 @@ function ModalMovimiento({
                   }}
                 >
                   <option value="">Seleccionar cuenta...</option>
-                  {cuentas.map((c) => {
-                    const usuario = usuarios.find(
-                      (u) => u.id_usuario === c.id_usuario
-                    );
-                    return (
-                      <option key={c.id_cuenta} value={c.id_cuenta}>
-                        {c.tipo_cuenta} - {usuario?.nombre_completo || "N/A"} -
-                        Saldo: L.{parseFloat(c.saldo_actual || c.saldo || 0).toFixed(2)}
-                      </option>
-                    );
-                  })}
+                  {cuentas.map((c) => (
+                    <option key={c.id_cuenta} value={c.id_cuenta}>
+                      {c.tipo_cuenta} - {c.nombre_completo || "N/A"} -
+                      Saldo: L.{parseFloat(c.saldo_actual || c.saldo || 0).toFixed(2)}
+                    </option>
+                  ))}
                 </select>
 
                 {/* Info de la cuenta seleccionada */}
@@ -1075,7 +1064,7 @@ function ModalMovimiento({
                   >
                     <div className="row g-2 small">
                       <div className="col-6">
-                        <strong>Socio:</strong> {usuarioSeleccionado?.nombre_completo}
+                        <strong>Socio:</strong> {cuentaSeleccionada?.nombre_completo || usuarioSeleccionado?.nombre_completo}
                       </div>
                       <div className="col-6">
                         <strong>Tipo:</strong> {cuentaSeleccionada.tipo_cuenta}

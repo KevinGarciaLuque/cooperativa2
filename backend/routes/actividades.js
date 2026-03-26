@@ -210,6 +210,7 @@ router.post("/", async (req, res) => {
       tipo, 
       monto, 
       descripcion,
+      fecha,
       id_usuario_registro // Usuario que registra la actividad
     } = req.body;
 
@@ -242,9 +243,9 @@ router.post("/", async (req, res) => {
 
       // Insertar actividad
       const [result] = await connection.query(
-        `INSERT INTO actividades (nombre, tipo, monto, descripcion)
-         VALUES (?, ?, ?, ?)`,
-        [nombre, tipo, parseFloat(monto), descripcion || null]
+        `INSERT INTO actividades (nombre, tipo, monto, descripcion, fecha)
+         VALUES (?, ?, ?, ?, ?)`,
+        [nombre, tipo, parseFloat(monto), descripcion || null, fecha || null]
       );
 
       const id_actividad = result.insertId;
@@ -289,7 +290,7 @@ router.post("/", async (req, res) => {
 // ============================================
 router.put("/:id", async (req, res) => {
   try {
-    const { nombre, tipo, monto, descripcion, id_usuario_actualiza } = req.body;
+    const { nombre, tipo, monto, descripcion, fecha, id_usuario_actualiza } = req.body;
 
     // Verificar que la actividad no esté liquidada
     const [actividad] = await pool.query(
@@ -340,9 +341,10 @@ router.put("/:id", async (req, res) => {
          SET nombre = COALESCE(?, nombre),
              tipo = COALESCE(?, tipo),
              monto = COALESCE(?, monto),
-             descripcion = COALESCE(?, descripcion)
+             descripcion = COALESCE(?, descripcion),
+             fecha = COALESCE(?, fecha)
          WHERE id_actividad = ?`,
-        [nombre, tipo, monto ? parseFloat(monto) : null, descripcion, req.params.id]
+        [nombre, tipo, monto ? parseFloat(monto) : null, descripcion, fecha || null, req.params.id]
       );
 
       // Registrar en bitácora

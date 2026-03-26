@@ -448,21 +448,22 @@ router.put("/:id", async (req, res) => {
       updateFields.push("nombre_completo = ?");
       values.push(nombre_completo);
     }
-    if (telefono) {
+    // Campos opcionales: se actualiza incluso si viene vacío (null limpia el campo)
+    if (telefono !== undefined) {
       updateFields.push("telefono = ?");
-      values.push(telefono);
+      values.push(telefono || null);
     }
-    if (correo) {
+    if (correo !== undefined) {
       updateFields.push("correo = ?");
-      values.push(correo);
+      values.push(correo || null);
     }
-    if (direccion) {
+    if (direccion !== undefined) {
       updateFields.push("direccion = ?");
-      values.push(direccion);
+      values.push(direccion || null);
     }
-    if (fecha_nacimiento) {
+    if (fecha_nacimiento !== undefined) {
       updateFields.push("fecha_nacimiento = ?");
-      values.push(fecha_nacimiento);
+      values.push(fecha_nacimiento || null);
     }
     if (rol_id) {
       updateFields.push("rol_id = ?");
@@ -511,15 +512,13 @@ router.put("/:id", async (req, res) => {
 });
 
 // ============================================
-// ELIMINAR USUARIO (BORRADO LÓGICO CON BITÁCORA)
+// ELIMINAR USUARIO (BORRADO FÍSICO MANUAL EN CASCADA)
 // ============================================
 router.delete("/:id", async (req, res) => {
+  const connection = await pool.getConnection();
   try {
-    const { force } = req.query;
-
-    // Verificar que el usuario existe
-    const [usuario] = await pool.query(
-      `SELECT * FROM usuarios WHERE id_usuario = ?`,
+    const [usuario] = await connection.query(
+      `SELECT id_usuario, nombre_completo, dni FROM usuarios WHERE id_usuario = ?`,
       [req.params.id]
     );
 
@@ -527,49 +526,61 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json({ message: "Usuario no encontrado" });
     }
 
-    // No permitir eliminar si tiene préstamos activos (a menos que sea forzado)
-    if (!force) {
-      const [prestamosActivos] = await pool.query(
-        `SELECT COUNT(*) as total FROM prestamos 
-         WHERE id_usuario = ? AND estado IN ('activo', 'mora')`,
-        [req.params.id]
-      );
+    await connection.beginTransaction();
 
-      if (prestamosActivos[0].total > 0) {
-        return res.status(400).json({ 
-          message: "No se puede eliminar el usuario. Tiene préstamos activos o en mora." 
-        });
-      }
-    }
+    const userId = usuario[0].id_usuario;
+    const nombre = usuario[0].nombre_completo;
+    const dni = usuario[0].dni;
 
-    const [result] = await pool.query(
-      `UPDATE usuarios SET estado = 'inactivo' WHERE id_usuario = ?`,
-      [req.params.id]
+    // 1. Eliminar movimientos de las cuentas del usuario
+    await connection.query(
+      `DELETE mc FROM movimientos_cuenta mc
+       INNER JOIN cuentas c ON mc.id_cuenta = c.id_cuenta
+       WHERE c.id_usuario = ?`,
+      [userId]
     );
 
-    // Cerrar todas las cuentas del usuario
-    await pool.query(
-      `UPDATE cuentas SET estado = 'cerrada' WHERE id_usuario = ?`,
-      [req.params.id]
+    // 2. Eliminar pagos de los préstamos del usuario
+    await connection.query(
+      `DELETE pp FROM pagos_prestamo pp
+       INNER JOIN prestamos p ON pp.id_prestamo = p.id_prestamo
+       WHERE p.id_usuario = ?`,
+      [userId]
     );
 
-    // Registrar en bitácora
-    await registrarBitacora(
-      req.params.id,
-      "Usuario eliminado",
-      `Se desactivó el usuario: ${usuario[0].nombre_completo}`
-    );
+    // 3. Eliminar bitácora del usuario
+    await connection.query(`DELETE FROM bitacora WHERE id_usuario = ?`, [userId]);
 
-    res.json({ 
+    // 4. Eliminar liquidaciones asignadas al usuario
+    await connection.query(`DELETE FROM liquidacion_socios WHERE id_usuario = ?`, [userId]);
+
+    // 5. Eliminar aportaciones
+    await connection.query(`DELETE FROM aportaciones WHERE id_usuario = ?`, [userId]);
+
+    // 6. Eliminar cuentas
+    await connection.query(`DELETE FROM cuentas WHERE id_usuario = ?`, [userId]);
+
+    // 7. Eliminar préstamos
+    await connection.query(`DELETE FROM prestamos WHERE id_usuario = ?`, [userId]);
+
+    // 8. Eliminar el usuario (password_resets tiene ON DELETE CASCADE, se elimina solo)
+    await connection.query(`DELETE FROM usuarios WHERE id_usuario = ?`, [userId]);
+
+    await connection.commit();
+
+    res.json({
       success: true,
-      message: "Usuario desactivado correctamente (borrado lógico)" 
+      message: "Usuario y todos sus datos eliminados permanentemente.",
     });
   } catch (error) {
+    await connection.rollback();
     console.error("ERROR AL ELIMINAR USUARIO:", error);
-    res.status(500).json({ 
-      message: "Error al eliminar el usuario", 
-      error: error.message 
+    res.status(500).json({
+      message: "Error al eliminar el usuario",
+      error: error.message,
     });
+  } finally {
+    connection.release();
   }
 });
 

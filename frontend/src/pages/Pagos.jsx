@@ -779,7 +779,7 @@ function TablaPagos({
                       </div>
                       <div style={{ minWidth: 0 }}>
                         <div className="fw-semibold text-truncate" style={{ color: "#2c3e50", fontSize: 14 }}>
-                          {usuario?.nombre_completo || "N/A"}
+                          {pago.nombre_completo || usuario?.nombre_completo || "N/A"}
                         </div>
                         <div className="text-muted d-flex align-items-center" style={{ fontSize: 12 }}>
                           <FaFileInvoiceDollar className="me-1" />
@@ -904,7 +904,7 @@ function TablaPagos({
                       </div>
                       <div style={{ minWidth: 0 }}>
                         <div className="fw-semibold text-truncate" style={{ color: "#2c3e50", fontSize: 14 }}>
-                          {usuario?.nombre_completo || "N/A"}
+                          {pago.nombre_completo || usuario?.nombre_completo || "N/A"}
                         </div>
                         <div className="text-muted" style={{ fontSize: 12 }}>
                           <FaFileInvoiceDollar className="me-1" />

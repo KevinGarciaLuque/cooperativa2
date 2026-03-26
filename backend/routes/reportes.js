@@ -205,14 +205,14 @@ router.get("/balance-general", async (req, res) => {
 
     // Préstamos por cobrar
     const [totalPrestamos] = await pool.query(
-      `SELECT SUM(monto_pendiente) as total FROM prestamos WHERE estado IN ('activo', 'mora')`
+      `SELECT SUM(saldo_restante) as total FROM prestamos WHERE estado IN ('activo', 'mora')`
     );
     worksheet.addRow(['Préstamos por Cobrar', '', formatearMoneda(totalPrestamos[0].total || 0)]);
     currentRow++;
 
     // Intereses por cobrar (mora)
     const [totalMora] = await pool.query(
-      `SELECT SUM(p.monto_pendiente * 0.24 * GREATEST(DATEDIFF(CURDATE(), DATE_ADD(p.fecha_aprobacion, INTERVAL 35 DAY)), 0) / 365) as mora_estimada
+      `SELECT SUM(p.saldo_restante * 0.24 * GREATEST(DATEDIFF(CURDATE(), DATE_ADD(p.fecha_otorgado, INTERVAL 35 DAY)), 0) / 365) as mora_estimada
        FROM prestamos p
        WHERE p.estado = 'mora'`
     );
@@ -315,6 +315,7 @@ router.get("/balance-general", async (req, res) => {
     // Exportar
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename=balance_general_${new Date().toISOString().split('T')[0]}.xlsx`);
+    await workbook.xlsx.write(res);
     res.end();
   } catch (error) {
     console.error("ERROR AL GENERAR BALANCE GENERAL:", error);
@@ -332,6 +333,15 @@ router.get("/prestamos-activos", async (req, res) => {
     const [prestamos] = await pool.query(
       `SELECT 
        p.*,
+       COALESCE(
+         p.cuota_mensual,
+         CASE 
+           WHEN p.tasa_interes > 0 AND p.plazo_meses > 0 THEN
+             ROUND(p.monto * (p.tasa_interes/100) * POW(1 + p.tasa_interes/100, p.plazo_meses) 
+               / (POW(1 + p.tasa_interes/100, p.plazo_meses) - 1), 2)
+           ELSE NULL
+         END
+       ) AS cuota_calculada,
        u.nombre_completo,
        u.dni,
        u.telefono,
@@ -339,7 +349,7 @@ router.get("/prestamos-activos", async (req, res) => {
        FROM prestamos p
        INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
        WHERE p.estado = ?
-       ORDER BY p.fecha_aprobacion DESC`,
+       ORDER BY p.fecha_otorgado DESC`,
       [estado]
     );
 
@@ -384,16 +394,16 @@ router.get("/prestamos-activos", async (req, res) => {
         p.nombre_completo,
         p.dni,
         formatearMoneda(p.monto),
-        formatearMoneda(p.monto_pendiente),
-        `${parseFloat(p.tasa_interes_anual)}%`,
+        formatearMoneda(p.saldo_restante),
+        `${parseFloat(p.tasa_interes)}%`,
         p.plazo_meses,
-        formatearMoneda(p.cuota_mensual),
-        new Date(p.fecha_aprobacion).toLocaleDateString('es-HN'),
+        p.cuota_calculada != null ? formatearMoneda(p.cuota_calculada) : "N/A",
+        new Date(p.fecha_otorgado).toLocaleDateString('es-HN'),
         p.estado
       ]);
 
       totalOriginal += parseFloat(p.monto);
-      totalPendiente += parseFloat(p.monto_pendiente);
+      totalPendiente += parseFloat(p.saldo_restante);
     });
 
     // Totales

@@ -307,7 +307,7 @@ export default function Bitacora() {
       {/* Tabla */}
       <div className="card border-0 shadow-sm" style={{ borderRadius: "15px" }}>
         <div className="card-body p-0">
-          <div className="table-responsive">
+          <div className="table-responsive" style={{ maxHeight: "500px", overflowY: "auto" }}>
             <table className="table table-hover mb-0">
               <thead style={{ background: "#f8f9fa" }}>
                 <tr>

@@ -6,6 +6,9 @@ export default function ModalConfirmacion({
   mensaje,
   onConfirm,
   onCancel,
+  loading = false,
+  confirmText = "Sí, eliminar",
+  variant = "danger",
 }) {
   if (!show) return null;
   return (
@@ -33,12 +36,24 @@ export default function ModalConfirmacion({
             {mensaje || "¿Estás seguro que deseas continuar?"}
           </h5>
           <div className="d-flex justify-content-center gap-3">
-            <button className="btn btn-danger px-4" onClick={onConfirm}>
-              Sí, eliminar
+            <button
+              className={`btn btn-${variant} px-4`}
+              onClick={onConfirm}
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2"></span>
+                  Eliminando...
+                </>
+              ) : (
+                confirmText
+              )}
             </button>
             <button
               className="btn btn-outline-secondary px-4"
               onClick={onCancel}
+              disabled={loading}
             >
               Cancelar
             </button>

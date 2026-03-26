@@ -59,7 +59,7 @@ export default function Actividades() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_URL}/actividades`, {
+      const res = await axios.get(`${API_URL}/actividades?limit=1000`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setActividades(res.data.data || res.data || []);

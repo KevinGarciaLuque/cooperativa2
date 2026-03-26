@@ -3,6 +3,7 @@ import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import TablaUsuarios from "./TablaUsuarios";
 import ModalAcciones from "./ModalAcciones";
+import ModalPerfilUsuario from "./ModalPerfilUsuario";
 import ModalConfirmacion from "../../components/ModalConfirmacion";
 import { FaUserPlus, FaUsers, FaUserCheck, FaUserTimes, FaSearch } from "react-icons/fa";
 import { useAlerta } from "../../context/AlertaContext";
@@ -28,6 +29,7 @@ export default function Usuarios() {
     id: null,
   });
   const [deleting, setDeleting] = useState(false);
+  const [perfilModal, setPerfilModal] = useState({ show: false, usuario: null });
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -273,6 +275,7 @@ export default function Usuarios() {
           usuarios={usuariosFiltrados}
           onEdit={openEditar}
           onDelete={handleEliminar}
+          onVerPerfil={(u) => setPerfilModal({ show: true, usuario: u })}
         />
       )}
 
@@ -283,6 +286,14 @@ export default function Usuarios() {
         usuario={modal.usuario}
         onClose={closeModal}
         onRefresh={fetchUsuarios}
+      />
+
+      <ModalPerfilUsuario
+        show={perfilModal.show}
+        usuario={perfilModal.usuario}
+        onClose={() => setPerfilModal({ show: false, usuario: null })}
+        onEdit={openEditar}
+        onDelete={handleEliminar}
       />
 
       {/* Modal paso 1: primera advertencia */}

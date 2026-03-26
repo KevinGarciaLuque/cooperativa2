@@ -30,6 +30,8 @@ export default function Reportes() {
   const [downloading, setDownloading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [usuarioInfo, setUsuarioInfo] = useState(null);
+  const [socioSeleccionado, setSocioSeleccionado] = useState(null);
+  const [mostrarResultados, setMostrarResultados] = useState(false);
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -169,10 +171,24 @@ export default function Reportes() {
     }
   };
 
-  // Filtrar usuarios
+  // Filtrar usuarios por nombre o DNI
   const usuariosFiltrados = usuarios.filter((u) =>
-    u.nombre_completo?.toLowerCase().includes(filtro.toLowerCase())
+    u.nombre_completo?.toLowerCase().includes(filtro.toLowerCase()) ||
+    u.dni?.toLowerCase().includes(filtro.toLowerCase())
   );
+
+  const seleccionarSocio = (u) => {
+    setSocioSeleccionado(u);
+    setIdUsuario(String(u.id_usuario));
+    setFiltro("");
+    setMostrarResultados(false);
+  };
+
+  const limpiarSocio = () => {
+    setSocioSeleccionado(null);
+    setIdUsuario("");
+    setFiltro("");
+  };
 
   return (
     <div
@@ -214,60 +230,122 @@ export default function Reportes() {
               </h5>
             </div>
             <div className="card-body" style={{ padding: "24px" }}>
-              {/* Búsqueda */}
-              <div className="mb-3">
+              {/* Búsqueda con autocompletado */}
+              <div className="mb-3" style={{ position: "relative" }}>
                 <label className="form-label fw-semibold small text-muted">
                   Buscar Socio
                 </label>
-                <div className="input-group">
-                  <span
-                    className="input-group-text bg-white border-end-0"
-                    style={{ borderRadius: "10px 0 0 10px" }}
-                  >
-                    <FaSearch style={{ color: "#95a5a6" }} />
-                  </span>
-                  <input
-                    type="text"
-                    className="form-control border-start-0"
-                    placeholder="Buscar por nombre..."
-                    value={filtro}
-                    onChange={(e) => setFiltro(e.target.value)}
+                {socioSeleccionado ? (
+                  <div
+                    className="d-flex align-items-center p-3"
                     style={{
-                      borderRadius: "0 10px 10px 0",
-                      boxShadow: "none",
+                      background: "rgba(39,174,96,0.1)",
+                      borderRadius: "10px",
+                      border: "2px solid rgba(39,174,96,0.3)",
                     }}
-                  />
-                </div>
-              </div>
-
-              {/* Select de Usuario */}
-              <div className="mb-3">
-                <label className="form-label fw-semibold small text-muted">
-                  Seleccionar de la lista
-                </label>
-                {loading ? (
-                  <div className="text-center py-3">
-                    <FaSpinner className="fa-spin" style={{ fontSize: "24px", color: "#e67e22" }} />
-                    <p className="text-muted mt-2 mb-0 small">Cargando socios...</p>
+                  >
+                    <div
+                      className="rounded-circle d-flex align-items-center justify-content-center me-3 flex-shrink-0"
+                      style={{
+                        width: "36px",
+                        height: "36px",
+                        background: "linear-gradient(135deg, #27ae60, #229954)",
+                        color: "white",
+                      }}
+                    >
+                      <FaUser style={{ fontSize: "16px" }} />
+                    </div>
+                    <div className="flex-grow-1 me-2">
+                      <p className="mb-0 fw-bold" style={{ color: "#2c3e50", fontSize: "14px" }}>
+                        {socioSeleccionado.nombre_completo}
+                      </p>
+                      <p className="mb-0 small text-muted">
+                        DNI: {socioSeleccionado.dni || "N/A"}
+                      </p>
+                    </div>
+                    <button
+                      className="btn btn-sm p-1"
+                      onClick={limpiarSocio}
+                      style={{ color: "#e74c3c", lineHeight: 1 }}
+                      title="Limpiar selección"
+                    >
+                      ✕
+                    </button>
                   </div>
                 ) : (
-                  <select
-                    className="form-select form-select-lg"
-                    value={idUsuario}
-                    onChange={(e) => setIdUsuario(e.target.value)}
-                    style={{
-                      borderRadius: "10px",
-                      border: "2px solid #e9ecef",
-                      padding: "12px 16px",
-                    }}
-                  >
-                    <option value="">Selecciona un socio...</option>
-                    {usuariosFiltrados.map((u) => (
-                      <option key={u.id_usuario} value={u.id_usuario}>
-                        {u.nombre_completo} - DNI: {u.dni || "N/A"}
-                      </option>
-                    ))}
-                  </select>
+                  <>
+                    <div className="input-group">
+                      <span
+                        className="input-group-text bg-white border-end-0"
+                        style={{ borderRadius: "10px 0 0 10px" }}
+                      >
+                        {loading ? (
+                          <FaSpinner className="fa-spin" style={{ color: "#e67e22" }} />
+                        ) : (
+                          <FaSearch style={{ color: "#95a5a6" }} />
+                        )}
+                      </span>
+                      <input
+                        type="text"
+                        className="form-control border-start-0"
+                        placeholder="Buscar por nombre o DNI..."
+                        value={filtro}
+                        onChange={(e) => {
+                          setFiltro(e.target.value);
+                          setMostrarResultados(true);
+                        }}
+                        onFocus={() => filtro && setMostrarResultados(true)}
+                        onBlur={() => setTimeout(() => setMostrarResultados(false), 200)}
+                        style={{ borderRadius: "0 10px 10px 0", boxShadow: "none" }}
+                        disabled={loading}
+                      />
+                    </div>
+                    {mostrarResultados && filtro && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "100%",
+                          left: 0,
+                          right: 0,
+                          zIndex: 1000,
+                          background: "white",
+                          border: "2px solid #e9ecef",
+                          borderRadius: "10px",
+                          maxHeight: "220px",
+                          overflowY: "auto",
+                          boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                        }}
+                      >
+                        {usuariosFiltrados.length === 0 ? (
+                          <div className="p-3 text-muted text-center small">
+                            No se encontraron socios
+                          </div>
+                        ) : (
+                          usuariosFiltrados.slice(0, 10).map((u) => (
+                            <div
+                              key={u.id_usuario}
+                              className="p-3"
+                              style={{
+                                cursor: "pointer",
+                                borderBottom: "1px solid #f0f0f0",
+                                transition: "background 0.15s",
+                              }}
+                              onMouseDown={() => seleccionarSocio(u)}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = "#f8f9fa")}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = "white")}
+                            >
+                              <p className="mb-0 fw-semibold" style={{ color: "#2c3e50", fontSize: "14px" }}>
+                                {u.nombre_completo}
+                              </p>
+                              <p className="mb-0 small text-muted">
+                                DNI: {u.dni || "N/A"}
+                              </p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 

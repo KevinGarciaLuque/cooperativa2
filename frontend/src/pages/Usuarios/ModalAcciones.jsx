@@ -13,11 +13,12 @@ import {
   FaToggleOn, 
   FaLock,
   FaSave,
-  FaTimes
+  FaTimes,
+  FaCamera
 } from "react-icons/fa";
 
 export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh }) {
-  const { token } = useAuth();
+  const { token, user: usuarioLogueado, updateUser } = useAuth();
   const { mostrarAlerta } = useAlerta();
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
   const [form, setForm] = useState({
@@ -33,6 +34,8 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
   });
   const [loading, setLoading] = useState(false);
   const [roles, setRoles] = useState([]);
+  const [fotoFile, setFotoFile] = useState(null);
+  const [fotoPreview, setFotoPreview] = useState(null);
 
   // Cargar roles disponibles
   useEffect(() => {
@@ -65,6 +68,9 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
         estado: usuario.estado || "activo",
         password: "",
       });
+      setFotoFile(null);
+      const base = import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:5000";
+      setFotoPreview(usuario.foto ? `${base}${usuario.foto}` : null);
     }
     if (tipo === "crear") {
       setForm({
@@ -78,8 +84,17 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
         estado: "activo",
         password: "",
       });
+      setFotoFile(null);
+      setFotoPreview(null);
     }
   }, [tipo, usuario, show]);
+
+  const handleFoto = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setFotoFile(file);
+    setFotoPreview(URL.createObjectURL(file));
+  };
 
   const handleInput = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -89,16 +104,30 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
     e.preventDefault();
     setLoading(true);
     try {
+      let nuevoId = usuario?.id_usuario;
       if (tipo === "crear") {
-        await axios.post(`${API_URL}/usuarios`, form, {
+        const res = await axios.post(`${API_URL}/usuarios`, form, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        nuevoId = res.data.id_usuario;
         mostrarAlerta("¡Usuario registrado con éxito!", "success");
       } else {
         await axios.put(`${API_URL}/usuarios/${usuario.id_usuario}`, form, {
           headers: { Authorization: `Bearer ${token}` },
         });
         mostrarAlerta("¡Usuario actualizado correctamente!", "success");
+      }
+      // Subir foto si se seleccionó una
+      if (fotoFile && nuevoId) {
+        const fd = new FormData();
+        fd.append("foto", fotoFile);
+        const fotoRes = await axios.put(`${API_URL}/usuarios/${nuevoId}/foto`, fd, {
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
+        });
+        // Si el usuario editado es el usuario logueado, actualizar el contexto
+        if (fotoRes.data?.foto && nuevoId === usuarioLogueado?.id_usuario) {
+          updateUser({ foto: fotoRes.data.foto });
+        }
       }
       onRefresh();
       onClose();
@@ -126,11 +155,9 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
         height: "100vh",
         overflowY: "auto",
       }}
-      onClick={onClose}
     >
       <div 
         className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable"
-        onClick={(e) => e.stopPropagation()}
       >
         <form
           className="modal-content border-0 shadow-lg"
@@ -159,6 +186,71 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
 
           <div className="modal-body" style={{ padding: "32px", background: "#f8f9fa" }}>
             <div className="row g-4">
+              {/* Foto de perfil */}
+              <div className="col-12">
+                <div className="d-flex align-items-center gap-4">
+                  <div style={{ position: "relative", flexShrink: 0 }}>
+                    <div
+                      className="rounded-circle d-flex align-items-center justify-content-center overflow-hidden"
+                      style={{
+                        width: "90px",
+                        height: "90px",
+                        background: fotoPreview ? "transparent" : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                        border: "3px solid #667eea",
+                      }}
+                    >
+                      {fotoPreview ? (
+                        <img
+                          src={fotoPreview}
+                          alt="Preview"
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      ) : (
+                        <FaUser style={{ fontSize: "36px", color: "white" }} />
+                      )}
+                    </div>
+                    <label
+                      htmlFor="input-foto"
+                      className="rounded-circle d-flex align-items-center justify-content-center"
+                      style={{
+                        position: "absolute",
+                        bottom: 0,
+                        right: 0,
+                        width: "28px",
+                        height: "28px",
+                        background: "#667eea",
+                        color: "white",
+                        cursor: "pointer",
+                        border: "2px solid white",
+                      }}
+                      title="Cambiar foto"
+                    >
+                      <FaCamera size={12} />
+                    </label>
+                    <input
+                      id="input-foto"
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={handleFoto}
+                    />
+                  </div>
+                  <div>
+                    <p className="fw-semibold mb-1" style={{ color: "#2c3e50" }}>Foto de Perfil</p>
+                    <p className="text-muted small mb-0">Cámara o galería · máx. 10 MB</p>
+                    {fotoPreview && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-link text-danger p-0 mt-1"
+                        onClick={() => { setFotoFile(null); setFotoPreview(null); }}
+                      >
+                        Quitar foto
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Nombre Completo */}
               <div className="col-12">
                 <label className="form-label fw-semibold d-flex align-items-center" style={{ color: "#2c3e50" }}>

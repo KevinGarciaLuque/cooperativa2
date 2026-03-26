@@ -1,8 +1,7 @@
-import { Fragment, useState } from "react";
-import { FaEdit, FaTrash, FaEnvelope, FaPhone, FaMapMarkerAlt, FaBirthdayCake, FaIdCard, FaChevronDown, FaChevronUp } from "react-icons/fa";
+import { Fragment } from "react";
+import { FaEnvelope, FaPhone, FaMapMarkerAlt, FaBirthdayCake, FaIdCard } from "react-icons/fa";
 
-export default function TablaUsuarios({ usuarios, onEdit, onDelete }) {
-  const [selectedId, setSelectedId] = useState(null);
+export default function TablaUsuarios({ usuarios, onEdit, onDelete, onVerPerfil }) {
 
   const getBadgeColorRol = (rol) => {
     const roles = {
@@ -13,8 +12,6 @@ export default function TablaUsuarios({ usuarios, onEdit, onDelete }) {
     };
     return roles[rol] || { bg: 'rgba(149, 165, 166, 0.1)', text: '#95a5a6' };
   };
-
-  const toggleSelected = (id) => setSelectedId(prev => prev === id ? null : id);
 
   if (usuarios.length === 0) {
     return (
@@ -42,22 +39,21 @@ export default function TablaUsuarios({ usuarios, onEdit, onDelete }) {
               <th style={{ padding: "14px 12px", borderBottom: "none" }}>Nacimiento</th>
               <th style={{ padding: "14px 12px", borderBottom: "none" }}>Rol</th>
               <th className="text-center" style={{ padding: "14px 12px", borderBottom: "none" }}>Estado</th>
-              <th className="text-center" style={{ padding: "14px 12px", borderBottom: "none", width: "48px" }}></th>
             </tr>
           </thead>
           <tbody>
             {usuarios.map((user, i) => {
               const rolColors = getBadgeColorRol(user.rol);
-              const isOpen = selectedId === user.id_usuario;
               return (
                 <Fragment key={user.id_usuario}>
                   <tr
-                    onClick={() => toggleSelected(user.id_usuario)}
+                    onClick={() => onVerPerfil && onVerPerfil(user)}
                     style={{
                       cursor: "pointer",
-                      background: isOpen ? "rgba(102,126,234,0.06)" : undefined,
                       transition: "background 0.15s"
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(102,126,234,0.05)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "")}
                   >
                     <td style={{ padding: "14px 12px" }}>
                       <div
@@ -112,35 +108,7 @@ export default function TablaUsuarios({ usuarios, onEdit, onDelete }) {
                         {user.estado}
                       </span>
                     </td>
-                    <td className="text-center" style={{ padding: "14px 12px", color: "#667eea" }}>
-                      {isOpen ? <FaChevronUp size={13} /> : <FaChevronDown size={13} />}
-                    </td>
                   </tr>
-
-                  {/* Fila de acciones expandible */}
-                  {isOpen && (
-                    <tr style={{ background: "rgba(102,126,234,0.04)" }}>
-                      <td colSpan={9} style={{ padding: "10px 16px 14px", borderTop: "none" }}>
-                        <div className="d-flex align-items-center gap-3">
-                          <span className="text-muted small me-2">Acciones para <strong>{user.nombre_completo}</strong>:</span>
-                          <button
-                            className="btn btn-sm"
-                            onClick={(e) => { e.stopPropagation(); onEdit(user); }}
-                            style={{ background: "rgba(52,152,219,0.1)", color: "#3498db", border: "1px solid rgba(52,152,219,0.3)", borderRadius: "8px", padding: "6px 16px", fontWeight: "600" }}
-                          >
-                            <FaEdit className="me-2" size={13} />Editar
-                          </button>
-                          <button
-                            className="btn btn-sm"
-                            onClick={(e) => { e.stopPropagation(); onDelete(user.id_usuario); }}
-                            style={{ background: "rgba(231,76,60,0.1)", color: "#e74c3c", border: "1px solid rgba(231,76,60,0.3)", borderRadius: "8px", padding: "6px 16px", fontWeight: "600" }}
-                          >
-                            <FaTrash className="me-2" size={13} />Eliminar
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
                 </Fragment>
               );
             })}
@@ -159,17 +127,18 @@ export default function TablaUsuarios({ usuarios, onEdit, onDelete }) {
         <div className="row g-3">
           {usuarios.map((user, i) => {
             const rolColors = getBadgeColorRol(user.rol);
-            const isOpen = selectedId === user.id_usuario;
             return (
               <div className="col-12 col-sm-6" key={user.id_usuario}>
                 <div
                   className="card border-0 shadow-sm h-100"
-                  style={{ borderRadius: "15px", overflow: "hidden", cursor: "pointer", border: isOpen ? "2px solid #667eea" : "2px solid transparent", transition: "border 0.15s" }}
-                  onClick={() => toggleSelected(user.id_usuario)}
+                  style={{ borderRadius: "15px", overflow: "hidden", cursor: "pointer", border: "2px solid transparent", transition: "border 0.15s" }}
+                  onClick={() => onVerPerfil && onVerPerfil(user)}
+                  onMouseEnter={(e) => (e.currentTarget.style.border = "2px solid #667eea")}
+                  onMouseLeave={(e) => (e.currentTarget.style.border = "2px solid transparent")}
                 >
                   {/* Cabecera */}
                   <div
-                    className="d-flex align-items-center justify-content-between px-3 py-3"
+                    className="d-flex align-items-center px-3 py-3"
                     style={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}
                   >
                     <div className="d-flex align-items-center gap-2">
@@ -181,9 +150,6 @@ export default function TablaUsuarios({ usuarios, onEdit, onDelete }) {
                       </div>
                       <span className="fw-bold text-white" style={{ fontSize: "14px" }}>{user.nombre_completo}</span>
                     </div>
-                    <span style={{ color: "rgba(255,255,255,0.85)" }}>
-                      {isOpen ? <FaChevronUp size={13} /> : <FaChevronDown size={13} />}
-                    </span>
                   </div>
 
                   {/* Cuerpo */}
@@ -230,25 +196,10 @@ export default function TablaUsuarios({ usuarios, onEdit, onDelete }) {
                       )}
                     </div>
 
-                    {/* Acciones expandibles */}
-                    {isOpen && (
-                      <div className="d-flex gap-2 mt-3 pt-3" style={{ borderTop: "1px solid #e9ecef" }}>
-                        <button
-                          className="btn btn-sm flex-fill"
-                          onClick={(e) => { e.stopPropagation(); onEdit(user); }}
-                          style={{ background: "rgba(52,152,219,0.1)", color: "#3498db", border: "1px solid rgba(52,152,219,0.3)", borderRadius: "8px", fontWeight: "600" }}
-                        >
-                          <FaEdit className="me-2" size={13} />Editar
-                        </button>
-                        <button
-                          className="btn btn-sm flex-fill"
-                          onClick={(e) => { e.stopPropagation(); onDelete(user.id_usuario); }}
-                          style={{ background: "rgba(231,76,60,0.1)", color: "#e74c3c", border: "1px solid rgba(231,76,60,0.3)", borderRadius: "8px", fontWeight: "600" }}
-                        >
-                          <FaTrash className="me-2" size={13} />Eliminar
-                        </button>
-                      </div>
-                    )}
+                    {/* Toque para ver perfil */}
+                    <p className="mb-0 text-muted small mt-2" style={{ fontSize: "11px" }}>
+                      Toca para ver perfil y acciones
+                    </p>
                   </div>
                 </div>
               </div>

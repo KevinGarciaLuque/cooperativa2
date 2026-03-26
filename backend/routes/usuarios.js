@@ -3,6 +3,34 @@ const router = express.Router();
 const pool = require("../db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+
+// Multer: almacenamiento de fotos de perfil
+const storageUsuarios = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, "../uploads/usuarios");
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `usuario_${req.params.id}_${Date.now()}${ext}`);
+  },
+});
+const uploadFoto = multer({
+  storage: storageUsuarios,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (req, file, cb) => {
+    const allowed = [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".gif"];
+    if (allowed.includes(path.extname(file.originalname).toLowerCase())) {
+      cb(null, true);
+    } else {
+      cb(new Error("Solo se permiten imágenes JPG, PNG, WEBP, HEIC o GIF"));
+    }
+  },
+});
 
 // ============================================
 // FUNCIONES AUXILIARES DE VALIDACIÓN
@@ -587,6 +615,48 @@ router.delete("/:id", async (req, res) => {
 // ============================================
 // CAMBIAR CONTRASEÑA
 // ============================================
+// ============================================
+// SUBIR / ACTUALIZAR FOTO DE PERFIL
+// ============================================
+router.put("/:id/foto", uploadFoto.single("foto"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No se recibió ningún archivo." });
+    }
+
+    const [usuario] = await pool.query(
+      `SELECT foto FROM usuarios WHERE id_usuario = ?`,
+      [req.params.id]
+    );
+    if (usuario.length === 0) {
+      return res.status(404).json({ message: "Usuario no encontrado." });
+    }
+
+    // Eliminar foto anterior si existe
+    if (usuario[0].foto) {
+      const oldPath = path.join(__dirname, "..", usuario[0].foto.replace(/^\//, ""));
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+
+    const fotoPath = `/uploads/usuarios/${req.file.filename}`;
+    await pool.query(
+      `UPDATE usuarios SET foto = ? WHERE id_usuario = ?`,
+      [fotoPath, req.params.id]
+    );
+
+    await registrarBitacora(
+      req.params.id,
+      "Actualización de foto",
+      `Se actualizó la foto de perfil del usuario`
+    );
+
+    res.json({ success: true, foto: fotoPath });
+  } catch (error) {
+    console.error("ERROR AL SUBIR FOTO:", error);
+    res.status(500).json({ message: error.message || "Error al subir la foto." });
+  }
+});
+
 router.post("/:id/cambiar-password", async (req, res) => {
   try {
     const { password_actual, password_nuevo } = req.body;

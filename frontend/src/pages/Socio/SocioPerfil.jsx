@@ -53,7 +53,7 @@ const estadoBadge = (estado) => {
 };
 
 export default function SocioPerfil() {
-  const { user, token, logout } = useAuth();
+  const { user, token, logout, updateUser } = useAuth();
   const [cuentas, setCuentas]           = useState([]);
   const [aportaciones, setAportaciones] = useState([]);
   const [prestamos, setPrestamos]       = useState([]);
@@ -95,7 +95,7 @@ export default function SocioPerfil() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [cuentasRes, aportacionesRes, prestamosRes] = await Promise.all([
+        const [cuentasRes, aportacionesRes, prestamosRes, usuarioRes] = await Promise.all([
           axios.get(`${API_URL}/cuentas?id_usuario=${user.id_usuario}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
@@ -105,10 +105,18 @@ export default function SocioPerfil() {
           axios.get(`${API_URL}/prestamos?id_usuario=${user.id_usuario}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
+          axios.get(`${API_URL}/usuarios/${user.id_usuario}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
         ]);
         setCuentas(cuentasRes.data.data || []);
         setAportaciones(aportacionesRes.data.data || aportacionesRes.data || []);
         setPrestamos(prestamosRes.data.data || prestamosRes.data || []);
+        // Sincronizar foto y datos del usuario desde la base de datos
+        const userActualizado = usuarioRes.data.usuario || usuarioRes.data;
+        if (userActualizado?.foto !== user.foto) {
+          updateUser({ foto: userActualizado.foto });
+        }
       } catch {
         setMsg("No se pudieron cargar los datos.");
         setMsgTipo("error");
@@ -116,7 +124,7 @@ export default function SocioPerfil() {
       setLoading(false);
     };
     if (user?.id_usuario) fetchData();
-  }, [user, token, API_URL]);
+  }, [user.id_usuario, token, API_URL]);
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
@@ -185,12 +193,23 @@ export default function SocioPerfil() {
               <div className="d-flex align-items-center gap-4">
                 <div style={{
                   width: 80, height: 80, borderRadius: "50%",
-                  background: "linear-gradient(135deg,#a8cd3a,#7db200)",
+                  background: user.foto ? "transparent" : "linear-gradient(135deg,#a8cd3a,#7db200)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: "2.2rem", fontWeight: 700, color: "#1a2a00", flexShrink: 0,
-                  boxShadow: "0 4px 16px #a8cd3a55"
+                  boxShadow: "0 4px 16px #a8cd3a55",
+                  overflow: "hidden",
+                  border: user.foto ? "3px solid #a8cd3a" : "none",
                 }}>
-                  {(user.nombre_completo || "S").charAt(0).toUpperCase()}
+                  {user.foto ? (
+                    <img
+                      src={`${API_URL.replace("/api", "")}${user.foto}`}
+                      alt={user.nombre_completo}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onError={(e) => { e.currentTarget.style.display = "none"; }}
+                    />
+                  ) : (
+                    (user.nombre_completo || "S").charAt(0).toUpperCase()
+                  )}
                 </div>
                 <div>
                   <h2 className="mb-1 fw-bold" style={{ fontSize: "1.6rem", letterSpacing: ".4px" }}>

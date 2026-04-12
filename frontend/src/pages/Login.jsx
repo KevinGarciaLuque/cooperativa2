@@ -13,7 +13,8 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const { config } = useConfigSitio();
-  const logoUrl = config.logo_url ? `http://localhost:5000${config.logo_url}` : null;
+  const BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace("/api", "");
+  const logoUrl = config.logo_url ? `${BASE_URL}${config.logo_url}` : null;
   const [dni, setDni] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);

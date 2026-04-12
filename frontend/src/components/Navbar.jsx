@@ -25,7 +25,8 @@ export default function Navbar({ user, onLogout, onMenuClick }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const refMenu = useRef();
   const { config } = useConfigSitio();
-  const logoUrl = config.logo_url ? `http://localhost:5000${config.logo_url}` : null;
+  const BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace("/api", "");
+  const logoUrl = config.logo_url ? `${BASE_URL}${config.logo_url}` : null;
   const siteName = config.site_name || "Smart Coop";
 
   const nombreMostrar =

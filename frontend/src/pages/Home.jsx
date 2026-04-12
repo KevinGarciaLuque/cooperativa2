@@ -11,7 +11,8 @@ export default function Home() {
   const { config } = useConfigSitio();
 
   const features = Array.isArray(config.home_features) ? config.home_features : [];
-  const logoUrl = config.logo_url ? `http://localhost:5000${config.logo_url}` : null;
+  const BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace("/api", "");
+  const logoUrl = config.logo_url ? `${BASE_URL}${config.logo_url}` : null;
 
   return (
     <div style={{ background: DARK, minHeight: "100vh", position: "relative", overflow: "hidden" }}>

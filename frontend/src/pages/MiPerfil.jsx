@@ -188,7 +188,7 @@ export default function MiPerfil() {
   };
 
   const fotoUrl = perfil?.foto
-    ? `http://localhost:5000${perfil.foto}`
+    ? `${API_URL.replace("/api", "")}${perfil.foto}`
     : null;
 
   const tabs = [

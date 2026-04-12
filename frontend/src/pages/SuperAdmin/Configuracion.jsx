@@ -583,7 +583,7 @@ export default function Configuracion() {
                     }}
                   >
                     <img
-                      src={logoActual ? `http://localhost:5000${logoActual}` : "/smartcoop.png"}
+                      src={logoActual ? `${API_URL.replace("/api", "")}${logoActual}` : "/smartcoop.png"}
                       alt="Logo actual"
                       style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
                     />

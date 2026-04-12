@@ -23,6 +23,11 @@ import Usuarios from "../pages/Usuarios/Usuarios";
 import SocioPerfil from "../pages/Socio/SocioPerfil";
 // Vista para restablecimiento por token
 import Restablecer from "../pages/Restablecer"; // <-- CREA este archivo si no existe
+// Super Administrador
+import SuperAdmin from "../pages/SuperAdmin/SuperAdmin";
+import Configuracion from "../pages/SuperAdmin/Configuracion";
+// Perfil de usuario
+import MiPerfil from "../pages/MiPerfil";
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
@@ -160,6 +165,30 @@ export default function Rutas() {
             element={
               <PrivateRoute>
                 <BaseDatos />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/superadmin"
+            element={
+              <PrivateRoute>
+                <SuperAdmin />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/configuracion"
+            element={
+              <PrivateRoute>
+                <Configuracion />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/perfil"
+            element={
+              <PrivateRoute>
+                <MiPerfil />
               </PrivateRoute>
             }
           />

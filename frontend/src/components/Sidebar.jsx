@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
+import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import {
   FaTachometerAlt,
@@ -20,6 +21,7 @@ import {
   FaAngleDoubleLeft,
   FaAngleDoubleRight,
   FaDatabase,
+  FaShieldAlt,
 } from "react-icons/fa";
 import LogoCoop from "./LogoCoop";
 
@@ -30,21 +32,29 @@ const TEXT_MUTED = "#8892a4";
 const SIDEBAR_WIDTH = 240;
 const SIDEBAR_COLLAPSED = 70;
 
-// Menú completo para Administrador
-const menuAdmin = [
-  { to: "/dashboard", icon: <FaTachometerAlt />, label: "Dashboard" },
-  { to: "/usuarios", icon: <FaUsers />, label: "Usuarios" },
-  { to: "/roles", icon: <FaUserShield />, label: "Roles" },
-  { to: "/cuentas", icon: <FaUniversity />, label: "Cuentas" },
-  { to: "/prestamos", icon: <FaHandHoldingUsd />, label: "Préstamos" },
-  { to: "/aportaciones", icon: <FaPiggyBank />, label: "Aportaciones" },
-  { to: "/pagos", icon: <FaMoneyCheckAlt />, label: "Pagos" },
-  { to: "/movimientos", icon: <FaExchangeAlt />, label: "Movimientos" },
-  { to: "/reportes", icon: <FaFileAlt />, label: "Reportes" },
-  { to: "/actividades", icon: <FaTasks />, label: "Actividades" },
-  { to: "/liquidaciones", icon: <FaChartPie />, label: "Liquidaciones" },
-  { to: "/bitacora", icon: <FaClipboardList />, label: "Bitácora" },
-  { to: "/basedatos", icon: <FaDatabase />, label: "Base de Datos" },
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
+// Todos los módulos del sistema (lista maestra)
+const TODOS_MODULOS = [
+  { key: "dashboard",     to: "/dashboard",     icon: <FaTachometerAlt />, label: "Dashboard" },
+  { key: "usuarios",      to: "/usuarios",      icon: <FaUsers />,          label: "Usuarios" },
+  { key: "roles",         to: "/roles",         icon: <FaUserShield />,     label: "Roles" },
+  { key: "cuentas",       to: "/cuentas",       icon: <FaUniversity />,     label: "Cuentas" },
+  { key: "prestamos",     to: "/prestamos",     icon: <FaHandHoldingUsd />, label: "Préstamos" },
+  { key: "aportaciones",  to: "/aportaciones",  icon: <FaPiggyBank />,      label: "Aportaciones" },
+  { key: "pagos",         to: "/pagos",         icon: <FaMoneyCheckAlt />,  label: "Pagos" },
+  { key: "movimientos",   to: "/movimientos",   icon: <FaExchangeAlt />,    label: "Movimientos" },
+  { key: "reportes",      to: "/reportes",      icon: <FaFileAlt />,        label: "Reportes" },
+  { key: "actividades",   to: "/actividades",   icon: <FaTasks />,          label: "Actividades" },
+  { key: "liquidaciones", to: "/liquidaciones", icon: <FaChartPie />,       label: "Liquidaciones" },
+  { key: "bitacora",      to: "/bitacora",      icon: <FaClipboardList />,  label: "Bitácora" },
+  { key: "basedatos",     to: "/basedatos",     icon: <FaDatabase />,       label: "Base de Datos" },
+];
+
+// Menú completo para Super Administrador (todos los módulos + control de accesos)
+const menuSuperAdmin = [
+  ...TODOS_MODULOS,
+  { to: "/superadmin", icon: <FaShieldAlt />, label: "Control de Accesos" },
 ];
 
 // Menú para Socio
@@ -52,13 +62,13 @@ const menuSocio = [
   { to: "/perfil", icon: <FaUserCircle />, label: "Mi Perfil" },
   { to: "/mis-cuentas", icon: <FaUniversity />, label: "Mis Cuentas" },
   { to: "/mis-aportaciones", icon: <FaPiggyBank />, label: "Mis Aportaciones" },
-  // Agrega más si el socio tiene otros módulos
 ];
 
 export default function Sidebar({ collapsed, onCollapseChange }) {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [open, setOpen] = useState(false); // móvil/tablet offcanvas
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 992);
+  const [permisosRol, setPermisosRol] = useState(null); // null = cargando
 
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth >= 992);
@@ -70,10 +80,35 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
     if (isDesktop) setOpen(false);
   }, [isDesktop]);
 
+  // Cargar permisos del rol actual desde la API
+  useEffect(() => {
+    if (!user?.rol_id || user?.rol === "Super Administrador" || user?.rol === "Socio") {
+      setPermisosRol(null);
+      return;
+    }
+    axios
+      .get(`${API_URL}/permisos/${user.rol_id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((res) => setPermisosRol(res.data.data || {}))
+      .catch(() => setPermisosRol({}));
+  }, [user?.rol_id, user?.rol, token]);
+
   // Escoge menú según el rol
   let menu = [];
-  if (user?.rol === "Administrador") menu = menuAdmin;
-  else if (user?.rol === "Socio") menu = menuSocio;
+  if (user?.rol === "Super Administrador") {
+    menu = menuSuperAdmin;
+  } else if (user?.rol === "Socio") {
+    menu = menuSocio;
+  } else if (user?.rol) {
+    // Para cualquier otro rol (Administrador, Contador, etc.) aplicar permisos
+    if (permisosRol === null) {
+      // Aún cargando: mostrar todos (luego se filtrará)
+      menu = TODOS_MODULOS;
+    } else {
+      menu = TODOS_MODULOS.filter((m) => permisosRol[m.key] !== false);
+    }
+  }
 
   const w = collapsed && isDesktop ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH;
 

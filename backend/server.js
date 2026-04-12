@@ -53,6 +53,8 @@ app.use("/api/dashboard", require("./routes/dashboard"));
 app.use("/api/roles", require("./routes/roles"));
 app.use("/api/recuperar", require("./routes/recuperar"));
 app.use("/api/basedatos", require("./routes/basedatos"));
+app.use("/api/permisos", require("./routes/permisos"));
+app.use("/api/configuracion", require("./routes/configuracion"));
 
 // Iniciar el scheduler de backups automáticos
 const { iniciarScheduler } = require("./utils/backupScheduler");

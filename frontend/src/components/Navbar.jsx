@@ -8,6 +8,7 @@ import {
   FaChevronDown,
 } from "react-icons/fa";
 import LogoCoop from "./LogoCoop";
+import { useConfigSitio } from "../hooks/useConfigSitio";
 
 const ACCENT = "#a8cd3a";
 const NAVBAR_BG = "#1a2035";
@@ -23,6 +24,9 @@ function getInitials(name) {
 export default function Navbar({ user, onLogout, onMenuClick }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const refMenu = useRef();
+  const { config } = useConfigSitio();
+  const logoUrl = config.logo_url ? `http://localhost:5000${config.logo_url}` : null;
+  const siteName = config.site_name || "Smart Coop";
 
   const nombreMostrar =
     user?.nombre_completo || user?.nombre || user?.username || "Usuario";
@@ -266,9 +270,9 @@ export default function Navbar({ user, onLogout, onMenuClick }) {
             to={user ? "/dashboard" : "/"}
             className="navbar-brand-custom me-auto"
           >
-            <LogoCoop size={68} />
+            <LogoCoop size={68} logoUrl={logoUrl} />
             <span className="navbar-brand-text d-none d-sm-inline">
-              <span>Smart Coop</span>
+              <span>{siteName}</span>
             </span>
           </Link>
 

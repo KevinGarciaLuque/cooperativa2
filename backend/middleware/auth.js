@@ -18,7 +18,10 @@ const verificarToken = (req, res, next) => {
 
 // Middleware extra para proteger rutas solo para admin
 const soloAdmin = (req, res, next) => {
-  if (!req.usuario || req.usuario.rol !== "Administrador") {
+  if (
+    !req.usuario ||
+    (req.usuario.rol !== "Administrador" && req.usuario.rol !== "Super Administrador")
+  ) {
     return res
       .status(403)
       .json({ message: "Acceso denegado, solo administradores." });
@@ -26,4 +29,14 @@ const soloAdmin = (req, res, next) => {
   next();
 };
 
-module.exports = { verificarToken, soloAdmin };
+// Middleware para proteger rutas solo para Super Administrador
+const soloSuperAdmin = (req, res, next) => {
+  if (!req.usuario || req.usuario.rol !== "Super Administrador") {
+    return res
+      .status(403)
+      .json({ message: "Acceso denegado, solo el Super Administrador." });
+  }
+  next();
+};
+
+module.exports = { verificarToken, soloAdmin, soloSuperAdmin };

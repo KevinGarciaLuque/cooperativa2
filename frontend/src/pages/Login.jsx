@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { FaIdCard, FaLock, FaEye, FaEyeSlash } from "react-icons/fa";
 import LogoCoop from "../components/LogoCoop";
+import { useConfigSitio } from "../hooks/useConfigSitio";
 
 const ACCENT = "#a8cd3a";
 const DARK = "#1a2035";
@@ -11,6 +12,8 @@ const DARK2 = "#222d45";
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { config } = useConfigSitio();
+  const logoUrl = config.logo_url ? `http://localhost:5000${config.logo_url}` : null;
   const [dni, setDni] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -338,22 +341,17 @@ export default function Login() {
       {/* Panel izquierdo — branding */}
       <div className="login-left">
         <div className="login-left-inner">
-          <LogoCoop size={260} withText />
+          <LogoCoop size={260} withText logoUrl={logoUrl} />
           <div className="login-tagline mt-3">
-            Tu Cooperativa,<br />
-            <span>siempre contigo.</span>
+            {config.login_tagline1}<br />
+            <span>{config.login_tagline2}</span>
           </div>
           <div className="login-divider" />
           <p className="login-subtitle">
-            Gestiona tus aportaciones, préstamos y cuentas desde un solo lugar, de forma segura y eficiente.
+            {config.login_subtitle}
           </p>
           <div className="mt-4">
-            {[
-              "Control total de tus finanzas",
-              "Acceso seguro 24/7",
-              "Reportes en tiempo real",
-              "Gestión de socios y roles",
-            ].map((f) => (
+            {(Array.isArray(config.login_features) ? config.login_features : []).map((f) => (
               <div className="login-feature" key={f}>
                 <div className="login-feature-dot" />
                 {f}
@@ -369,7 +367,7 @@ export default function Login() {
         <div className="login-card">
           {/* Logo solo visible en móvil/tablet */}
           <div className="login-logo-mobile">
-            <LogoCoop size={120} />
+            <LogoCoop size={120} logoUrl={logoUrl} />
             <Link to="/" className="login-home-btn">← Inicio</Link>
           </div>
 
@@ -446,6 +444,13 @@ export default function Login() {
           <div className="text-center mt-4" style={{ color: "rgba(255,255,255,0.2)", fontSize: "0.75rem" }}>
             © {new Date().getFullYear()} · Desarrollado por{" "}
             <span style={{ color: ACCENT, fontWeight: 600 }}>Kevin Garcia</span>
+            {" "}·{" "}
+            <a
+              href="tel:+50496065564"
+              style={{ color: ACCENT, fontWeight: 600, textDecoration: "none" }}
+            >
+              +504 9606-5564
+            </a>
           </div>
         </div>
       </div>

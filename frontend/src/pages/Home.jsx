@@ -1,35 +1,18 @@
 import React from "react";
 import LogoCoop from "../components/LogoCoop";
+import { useConfigSitio } from "../hooks/useConfigSitio";
 
 const ACCENT = "#a8cd3a";
 const DARK  = "#1a2035";
 const DARK2 = "#222d45";
 const MUTED = "rgba(255,255,255,0.45)";
 
-const features = [
-  {
-    icon: "💰",
-    title: "Aportaciones",
-    desc: "Registra y consulta tus aportaciones en tiempo real.",
-  },
-  {
-    icon: "🏦",
-    title: "Préstamos",
-    desc: "Solicita y gestiona préstamos de forma rápida y segura.",
-  },
-  {
-    icon: "📊",
-    title: "Reportes",
-    desc: "Accede a reportes financieros detallados y actualizados.",
-  },
-  {
-    icon: "🔐",
-    title: "Seguridad",
-    desc: "Tu información protegida con acceso seguro las 24 horas.",
-  },
-];
-
 export default function Home() {
+  const { config } = useConfigSitio();
+
+  const features = Array.isArray(config.home_features) ? config.home_features : [];
+  const logoUrl = config.logo_url ? `http://localhost:5000${config.logo_url}` : null;
+
   return (
     <div style={{ background: DARK, minHeight: "100vh", position: "relative", overflow: "hidden" }}>
       <style>{`
@@ -242,7 +225,7 @@ export default function Home() {
 
       {/* Navbar fija */}
       <nav className="home-nav">
-        <LogoCoop size={44} />
+        <LogoCoop size={44} logoUrl={logoUrl} />
         <a href="/login" className="home-nav-btn">Iniciar sesión</a>
       </nav>
 
@@ -250,23 +233,23 @@ export default function Home() {
       <section className="home-hero">
         <div className="home-badge">
           <div className="home-badge-dot" />
-          Plataforma cooperativa digital
+          {config.home_badge}
         </div>
 
         <div style={{ marginBottom: 0 }}>
-          <LogoCoop size={210} />
+          <LogoCoop size={210} logoUrl={logoUrl} />
         </div>
 
         <h1 className="home-title ">
-          Tu cooperativa,<br />
-          <span>siempre contigo.</span>
+          {config.home_title1}<br />
+          <span>{config.home_title2}</span>
         </h1>
         <p className="home-subtitle">
-          Gestiona tus aportaciones, préstamos y cuentas desde un solo lugar, de forma segura, rápida y eficiente.
+          {config.home_subtitle}
         </p>
 
         <a href="/login" className="home-cta">
-          Comenzar ahora
+          {config.home_cta}
           <span className="home-cta-arrow">→</span>
         </a>
 
@@ -288,7 +271,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="home-footer">
-        Smart Coop &copy; {new Date().getFullYear()} &mdash; Ahorro y crédito, desde cualquier lugar.
+        {config.home_footer.replace("{year}", new Date().getFullYear())}
       </footer>
     </div>
   );

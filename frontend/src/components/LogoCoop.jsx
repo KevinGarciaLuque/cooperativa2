@@ -1,20 +1,25 @@
 /**
  * LogoCoop — Logo de Smart Coop
- * Usa /smartcoop.png (carpeta public) con fondo transparente.
+ * Usa el logo subido via configuración del sitio si existe,
+ * de lo contrario usa /smartcoop.png (carpeta public).
  * Props:
  *   size      → ancho en px (default 48, alto proporcional automático)
- *   withText  → reservado para compatibilidad (la imagen ya incluye el texto)
+ *   withText  → reservado para compatibilidad
+ *   logoUrl   → URL dinámica desde configuración (opcional)
  *   style, className
  */
 export default function LogoCoop({
   size = 100,
   withText = false,
+  logoUrl = null,
   style = {},
   className = "",
 }) {
+  const src = logoUrl || "/smartcoop.png";
+
   return (
     <img
-      src="/smartcoop.png"
+      src={src}
       alt="Smart Coop"
       className={className}
       style={{
@@ -28,3 +33,4 @@ export default function LogoCoop({
     />
   );
 }
+

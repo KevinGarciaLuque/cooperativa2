@@ -401,11 +401,16 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
                   }}
                 >
                   {roles.length > 0 ? (
-                    roles.map(rol => (
-                      <option key={rol.id_rol} value={rol.id_rol}>
-                        {rol.nombre || rol.nombre_rol}
-                      </option>
-                    ))
+                    roles
+                      .filter(rol => 
+                        usuarioLogueado?.rol === "Super Administrador" || 
+                        (rol.nombre || rol.nombre_rol) !== "Super Administrador"
+                      )
+                      .map(rol => (
+                        <option key={rol.id_rol} value={rol.id_rol}>
+                          {rol.nombre || rol.nombre_rol}
+                        </option>
+                      ))
                   ) : (
                     <>
                       <option value={1}>Administrador</option>

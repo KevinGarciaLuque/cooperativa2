@@ -16,7 +16,7 @@ const DEFAULTS_HOME = {
   home_title2:   "siempre contigo.",
   home_subtitle: "Gestiona tus aportaciones, préstamos y cuentas desde un solo lugar, de forma segura, rápida y eficiente.",
   home_cta:      "Comenzar ahora",
-  home_footer:   "Smart Coop © {year} — Ahorro y crédito, desde cualquier lugar.",
+  home_footer:   "Demo © {year} — Ahorro y crédito, desde cualquier lugar.",
   home_features: [
     { icon: "💰", title: "Aportaciones", desc: "Registra y consulta tus aportaciones en tiempo real." },
     { icon: "🏦", title: "Préstamos",    desc: "Solicita y gestiona préstamos de forma rápida y segura." },
@@ -117,7 +117,7 @@ function TabInicio({ datos, setDatos }) {
             label='Pie de página (usa {year} para el año actual)'
             value={datos.home_footer}
             onChange={setField("home_footer")}
-            placeholder="Smart Coop © {year} — ..."
+            placeholder="Demo © {year} — ..."
           />
         </div>
       </div>
@@ -407,7 +407,7 @@ export default function Configuracion() {
 
   const [datosHome,  setDatosHome]  = useState(DEFAULTS_HOME);
   const [datosLogin, setDatosLogin] = useState(DEFAULTS_LOGIN);
-  const [siteName,   setSiteName]   = useState("Smart Coop");
+  const [siteName,   setSiteName]   = useState("Demo");
 
   // Logo
   const [logoActual,    setLogoActual]    = useState("");
@@ -682,7 +682,7 @@ export default function Configuracion() {
                   className="form-control"
                   value={siteName}
                   onChange={(e) => setSiteName(e.target.value)}
-                  placeholder="Smart Coop"
+                  placeholder="Demo"
                   style={{ fontSize: 14, maxWidth: 320 }}
                 />
                 <p className="mb-0 mt-1" style={{ fontSize: 11, color: "#9ca3af" }}>

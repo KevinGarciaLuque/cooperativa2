@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Propuesta Comercial - Sistema de Gestión Cooperativa</title>
+  <style>
+    @page {
+      margin: 2.5cm 2cm;
+    }
+    body {
+      font-family: "Calibri", "Arial", sans-serif;
+      font-size: 11pt;
+      color: #1a1a1a;
+      line-height: 1.5;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 30px;
+      background: #fff;
+    }
+    /* ── Encabezado ── */
+    .header-block {
+      background: linear-gradient(135deg, #0d47a1 0%, #1565c0 60%, #1976d2 100%);
+      color: #fff;
+      padding: 32px 36px;
+      border-radius: 6px;
+      margin-bottom: 28px;
+    }
+    .header-block h1 {
+      font-size: 22pt;
+      margin: 0 0 6px;
+      letter-spacing: 0.5px;
+    }
+    .header-block .subtitle {
+      font-size: 12pt;
+      opacity: 0.9;
+      margin: 0;
+    }
+    .header-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9.5pt;
+      color: #555;
+      margin-bottom: 24px;
+      border-bottom: 2px solid #1565c0;
+      padding-bottom: 8px;
+    }
+    /* ── Secciones ── */
+    h2 {
+      font-size: 14pt;
+      color: #0d47a1;
+      border-left: 5px solid #1976d2;
+      padding-left: 10px;
+      margin-top: 32px;
+      margin-bottom: 10px;
+      page-break-after: avoid;
+    }
+    h3 {
+      font-size: 11.5pt;
+      color: #1565c0;
+      margin-top: 18px;
+      margin-bottom: 6px;
+    }
+    p { margin: 6px 0 10px; }
+    ul, ol { margin: 6px 0 12px; padding-left: 22px; }
+    li { margin-bottom: 4px; }
+    /* ── Tablas ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 10.5pt;
+    }
+    th {
+      background-color: #1565c0;
+      color: #fff;
+      padding: 9px 12px;
+      text-align: left;
+      font-weight: 600;
+    }
+    td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #dce3ee;
+      vertical-align: top;
+    }
+    tr:nth-child(even) td { background-color: #f0f4fb; }
+    tr:hover td { background-color: #dce8fb; }
+    .price-cell {
+      font-weight: 700;
+      color: #0d47a1;
+      white-space: nowrap;
+    }
+    /* ── Cajas de resumen ── */
+    .box {
+      border: 1.5px solid #bbcfee;
+      border-radius: 6px;
+      padding: 14px 18px;
+      margin: 14px 0;
+      background: #f5f8ff;
+    }
+    .box-green {
+      border-color: #b2dfdb;
+      background: #f0faf8;
+    }
+    .box-orange {
+      border-color: #ffe0b2;
+      background: #fff8f0;
+    }
+    .highlight {
+      background: #fff3cd;
+      border-left: 4px solid #f59e0b;
+      padding: 10px 14px;
+      border-radius: 4px;
+      margin: 12px 0;
+      font-size: 10.5pt;
+    }
+    .tag {
+      display: inline-block;
+      background: #1976d2;
+      color: #fff;
+      border-radius: 3px;
+      padding: 2px 8px;
+      font-size: 9pt;
+      margin: 2px 3px 2px 0;
+    }
+    .tag-green { background: #2e7d32; }
+    .tag-orange { background: #e65100; }
+    .tag-gray { background: #546e7a; }
+    /* ── Pie de página ── */
+    .footer {
+      margin-top: 40px;
+      border-top: 2px solid #1565c0;
+      padding-top: 14px;
+      font-size: 9pt;
+      color: #666;
+      text-align: center;
+    }
+    .total-row td {
+      font-weight: 700;
+      font-size: 11.5pt;
+      color: #0d47a1;
+      background: #e3ecfc !important;
+      border-top: 2px solid #1565c0;
+    }
+    @media print {
+      body { padding: 0; }
+      .header-block { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      h2 { page-break-after: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════
+       ENCABEZADO
+  ══════════════════════════════════════════════ -->
+  <div class="header-block">
+    <h1>&#x1F4CA; Sistema de Gestión de Cooperativas</h1>
+    <p class="subtitle">Propuesta Comercial &mdash; Valoración, Tecnologías y Servicios Asociados</p>
+    <p class="subtitle" style="font-size:10pt; opacity:0.85; margin-top:6px;">&#x1F1F8;&#x1F1FB; Mercado Objetivo: El Salvador &mdash; Solución Empresarial para Cooperativas</p>
+  </div>
+  <div class="header-meta">
+    <span><strong>Documento:</strong> Propuesta Comercial &mdash; Estimado de Valor (El Salvador)</span>
+    <span><strong>Fecha:</strong> Abril 2026</span>
+    <span><strong>Versión:</strong> 1.0</span>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       1. DESCRIPCIÓN DEL SISTEMA
+  ══════════════════════════════════════════════ -->
+  <h2>1. Descripción General del Sistema</h2>
+  <p>
+    El <strong>Sistema de Gestión de Cooperativas</strong> es una aplicación web completa de arquitectura
+    cliente-servidor (Full Stack), desarrollada con tecnologías modernas. Cuenta con dos grandes módulos:
+    un <strong>Panel Administrativo</strong> completo y un <strong>Portal de Socio</strong> (perfil personal
+    con vista de cuenta, aportaciones, préstamos y movimientos).
+  </p>
+  <div class="box">
+    <strong>&#x2705; Módulos funcionales implementados:</strong>
+    <ul>
+      <li>Autenticación segura con JWT y recuperación de contraseña por correo electrónico</li>
+      <li>Dashboard con estadísticas en tiempo real y gráficas interactivas</li>
+      <li>Gestión de Usuarios (altas, bajas, edición, foto de perfil, roles)</li>
+      <li>Gestión de Roles y Permisos granulares por módulo</li>
+      <li>Gestión de Cuentas de socios</li>
+      <li>Gestión de Préstamos (créditos, cuotas, seguimiento)</li>
+      <li>Gestión de Aportaciones (registro y seguimiento de aportaciones de socios)</li>
+      <li>Gestión de Pagos</li>
+      <li>Registro de Movimientos contables</li>
+      <li>Liquidaciones</li>
+      <li>Actividades de la cooperativa</li>
+      <li>Reportes exportables a Excel (ExcelJS)</li>
+      <li>Bitácora de auditoría (registro de acciones del sistema)</li>
+      <li>Gestión de Base de Datos: backups manuales y <em>automáticos programados</em> (cron)</li>
+      <li>Panel SuperAdministrador con configuración del sitio, logo y parámetros globales</li>
+      <li>Portal de Socio: vista personal de cuenta, movimientos y estado de préstamos</li>
+      <li>Subida de archivos (logos, fotos de usuario)</li>
+      <li>Sistema multirol: SuperAdmin, Admin, Operador, Socio</li>
+    </ul>
+  </div>
+  <div class="highlight">
+    &#x26A0;&#xFE0F; <strong>Nota:</strong> El sistema actualmente <strong>no incluye integración con
+    pasarelas de pago ni transferencias bancarias</strong>. Este módulo queda como funcionalidad futura.
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       2. TIEMPO INVERTIDO
+  ══════════════════════════════════════════════ -->
+  <h2>2. Estimado de Tiempo Invertido</h2>
+  <p>
+    El desarrollo inició en <strong>enero de 2025</strong> y la versión actual fue completada en
+    <strong>abril de 2026</strong>, lo que representa aproximadamente <strong>15 meses</strong> de trabajo.
+  </p>
+  <table>
+    <tr>
+      <th>Fase de Desarrollo</th>
+      <th>Horas Estimadas</th>
+    </tr>
+    <tr>
+      <td>Diseño de base de datos, arquitectura y planificación</td>
+      <td>40 – 60 h</td>
+    </tr>
+    <tr>
+      <td>Backend: API REST, autenticación, módulos principales</td>
+      <td>150 – 200 h</td>
+    </tr>
+    <tr>
+      <td>Frontend: UI, vistas administrativas, lógica de negocio</td>
+      <td>150 – 200 h</td>
+    </tr>
+    <tr>
+      <td>Portal de Socio, Roles y Permisos avanzados</td>
+      <td>40 – 60 h</td>
+    </tr>
+    <tr>
+      <td>Reportes, Backups, SuperAdmin, Configuración</td>
+      <td>30 – 50 h</td>
+    </tr>
+    <tr>
+      <td>Pruebas, correcciones, ajustes finales</td>
+      <td>30 – 50 h</td>
+    </tr>
+    <tr class="total-row">
+      <td><strong>TOTAL ESTIMADO</strong></td>
+      <td><strong>440 – 620 horas</strong></td>
+    </tr>
+  </table>
+  <div class="box box-green">
+    Tomando una tarifa de desarrollador Full Stack senior de <strong>$25 – $45 USD/hora</strong>
+    (estándar para desarrollo de software financiero/cooperativo en El Salvador y Centroamérica),
+    el costo de desarrollo puro equivale a <strong>$11,000 – $27,900 USD</strong>.
+    Soluciones similares en el mercado salvadoreño (SIGCOOP, CoopWare, sistemas a medida para
+    cooperativas reguladas por INSAFOCOOP) oscilan entre <strong>$8,000 – $35,000 USD</strong>
+    solo en licencias iniciales, sin contar implementación ni soporte.
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       3. TECNOLOGÍAS UTILIZADAS
+  ══════════════════════════════════════════════ -->
+  <h2>3. Tecnologías y Librerías Utilizadas</h2>
+
+  <h3>&#x1F527; Backend (Node.js)</h3>
+  <p>
+    <span class="tag">Node.js</span>
+    <span class="tag">Express.js</span>
+    <span class="tag">MySQL 8</span>
+    <span class="tag tag-gray">mysql2</span>
+    <span class="tag tag-gray">JWT (jsonwebtoken)</span>
+    <span class="tag tag-gray">bcryptjs</span>
+    <span class="tag tag-gray">Nodemailer</span>
+    <span class="tag tag-gray">Multer</span>
+    <span class="tag tag-gray">ExcelJS</span>
+    <span class="tag tag-gray">node-cron</span>
+    <span class="tag tag-gray">CORS</span>
+    <span class="tag tag-gray">dotenv</span>
+  </p>
+
+  <h3>&#x1F3A8; Frontend (React)</h3>
+  <p>
+    <span class="tag tag-green">React 19</span>
+    <span class="tag tag-green">Vite 7</span>
+    <span class="tag tag-green">React Router DOM v7</span>
+    <span class="tag tag-green">Bootstrap 5</span>
+    <span class="tag tag-green">React Bootstrap</span>
+    <span class="tag tag-green">Axios</span>
+    <span class="tag tag-green">Recharts</span>
+    <span class="tag tag-green">React Icons</span>
+    <span class="tag tag-green">React Circular Progressbar</span>
+  </p>
+
+  <h3>&#x2601;&#xFE0F; Infraestructura / Despliegue</h3>
+  <p>
+    <span class="tag tag-orange">Railway (nube)</span>
+    <span class="tag tag-orange">MySQL en la nube</span>
+    <span class="tag tag-orange">Variables de entorno (.env)</span>
+    <span class="tag tag-orange">API REST</span>
+    <span class="tag tag-orange">Backups automáticos (cron)</span>
+  </p>
+
+  <table>
+    <tr>
+      <th>Librería / Tecnología</th>
+      <th>Propósito</th>
+      <th>Capa</th>
+    </tr>
+    <tr><td>Node.js + Express.js</td><td>Servidor y API REST</td><td>Backend</td></tr>
+    <tr><td>MySQL / mysql2</td><td>Base de datos relacional</td><td>Backend</td></tr>
+    <tr><td>jsonwebtoken (JWT)</td><td>Autenticación segura sin estado</td><td>Backend</td></tr>
+    <tr><td>bcryptjs</td><td>Hash seguro de contraseñas</td><td>Backend</td></tr>
+    <tr><td>Nodemailer</td><td>Envío de correos (recuperación de contraseña)</td><td>Backend</td></tr>
+    <tr><td>Multer</td><td>Subida de archivos (fotos, logos)</td><td>Backend</td></tr>
+    <tr><td>ExcelJS</td><td>Generación de reportes en Excel</td><td>Backend</td></tr>
+    <tr><td>node-cron</td><td>Backups automáticos programados</td><td>Backend</td></tr>
+    <tr><td>React 19</td><td>Interfaz de usuario dinámica (SPA)</td><td>Frontend</td></tr>
+    <tr><td>Vite 7</td><td>Bundler y servidor de desarrollo ultrarrápido</td><td>Frontend</td></tr>
+    <tr><td>React Router DOM v7</td><td>Navegación de rutas protegidas</td><td>Frontend</td></tr>
+    <tr><td>Bootstrap 5 + React Bootstrap</td><td>Componentes UI responsivos</td><td>Frontend</td></tr>
+    <tr><td>Axios</td><td>Cliente HTTP para consumo de la API</td><td>Frontend</td></tr>
+    <tr><td>Recharts</td><td>Gráficas y estadísticas en dashboard</td><td>Frontend</td></tr>
+    <tr><td>React Icons</td><td>Iconografía en toda la aplicación</td><td>Frontend</td></tr>
+    <tr><td>React Circular Progressbar</td><td>Indicadores visuales circulares</td><td>Frontend</td></tr>
+    <tr><td>Railway</td><td>Plataforma de despliegue en la nube</td><td>Infraestructura</td></tr>
+  </table>
+
+  <!-- ═══════════════════════════════════════════
+       4. OPCIONES DE COMERCIALIZACIÓN
+  ══════════════════════════════════════════════ -->
+  <h2>4. Opciones de Comercialización</h2>
+
+  <div class="highlight">
+    &#x1F512; <strong>Política de Protección del Software:</strong> En ninguna modalidad se entrega el
+    código fuente al cliente, salvo en la Opción C (Licencia Empresarial Exclusiva) con contrato
+    legal notariado. El software se protege mediante compilación, ofuscación y acuerdo de
+    confidencialidad (NDA). Esto garantiza que el cliente <strong>no puede replicar, revender
+    ni redistribuir el sistema</strong> bajo ninguna circunstancia.
+  </div>
+
+  <!-- OPCIÓN A: SaaS — RECOMENDADA -->
+  <h3>&#x2B50; Opción A — SaaS en la Nube (Modalidad Recomendada)</h3>
+  <div class="box box-green">
+    <p>El cliente accede al sistema a través de internet. <strong>Nunca recibe el código fuente.</strong>
+    El desarrollador administra el servidor, las actualizaciones, los backups y la seguridad.
+    Es la opción más segura para el proveedor y la más económica para el cliente.</p>
+    <table>
+      <tr>
+        <th>Plan</th>
+        <th>Alcance</th>
+        <th class="price-cell">Mensual (USD)</th>
+        <th class="price-cell">Anual (USD)</th>
+      </tr>
+      <tr>
+        <td><strong>Plan Básico</strong></td>
+        <td>Hasta 100 socios, 2 administradores, hosting incluido, soporte por correo</td>
+        <td class="price-cell">$150 – $200</td>
+        <td class="price-cell">$1,600 – $2,200</td>
+      </tr>
+      <tr>
+        <td><strong>Plan Estándar</strong></td>
+        <td>Hasta 500 socios, 5 usuarios admin, soporte mensual incluido, backups automáticos diarios</td>
+        <td class="price-cell">$280 – $380</td>
+        <td class="price-cell">$3,000 – $4,200</td>
+      </tr>
+      <tr>
+        <td><strong>Plan Premium</strong></td>
+        <td>Socios ilimitados, usuarios ilimitados, soporte prioritario 48h, SLA garantizado, actualizaciones incluidas</td>
+        <td class="price-cell">$500 – $700</td>
+        <td class="price-cell">$5,400 – $7,500</td>
+      </tr>
+    </table>
+    <p>&#x2705; <strong>Ventajas para el proveedor:</strong> El cliente <em>nunca</em> recibe el código.
+    No puede replicarlo ni revenderlo. Vos mantenés el control total del software.</p>
+    <p><em>&#x1F4A1; Con solo 4 clientes en Plan Estándar se generan <strong>$1,120 – $1,520/mes</strong>
+    de ingreso recurrente. El mercado salvadoreño tiene más de 500 cooperativas activas registradas
+    ante el <strong>INSAFOCOOP</strong>.</em></p>
+  </div>
+
+  <!-- OPCIÓN B: LICENCIA ON-PREMISE (sin código fuente) -->
+  <h3>&#x1F4BB; Opción B — Licencia On-Premise (Instalación en Servidor del Cliente, sin código)</h3>
+  <div class="box">
+    <p>Para clientes que necesitan el sistema instalado en <strong>su propio servidor</strong> (por
+    política interna o regulatoria), se entrega únicamente el <strong>ejecutable compilado y
+    ofuscado</strong>, nunca el código fuente legible. El cliente no puede leer, modificar
+    ni redistribuir el software. Se firma un <strong>Contrato de Licencia de Uso Restringido</strong>
+    que establece penalidades legales en caso de incumplimiento.</p>
+    <table>
+      <tr>
+        <th>Modalidad</th>
+        <th>Qué se entrega</th>
+        <th class="price-cell">Precio (USD)</th>
+      </tr>
+      <tr>
+        <td><strong>Licencia On-Premise Básica</strong></td>
+        <td>Build compilado + instalación en servidor del cliente + contrato de licencia de uso + 3 meses soporte</td>
+        <td class="price-cell">$6,000 – $8,500</td>
+      </tr>
+      <tr>
+        <td><strong>Licencia On-Premise Estándar</strong></td>
+        <td>Build compilado + personalización de marca + instalación + contrato + 6 meses soporte + actualizaciones</td>
+        <td class="price-cell">$9,000 – $13,000</td>
+      </tr>
+      <tr>
+        <td><strong>Licencia On-Premise Premium</strong></td>
+        <td>Build compilado + personalización completa + instalación + contrato + 12 meses soporte + 2 actualizaciones mayores</td>
+        <td class="price-cell">$14,000 – $18,000</td>
+      </tr>
+    </table>
+    <p>&#x1F512; <strong>Protección:</strong> El frontend se entrega como archivos compilados (<code>dist/</code>
+    minificados). El backend se entrega ofuscado o empaquetado con herramientas que impiden su lectura.
+    El contrato prohíbe expresamente la ingeniería inversa, copia o redistribución.</p>
+    <p><em>&#x1F4A1; Precio recomendado para empresa en El Salvador: <strong>$9,000 – $13,000 USD</strong>
+    (Licencia On-Premise Estándar). Competitivo frente a software cooperativo regional.</em></p>
+  </div>
+
+  <!-- OPCIÓN C: CÓDIGO FUENTE — SOLO GRANDES EMPRESAS -->
+  <h3>&#x1F6A8; Opción C — Licencia Empresarial con Código Fuente (Solo bajo contrato notariado)</h3>
+  <div class="box box-orange">
+    <p>Esta opción es <strong>exclusiva para grandes empresas o grupos corporativos</strong> que
+    requieren acceso al código fuente por motivos de auditoría interna, personalización profunda
+    o integración con otros sistemas empresariales. <strong>Requiere contrato notariado</strong>
+    con cláusulas de confidencialidad, prohibición de redistribución y penalidades económicas
+    por incumplimiento. <u>No se recomienda para cooperativas individuales.</u></p>
+    <table>
+      <tr>
+        <th>Modalidad</th>
+        <th>Condiciones</th>
+        <th class="price-cell">Precio (USD)</th>
+      </tr>
+      <tr>
+        <td><strong>Licencia Corporativa Exclusiva</strong></td>
+        <td>Código fuente completo · Uso exclusivo para 1 empresa · Prohibición total de reventa · Contrato notariado · NDA firmado · 12 meses soporte</td>
+        <td class="price-cell">$22,000 – $30,000</td>
+      </tr>
+      <tr>
+        <td><strong>Licencia de Distribución (Franquicia)</strong></td>
+        <td>Derecho de desplegar en múltiples cooperativas del mismo grupo · Prohibición de reventa a terceros externos · Contrato notariado · Royalty anual incluido</td>
+        <td class="price-cell">$35,000 – $50,000</td>
+      </tr>
+    </table>
+    <p>&#x26A0;&#xFE0F; <strong>Advertencia:</strong> Aunque el contrato protege legalmente, entregar
+    código fuente siempre conlleva un riesgo residual. Solo se recomienda cuando el cliente
+    tiene una razón técnica o legal válida y justificada, y cuando el precio refleja
+    ese riesgo adecuadamente.</p>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       5. IMPLEMENTACIÓN
+  ══════════════════════════════════════════════ -->
+  <h2>5. Implementación</h2>
+  <div class="box">
+    <p>Incluye: configuración del servidor, despliegue en la nube (Railway u otro proveedor),
+    configuración de variables de entorno, carga inicial de datos, pruebas en producción y
+    entrega funcional del sistema.</p>
+    <table>
+      <tr>
+        <th>Tipo</th>
+        <th>Descripción</th>
+        <th class="price-cell">Precio (USD)</th>
+      </tr>
+      <tr>
+        <td>Implementación Básica</td>
+        <td>Despliegue en nube + configuración inicial (entrega en 3–5 días hábiles)</td>
+        <td class="price-cell">$600 – $900</td>
+      </tr>
+      <tr>
+        <td>Implementación Completa</td>
+        <td>Despliegue + personalización visual (logo, colores corporativos) + pruebas integrales + acta de entrega</td>
+        <td class="price-cell">$1,000 – $1,600</td>
+      </tr>
+      <tr>
+        <td>Implementación con Servidor Propio</td>
+        <td>Instalación en servidor del cliente en El Salvador (VPS/on-premise) + configuración de red + seguridad</td>
+        <td class="price-cell">$1,500 – $2,500</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       6. DOCUMENTACIÓN (MANUAL DE USUARIO)
+  ══════════════════════════════════════════════ -->
+  <h2>6. Documentación — Manual de Usuario</h2>
+  <div class="box">
+    <p>Elaboración de manual de usuario completo en formato PDF/Word con capturas de pantalla,
+    flujos paso a paso, descripción de módulos y guía de resolución de problemas comunes.</p>
+    <table>
+      <tr>
+        <th>Tipo de Documento</th>
+        <th>Contenido</th>
+        <th class="price-cell">Precio (USD)</th>
+      </tr>
+      <tr>
+        <td>Manual de Usuario Básico</td>
+        <td>Módulos principales, 20–30 páginas, capturas incluidas, entregado en PDF</td>
+        <td class="price-cell">$400 – $600</td>
+      </tr>
+      <tr>
+        <td>Manual de Usuario Completo</td>
+        <td>Todos los módulos, guía por roles (Admin, Operador, Socio), FAQ, 40–60 páginas</td>
+        <td class="price-cell">$600 – $900</td>
+      </tr>
+      <tr>
+        <td>Manual Técnico (Administrador TI)</td>
+        <td>Arquitectura del sistema, configuración, backups, base de datos, seguridad</td>
+        <td class="price-cell">$400 – $700</td>
+      </tr>
+      <tr>
+        <td>Paquete Completo (Usuario + Técnico)</td>
+        <td>Ambos manuales + 3–5 videos tutoriales cortos (screencast)</td>
+        <td class="price-cell">$900 – $1,400</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       7. CAPACITACIÓN
+  ══════════════════════════════════════════════ -->
+  <h2>7. Capacitación</h2>
+  <div class="box box-orange">
+    <p>Sesiones de capacitación para el personal de la cooperativa: administradores, operadores
+    y socios. Puede ser presencial o en línea (Zoom/Meet).</p>
+    <table>
+      <tr>
+        <th>Modalidad</th>
+        <th>Duración / Alcance</th>
+        <th class="price-cell">Precio (USD)</th>
+      </tr>
+      <tr>
+        <td>Capacitación Básica (en línea)</td>
+        <td>3–4 horas, uso general del sistema para operadores y socios, grabación entregada</td>
+        <td class="price-cell">$300 – $500</td>
+      </tr>
+      <tr>
+        <td>Capacitación Estándar (en línea)</td>
+        <td>6–8 horas en 2 sesiones, todos los módulos por roles, material digital incluido</td>
+        <td class="price-cell">$550 – $850</td>
+      </tr>
+      <tr>
+        <td>Capacitación Presencial (El Salvador)</td>
+        <td>Día completo (7–8 h) in situ con el equipo staff de la cooperativa, incluye viáticos</td>
+        <td class="price-cell">$900 – $1,500</td>
+      </tr>
+      <tr>
+        <td>Consultoría / Soporte por Hora</td>
+        <td>Sesiones adicionales a demanda, post-entrega del sistema</td>
+        <td class="price-cell">$65 – $100 / hora</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       8. MIGRACIÓN DE DATOS
+  ══════════════════════════════════════════════ -->
+  <h2>8. Migración de Datos</h2>
+  <div class="box">
+    <p>Servicio de importación y limpieza de datos históricos desde el sistema anterior del cliente
+    (Excel, Access, otro software) hacia la nueva base de datos MySQL del sistema.</p>
+    <table>
+      <tr>
+        <th>Tipo de Migración</th>
+        <th>Descripción</th>
+        <th class="price-cell">Precio (USD)</th>
+      </tr>
+      <tr>
+        <td>Migración Simple</td>
+        <td>Datos desde Excel/CSV (socios, saldos básicos). Volumen pequeño (&lt;500 registros)</td>
+        <td class="price-cell">$350 – $600</td>
+      </tr>
+      <tr>
+        <td>Migración Estándar</td>
+        <td>Datos de socios, cuentas, préstamos e historial de movimientos. Hasta 5,000 registros</td>
+        <td class="price-cell">$700 – $1,200</td>
+      </tr>
+      <tr>
+        <td>Migración Completa / Compleja</td>
+        <td>Desde otro sistema (Access, SQL Server, CoopWare), limpieza, validación y transformación</td>
+        <td class="price-cell">$1,200 – $2,200</td>
+      </tr>
+      <tr>
+        <td>Validación y Auditoría Post-Migración</td>
+        <td>Reporte de integridad, consistencia y cuadre contable de datos migrados</td>
+        <td class="price-cell">$250 – $500</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       9. RESUMEN / PAQUETES
+  ══════════════════════════════════════════════ -->
+  <h2>9. Resumen de Precios por Paquetes</h2>
+
+  <h3>&#x2B50; Paquete SaaS Año 1 (Modalidad Recomendada)</h3>
+  <p style="font-size:10pt; color:#2e7d32;"><strong>&#x2705; El cliente NUNCA recibe código fuente. Vos mantenés el control total.</strong></p>
+  <table>
+    <tr>
+      <th>Servicio</th>
+      <th class="price-cell">Precio Referencial (USD)</th>
+    </tr>
+    <tr><td>SaaS Plan Estándar (primer año)</td><td class="price-cell">$3,000 – $4,200</td></tr>
+    <tr><td>Implementación Básica en nube</td><td class="price-cell">$600 – $900</td></tr>
+    <tr><td>Manual de Usuario Básico</td><td class="price-cell">$400 – $600</td></tr>
+    <tr><td>Capacitación Básica (en línea, 3–4 h)</td><td class="price-cell">$300 – $500</td></tr>
+    <tr><td>Migración Simple</td><td class="price-cell">$350 – $600</td></tr>
+    <tr class="total-row">
+      <td>TOTAL PAQUETE SAAS – AÑO 1</td>
+      <td class="price-cell">$4,650 – $6,800 USD</td>
+    </tr>
+  </table>
+
+  <h3>&#x1F4BB; Paquete On-Premise "Llave en Mano" (Sin código fuente)</h3>
+  <p style="font-size:10pt; color:#1565c0;"><strong>&#x1F512; Se entrega build compilado + contrato de licencia de uso restringido. Sin código fuente legible.</strong></p>
+  <table>
+    <tr>
+      <th>Servicio</th>
+      <th class="price-cell">Precio Referencial (USD)</th>
+    </tr>
+    <tr><td>Licencia On-Premise Estándar (build compilado + contrato notariado)</td><td class="price-cell">$9,000 – $13,000</td></tr>
+    <tr><td>Implementación en servidor del cliente</td><td class="price-cell">$1,000 – $1,600</td></tr>
+    <tr><td>Manual de Usuario Completo + Técnico (paquete)</td><td class="price-cell">$900 – $1,400</td></tr>
+    <tr><td>Capacitación Estándar (en línea, 2 sesiones)</td><td class="price-cell">$550 – $850</td></tr>
+    <tr><td>Migración de Datos (estándar)</td><td class="price-cell">$700 – $1,200</td></tr>
+    <tr class="total-row">
+      <td>TOTAL PAQUETE ON-PREMISE LLAVE EN MANO</td>
+      <td class="price-cell">$12,150 – $18,050 USD</td>
+    </tr>
+  </table>
+
+  <h3>&#x1F6A8; Licencia Corporativa con Código Fuente (Solo grandes corporaciones)</h3>
+  <table>
+    <tr>
+      <th>Servicio</th>
+      <th class="price-cell">Precio Referencial (USD)</th>
+    </tr>
+    <tr><td>Licencia Corporativa Exclusiva (código fuente + contrato notariado)</td><td class="price-cell">$22,000 – $30,000</td></tr>
+    <tr><td>Implementación + personalización completa</td><td class="price-cell">$1,500 – $2,500</td></tr>
+    <tr><td>Paquete Documentación Completa</td><td class="price-cell">$900 – $1,400</td></tr>
+    <tr><td>Capacitación Estándar</td><td class="price-cell">$550 – $850</td></tr>
+    <tr><td>Migración Completa</td><td class="price-cell">$1,200 – $2,200</td></tr>
+    <tr class="total-row">
+      <td>TOTAL PAQUETE CORPORATIVO</td>
+      <td class="price-cell">$26,150 – $36,950 USD</td>
+    </tr>
+  </table>
+
+  <div class="highlight">
+    &#x1F4A1; <strong>Recomendación estratégica para El Salvador:</strong> Empezar con el modelo
+    <strong>SaaS</strong> como oferta principal. Si el cliente requiere instalación propia, ofrecer
+    la <strong>Licencia On-Premise</strong> (build compilado, sin código). Reservar la opción de
+    código fuente únicamente para corporaciones con contrato notariado.
+    El Salvador usa <strong>dólar USD</strong> como moneda oficial, lo que elimina el riesgo cambiario.
+    Con 5 clientes SaaS en Plan Estándar se generan <strong>$1,400 – $1,900/mes</strong> de ingresos pasivos.
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       10. NOTAS FINALES
+  ══════════════════════════════════════════════ -->
+  <h2>10. Notas y Consideraciones Finales</h2>
+  <ul>
+    <li>Los precios indicados son <strong>estimados de referencia en USD</strong>, orientados al
+        mercado empresarial de <strong>El Salvador</strong> (economía dolarizada, sin riesgo cambiario).</li>
+    <li><strong>El código fuente NUNCA se entrega en los planes SaaS ni On-Premise.</strong>
+        Solo se entrega bajo contrato notariado en la Licencia Corporativa Exclusiva.</li>
+    <li>En la modalidad On-Premise, el frontend se entrega como archivos de producción compilados
+        (<code>dist/</code>) y el backend como ejecutable o paquete ofuscado, lo que impide su
+        lectura, modificación o redistribución.</li>
+    <li>Todo cliente firma un <strong>Contrato de Licencia de Uso</strong> con cláusulas de
+        confidencialidad (NDA), prohibición de ingeniería inversa y penalidades por incumplimiento.</li>
+    <li>El sistema <strong>no incluye integración con pasarelas de pago ni banca en línea</strong>.
+        Agregar ese módulo (ACH, banca salvadoreña) justificaría un incremento de
+        <strong>$3,000 – $6,000 USD adicionales</strong>.</li>
+    <li>El código está construido con React 19, Vite 7 y Node.js en sus versiones más recientes,
+        garantizando soporte, seguridad y escalabilidad a largo plazo.</li>
+    <li>Puede desplegarse en la nube (Railway, AWS, DigitalOcean) o en servidor propio del cliente.</li>
+    <li>Se recomienda incluir un <strong>contrato de mantenimiento anual</strong> de $800 – $1,500 USD
+        para renovaciones, parches de seguridad y actualizaciones menores.</li>
+  </ul>
+
+  <div class="footer">
+    <p>Documento generado para uso comercial &mdash; Sistema de Gestión de Cooperativas &mdash; Abril 2026</p>
+    <p><em>Los precios son estimados referenciales. Pueden variar según negociación y alcance específico del cliente.</em></p>
+  </div>
+
+</body>
+</html>

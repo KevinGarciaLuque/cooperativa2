@@ -779,7 +779,7 @@ export default function SocioPerfil() {
 
           {/* Footer */}
           <div className="text-center mt-4 text-muted small" style={{ opacity: .6 }}>
-            Smart Coop © {new Date().getFullYear()} • Panel de Socio
+            Demo © {new Date().getFullYear()} • Panel de Socio
           </div>
 
         </div>

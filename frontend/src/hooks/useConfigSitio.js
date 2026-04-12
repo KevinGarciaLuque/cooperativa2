@@ -4,13 +4,13 @@ import axios from "axios";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const DEFAULTS = {
-  site_name:      "Smart Coop",
+  site_name:      "Demo",
   home_badge:     "Plataforma cooperativa digital",
   home_title1:    "Tu cooperativa,",
   home_title2:    "siempre contigo.",
   home_subtitle:  "Gestiona tus aportaciones, préstamos y cuentas desde un solo lugar, de forma segura, rápida y eficiente.",
   home_cta:       "Comenzar ahora",
-  home_footer:    `Smart Coop © ${new Date().getFullYear()} — Ahorro y crédito, desde cualquier lugar.`,
+  home_footer:    `Demo © ${new Date().getFullYear()} — Ahorro y crédito, desde cualquier lugar.`,
   home_features: [
     { icon: "💰", title: "Aportaciones", desc: "Registra y consulta tus aportaciones en tiempo real." },
     { icon: "🏦", title: "Préstamos",    desc: "Solicita y gestiona préstamos de forma rápida y segura." },

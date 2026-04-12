@@ -27,7 +27,7 @@ export default function Navbar({ user, onLogout, onMenuClick }) {
   const { config } = useConfigSitio();
   const BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace("/api", "");
   const logoUrl = config.logo_url ? `${BASE_URL}${config.logo_url}` : null;
-  const siteName = config.site_name || "Smart Coop";
+  const siteName = config.site_name || "Demo";
 
   const nombreMostrar =
     user?.nombre_completo || user?.nombre || user?.username || "Usuario";

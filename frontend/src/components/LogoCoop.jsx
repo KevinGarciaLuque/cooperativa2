@@ -1,5 +1,5 @@
 /**
- * LogoCoop — Logo de Smart Coop
+ * LogoCoop — Logo de Demo
  * Usa el logo subido via configuración del sitio si existe,
  * de lo contrario usa /smartcoop.png (carpeta public).
  * Props:
@@ -20,7 +20,7 @@ export default function LogoCoop({
   return (
     <img
       src={src}
-      alt="Smart Coop"
+      alt="Demo"
       className={className}
       style={{
         width: size,

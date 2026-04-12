@@ -335,7 +335,7 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
         {/* Logo */}
         <div className="sidebar-logo-area">
           <LogoCoop size={68} />
-          {!collapsed && <span className="sidebar-brand-text">Smart Coop</span>}
+          {!collapsed && <span className="sidebar-brand-text">Demo</span>}
         </div>
 
         {/* Navegación */}
@@ -388,7 +388,7 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
         >
           <div className="d-flex align-items-center">
             <LogoCoop size={68} />
-            <span className="sidebar-brand-text">Smart Coop</span>
+            <span className="sidebar-brand-text">Demo</span>
           </div>
           <button
             type="button"

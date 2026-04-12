@@ -2,10 +2,18 @@
 -- MIGRACIÓN: SUPER ADMINISTRADOR Y PERMISOS DE MÓDULOS
 -- ============================================
 
--- 1. Insertar rol Super Administrador
-INSERT INTO roles (id_rol, nombre, descripcion) VALUES
-(3, 'Super Administrador', 'Control total del sistema y configuración de permisos por rol')
-ON DUPLICATE KEY UPDATE nombre=nombre;
+-- 1. Insertar rol Super Administrador (sin forzar ID fijo)
+INSERT INTO roles (nombre, descripcion)
+SELECT 'Super Administrador', 'Control total del sistema y configuración de permisos por rol'
+WHERE NOT EXISTS (SELECT 1 FROM roles WHERE nombre = 'Super Administrador');
+
+-- 5. Insertar el usuario Super Administrador usando el ID del rol por nombre
+--    DNI: 000000001 | Password: admin123*
+INSERT INTO usuarios (nombre_completo, dni, password, rol_id, estado)
+SELECT 'Super Administrador', '000000001', '$2b$10$9LiYFVVCDiRVaq0SRHJoSOyvCiTwmh3dDr8.m200c/MNBn5PXyUEa',
+       (SELECT id_rol FROM roles WHERE nombre = 'Super Administrador' LIMIT 1),
+       'activo'
+WHERE NOT EXISTS (SELECT 1 FROM usuarios WHERE dni = '000000001');
 
 -- 2. Crear tabla de permisos de módulos por rol
 CREATE TABLE IF NOT EXISTS permisos_modulos (

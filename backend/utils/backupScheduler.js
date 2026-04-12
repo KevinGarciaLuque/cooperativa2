@@ -47,7 +47,7 @@ async function generarSQL() {
   lines.push(
     `-- Fecha y hora: ${now.toLocaleDateString("es-HN")} ${now.toLocaleTimeString("es-HN")}`
   );
-  lines.push(`-- Generado por Smart Coop`);
+  lines.push(`-- Generado por Demo`);
   lines.push(`-- ============================================`);
   lines.push(``);
   lines.push(`SET FOREIGN_KEY_CHECKS=0;`);

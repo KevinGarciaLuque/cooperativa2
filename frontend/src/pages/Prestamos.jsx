@@ -1115,28 +1115,34 @@ function ModalPrestamo({
           padding:.4rem .75rem; display:flex; justify-content:space-between; align-items:center; }
       `}</style>
       <div
-        className="modal show d-block"
+        className="modal show"
         tabIndex="-1"
         style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
           background: "rgba(0,0,0,0.65)",
           backdropFilter: "blur(5px)",
           zIndex: 5000,
           position: "fixed",
           top: 0, left: 0,
-          width: "100vw", height: "100vh",
-          overflowY: "hidden",
-          paddingBottom: "env(safe-area-inset-bottom)",
+          width: "100%", height: "100%",
+          overflow: "hidden",
+          paddingTop: "max(1rem, env(safe-area-inset-top))",
+          paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
+          paddingLeft: "env(safe-area-inset-left, 0px)",
+          paddingRight: "env(safe-area-inset-right, 0px)",
+          boxSizing: "border-box",
         }}
       >
         <div
-          className="modal-dialog modal-dialog-centered modal-dialog-scrollable"
-          style={{ maxWidth: 760, margin: "1rem auto" }}
+          style={{ width: "100%", maxWidth: 760, maxHeight: "100%", display: "flex", flexDirection: "column" }}
           onClick={(e) => e.stopPropagation()}
         >
           <form
             className="modal-content border-0 shadow-lg"
             onSubmit={onSubmit}
-            style={{ borderRadius: "16px", overflow: "hidden" }}
+            style={{ borderRadius: "16px", overflow: "hidden", maxHeight: "100%" }}
           >
             {/* ── Header ── */}
             <div
@@ -1156,7 +1162,7 @@ function ModalPrestamo({
             </div>
 
             {/* ── Body ── */}
-            <div className="modal-body p-0" style={{ background: "#f8fafc" }}>
+            <div className="modal-body p-0" style={{ background: "#f8fafc", overflowY: "auto" }}>
               <div className="row g-0">
 
                 {/* Columna izquierda – formulario */}
@@ -1586,7 +1592,7 @@ function ModalPrestamo({
             </div>
 
             {/* ── Footer ── */}
-            <div className="modal-footer border-0 bg-white px-3 gap-2" style={{ paddingTop: "8px", paddingBottom: "calc(8px + env(safe-area-inset-bottom))" }}>
+            <div className="modal-footer border-0 bg-white px-3 py-2 gap-2">
               <button
                 type="submit"
                 className="btn shadow-sm fw-semibold"

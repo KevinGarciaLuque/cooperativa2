@@ -46,6 +46,7 @@ export default function Prestamos() {
   });
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [prestamoParaEliminar, setPrestamoParaEliminar] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -82,6 +83,8 @@ export default function Prestamos() {
   // Crear o editar préstamo
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
     try {
       // Convertir tasa al equivalente anual antes de enviar al backend
       const tasaInput = parseFloat(form.tasa_interes) || 0;
@@ -131,6 +134,8 @@ export default function Prestamos() {
         err.response?.data?.message || "Error al guardar el préstamo.",
         "error"
       );
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -559,6 +564,7 @@ export default function Prestamos() {
           onClose={() => setShowModal(false)}
           onSubmit={handleSubmit}
           handleInput={handleInput}
+          submitting={submitting}
         />
       )}
 
@@ -1058,6 +1064,7 @@ function ModalPrestamo({
   onClose,
   onSubmit,
   handleInput,
+  submitting = false,
 }) {
   // ── Hooks antes del early return (regla de React) ──
   const [busquedaSocio, setBusquedaSocio] = useState("");
@@ -1117,12 +1124,12 @@ function ModalPrestamo({
           position: "fixed",
           top: 0, left: 0,
           width: "100vw", height: "100vh",
-          overflowY: "auto",
+          overflowY: "hidden",
         }}
       >
         <div
-          className="modal-dialog modal-dialog-centered"
-          style={{ maxWidth: 760 }}
+          className="modal-dialog modal-dialog-centered modal-dialog-scrollable"
+          style={{ maxWidth: 760, margin: "1rem auto" }}
           onClick={(e) => e.stopPropagation()}
         >
           <form
@@ -1582,14 +1589,28 @@ function ModalPrestamo({
               <button
                 type="submit"
                 className="btn shadow-sm fw-semibold"
+                disabled={submitting}
                 style={{
-                  background: "linear-gradient(135deg,#27ae60,#1e8449)",
+                  background: submitting
+                    ? "#95a5a6"
+                    : "linear-gradient(135deg,#27ae60,#1e8449)",
                   color: "white", border: "none",
                   borderRadius: "8px", padding: "7px 22px", fontSize: ".9rem",
+                  opacity: submitting ? 0.75 : 1,
+                  cursor: submitting ? "not-allowed" : "pointer",
                 }}
               >
-                <FaCheckCircle className="me-2" />
-                {editPrestamo ? "Guardar Cambios" : "Registrar Préstamo"}
+                {submitting ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <FaCheckCircle className="me-2" />
+                    {editPrestamo ? "Guardar Cambios" : "Registrar Préstamo"}
+                  </>
+                )}
               </button>
               <button
                 type="button"
@@ -1742,10 +1763,37 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
     return tabla;
   };
 
-  const tablaAmortizacion = calcularAmortizacion(usandoCustom ? cuotaCustom : null);
+  // Para préstamos de plazo indefinido (solo interés mensual), armar la tabla
+  // directamente desde los pagos reales registrados
+  const esIndefinido = plazoP === 0;
+
+  const tablaIndefinido = pagosPrestamo.map((pago, i) => {
+    const saldoAnterior =
+      i === 0
+        ? montoP
+        : parseFloat(pagosPrestamo[i - 1].saldo_restante ?? 0);
+    return {
+      cuota: i + 1,
+      fecha: pago.fecha_pago
+        ? new Date(pago.fecha_pago).toISOString().substring(0, 10)
+        : null,
+      saldoInicial: saldoAnterior,
+      capital: parseFloat(pago.monto_capital || 0),
+      interes: parseFloat(pago.monto_interes || 0),
+      cuotaMensual: parseFloat(pago.monto_pagado || 0),
+      abonoExtra: 0,
+      saldo: parseFloat(pago.saldo_restante ?? 0),
+    };
+  });
+
+  const tablaAmortizacion = esIndefinido
+    ? tablaIndefinido
+    : calcularAmortizacion(usandoCustom ? cuotaCustom : null);
 
   // Tabla estándar para comparación de ahorros
-  const tablaEstandar = calcularAmortizacion(null);
+  const tablaEstandar = esIndefinido
+    ? tablaIndefinido
+    : calcularAmortizacion(null);
   const interesesEstandar = tablaEstandar.reduce((a, f) => a + f.interes, 0);
   const interesesCustom = tablaAmortizacion.reduce((a, f) => a + f.interes, 0);
   const cuotasAhorradas = tablaEstandar.length - tablaAmortizacion.length;
@@ -2102,32 +2150,51 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
                   <div>
                     <h6 className="fw-bold mb-1" style={{ color: "#2c3e50" }}>
                       <FaChartLine className="me-2" style={{ color: "#27ae60" }} />
-                      Tabla de Amortización
+                      {esIndefinido ? "Historial de Pagos (Plazo Indefinido)" : "Tabla de Amortización"}
                     </h6>
-                    <div className="d-flex flex-wrap gap-3" style={{ fontSize: ".8rem", color: "#555" }}>
-                      <span>
-                        Principal:{" "}
-                        <strong style={{ color: "#2c3e50" }}>L. {fmt(montoP)}</strong>
-                      </span>
-                      <span>
-                        Tasa mensual:{" "}
-                        <strong style={{ color: "#e67e22" }}>{tasaMensualPct}%</strong>
-                      </span>
-                      <span>
-                        Tasa anual equiv.:{" "}
-                        <strong style={{ color: "#e67e22" }}>{tasaAnualPct}%</strong>
-                      </span>
-                      <span>
-                        1er pago:{" "}
-                        <strong style={{ color: "#2c3e50" }}>
-                          {calcularFechaVencimiento(1) || "—"}
-                        </strong>
-                      </span>
-                    </div>
+                    {esIndefinido && (
+                      <div
+                        className="small mb-2"
+                        style={{
+                          background: "rgba(52,152,219,0.08)",
+                          border: "1px solid #90caf9",
+                          borderRadius: "8px",
+                          padding: "6px 10px",
+                          color: "#1565c0",
+                        }}
+                      >
+                        💡 Préstamo de interés mensual indefinido — se muestran los pagos registrados.
+                        {tablaAmortizacion.length === 0 && (
+                          <span className="ms-1" style={{ color: "#e67e22" }}>Sin pagos registrados aún.</span>
+                        )}
+                      </div>
+                    )}
+                    {!esIndefinido && (
+                      <div className="d-flex flex-wrap gap-3" style={{ fontSize: ".8rem", color: "#555" }}>
+                        <span>
+                          Principal:{" "}
+                          <strong style={{ color: "#2c3e50" }}>L. {fmt(montoP)}</strong>
+                        </span>
+                        <span>
+                          Tasa mensual:{" "}
+                          <strong style={{ color: "#e67e22" }}>{tasaMensualPct}%</strong>
+                        </span>
+                        <span>
+                          Tasa anual equiv.:{" "}
+                          <strong style={{ color: "#e67e22" }}>{tasaAnualPct}%</strong>
+                        </span>
+                        <span>
+                          1er pago:{" "}
+                          <strong style={{ color: "#2c3e50" }}>
+                            {calcularFechaVencimiento(1) || "—"}
+                          </strong>
+                        </span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Simulador cuota personalizada */}
-                  <div
+                  {/* Simulador cuota personalizada — solo para plazo fijo */}
+                  {!esIndefinido && <div
                     style={{
                       background: "linear-gradient(135deg,#edf7ff,#dbeeff)",
                       border: "1.5px solid #90caf9",
@@ -2192,11 +2259,11 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
                         ⚠ Ingresa un valor mayor a L. {fmt(cuotaEstandar)}
                       </div>
                     )}
-                  </div>
+                  </div>}
                 </div>
 
-                {/* Banner de ahorro */}
-                {usandoCustom && (
+                {/* Banner de ahorro — solo para plazo fijo */}
+                {!esIndefinido && usandoCustom && (
                   <div
                     className="rounded-3 mb-3 p-3"
                     style={{

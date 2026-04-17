@@ -17,7 +17,7 @@ export default function ModalConfirmacion({
       tabIndex="-1"
       style={{
         background: "#0008",
-        zIndex: 2100,
+        zIndex: 9999,
         position: "fixed",
         top: 0,
         left: 0,

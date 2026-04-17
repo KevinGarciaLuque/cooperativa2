@@ -1125,6 +1125,7 @@ function ModalPrestamo({
           top: 0, left: 0,
           width: "100vw", height: "100vh",
           overflowY: "hidden",
+          paddingBottom: "env(safe-area-inset-bottom)",
         }}
       >
         <div
@@ -1585,7 +1586,7 @@ function ModalPrestamo({
             </div>
 
             {/* ── Footer ── */}
-            <div className="modal-footer border-0 bg-white px-3 py-2 gap-2">
+            <div className="modal-footer border-0 bg-white px-3 gap-2" style={{ paddingTop: "8px", paddingBottom: "calc(8px + env(safe-area-inset-bottom))" }}>
               <button
                 type="submit"
                 className="btn shadow-sm fw-semibold"

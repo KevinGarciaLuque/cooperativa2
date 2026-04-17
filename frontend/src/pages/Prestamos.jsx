@@ -2323,7 +2323,7 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
                   </div>
                 )}
 
-                <div className="table-responsive">
+                <div className="table-responsive" style={{ maxHeight: "420px", overflowY: "auto", overflowX: "auto" }}>
                   <table className="table table-sm table-hover align-middle mb-0">
                     <thead
                       style={{

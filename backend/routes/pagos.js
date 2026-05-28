@@ -656,7 +656,7 @@ router.put("/:id", async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error("ERROR AL EDITAR PAGO:", error);
-    res.status(500).json({ message: "Error al editar el pago.", error: error.message });
+    res.status(500).json({ message: error.message || "Error al editar el pago." });
   } finally {
     connection.release();
   }

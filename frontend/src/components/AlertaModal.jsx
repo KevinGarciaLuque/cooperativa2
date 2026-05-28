@@ -45,7 +45,7 @@ export default function AlertaModal({
       style={{
         backgroundColor: "rgba(0, 0, 0, 0.6)",
         backdropFilter: "blur(4px)",
-        zIndex: 2200,
+        zIndex: 9000,
       }}
       onClick={onClose}
     >

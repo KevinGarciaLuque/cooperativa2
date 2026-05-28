@@ -560,20 +560,26 @@ router.get("/:id/comprobante", async (req, res) => {
 
 // ============================================
 // EDITAR UN PAGO (monto, método, descripción)
-// Recalcula capital/interés/saldo de todos los pagos del préstamo en orden
+// Solo recalcula si el monto cambia; si solo cambia método/descripción actualiza directo
 // ============================================
 router.put("/:id", async (req, res) => {
   const connection = await pool.getConnection();
   try {
     const { monto_pagado, metodo_pago, descripcion } = req.body;
     const montoPagadoNum = parseFloat(monto_pagado);
-    if (isNaN(montoPagadoNum) || montoPagadoNum <= 0) {
+    if (isNaN(montoPagadoNum) || montoPagadoNum <= 0)
       return res.status(400).json({ message: "El monto debe ser un número positivo." });
-    }
 
-    // Obtener el pago y el préstamo
+    // El ENUM del DB es lowercase — normalizar
+    const metodosValidos = ['efectivo', 'transferencia', 'cheque', 'deposito'];
+    const metodoNorm = metodo_pago
+      ? (metodosValidos.find(m => m === metodo_pago.toLowerCase()) || 'efectivo')
+      : 'efectivo';
+
+    // Obtener el pago actual junto con datos del préstamo
     const [pagoRows] = await connection.query(
-      `SELECT p.*, pre.monto AS monto_original, pre.tasa_interes, pre.plazo_meses
+      `SELECT p.id_pago, p.id_prestamo, p.monto_pagado, p.fecha_pago,
+              pre.monto AS monto_original, pre.tasa_interes
        FROM pagos_prestamo p
        INNER JOIN prestamos pre ON p.id_prestamo = pre.id_prestamo
        WHERE p.id_pago = ?`,
@@ -582,48 +588,71 @@ router.put("/:id", async (req, res) => {
     if (pagoRows.length === 0)
       return res.status(404).json({ message: "Pago no encontrado." });
 
-    const pagoData  = pagoRows[0];
+    const pagoData   = pagoRows[0];
     const idPrestamo = pagoData.id_prestamo;
-    const tasaMensual = parseFloat(pagoData.tasa_interes) / 100 / 12;
-
-    // Obtener todos los pagos del préstamo en orden cronológico
-    const [todosPagos] = await connection.query(
-      `SELECT * FROM pagos_prestamo WHERE id_prestamo = ? ORDER BY fecha_pago ASC, id_pago ASC`,
-      [idPrestamo]
-    );
+    const montoAnterior = parseFloat(pagoData.monto_pagado);
+    const montoChanged  = Math.abs(montoPagadoNum - montoAnterior) >= 0.005;
 
     await connection.beginTransaction();
 
-    // Recalcular todos los pagos en orden, sustituyendo el monto del editado
-    let saldo = parseFloat(pagoData.monto_original);
-    for (const pg of todosPagos) {
-      const montoEste = pg.id_pago === parseInt(req.params.id) ? montoPagadoNum : parseFloat(pg.monto_pagado);
-      const interes   = parseFloat((saldo * tasaMensual).toFixed(2));
-      const capital   = parseFloat(Math.max(0, montoEste - interes).toFixed(2));
-      const nuevoSaldo = parseFloat(Math.max(0, saldo - capital).toFixed(2));
-
-      const metodo = pg.id_pago === parseInt(req.params.id) ? (metodo_pago || pg.metodo_pago) : pg.metodo_pago;
-      const desc   = pg.id_pago === parseInt(req.params.id) ? (descripcion  ?? pg.descripcion)  : pg.descripcion;
-
+    if (!montoChanged) {
+      // Solo actualizar método y descripción — sin tocar montos ni saldos
       await connection.query(
-        `UPDATE pagos_prestamo
-         SET monto_pagado = ?, monto_capital = ?, monto_interes = ?, saldo_restante = ?, metodo_pago = ?, descripcion = ?
-         WHERE id_pago = ?`,
-        [montoEste, capital, interes, nuevoSaldo, metodo, desc, pg.id_pago]
+        `UPDATE pagos_prestamo SET metodo_pago = ?, descripcion = ? WHERE id_pago = ?`,
+        [metodoNorm, descripcion ?? null, req.params.id]
+      );
+    } else {
+      // Monto cambió → recalcular este pago y todos los posteriores
+      const tasaMensual = parseFloat(pagoData.tasa_interes) / 100 / 12;
+
+      const [todosPagos] = await connection.query(
+        `SELECT * FROM pagos_prestamo WHERE id_prestamo = ? ORDER BY fecha_pago ASC, id_pago ASC`,
+        [idPrestamo]
       );
 
-      saldo = nuevoSaldo;
+      // Calcular el saldo antes del pago editado
+      let saldo = parseFloat(pagoData.monto_original);
+      let encontrado = false;
+      for (const pg of todosPagos) {
+        if (pg.id_pago === parseInt(req.params.id)) { encontrado = true; break; }
+        saldo = parseFloat(pg.saldo_restante ?? saldo);
+      }
+      if (!encontrado) {
+        await connection.rollback();
+        return res.status(404).json({ message: "Pago no encontrado en la secuencia." });
+      }
+
+      // Recalcular desde el pago editado en adelante
+      let actualizando = false;
+      for (const pg of todosPagos) {
+        if (pg.id_pago === parseInt(req.params.id)) actualizando = true;
+        if (!actualizando) continue;
+
+        const montoEste  = pg.id_pago === parseInt(req.params.id) ? montoPagadoNum : parseFloat(pg.monto_pagado);
+        const interes    = parseFloat((saldo * tasaMensual).toFixed(2));
+        const capital    = parseFloat(Math.max(0, montoEste - interes).toFixed(2));
+        const nuevoSaldo = parseFloat(Math.max(0, saldo - capital).toFixed(2));
+        const metodoEste = pg.id_pago === parseInt(req.params.id) ? metodoNorm : pg.metodo_pago;
+        const descEste   = pg.id_pago === parseInt(req.params.id) ? (descripcion ?? pg.descripcion) : pg.descripcion;
+
+        await connection.query(
+          `UPDATE pagos_prestamo
+           SET monto_pagado = ?, monto_capital = ?, monto_interes = ?, saldo_restante = ?, metodo_pago = ?, descripcion = ?
+           WHERE id_pago = ?`,
+          [montoEste, capital, interes, nuevoSaldo, metodoEste, descEste, pg.id_pago]
+        );
+        saldo = nuevoSaldo;
+      }
+
+      // Actualizar saldo del préstamo
+      await connection.query(
+        `UPDATE prestamos SET saldo_restante = ?, estado = IF(? <= 0.01, 'pagado', estado) WHERE id_prestamo = ?`,
+        [saldo, saldo, idPrestamo]
+      );
     }
 
-    // Actualizar saldo del préstamo con el saldo del último pago
-    const nuevoEstado = saldo <= 0.01 ? 'pagado' : pagoData.estado || 'activo';
-    await connection.query(
-      `UPDATE prestamos SET saldo_restante = ?, estado = IF(? <= 0.01, 'pagado', estado) WHERE id_prestamo = ?`,
-      [saldo, saldo, idPrestamo]
-    );
-
     await connection.commit();
-    res.json({ success: true, message: "Pago actualizado y saldos recalculados." });
+    res.json({ success: true, message: "Pago actualizado correctamente." });
   } catch (error) {
     await connection.rollback();
     console.error("ERROR AL EDITAR PAGO:", error);

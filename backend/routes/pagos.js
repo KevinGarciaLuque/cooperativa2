@@ -596,10 +596,10 @@ router.put("/:id", async (req, res) => {
     await connection.beginTransaction();
 
     if (!montoChanged) {
-      // Solo actualizar método y descripción — sin tocar montos ni saldos
+      // Solo actualizar método — sin tocar montos ni saldos
       await connection.query(
-        `UPDATE pagos_prestamo SET metodo_pago = ?, descripcion = ? WHERE id_pago = ?`,
-        [metodoNorm, descripcion ?? null, req.params.id]
+        `UPDATE pagos_prestamo SET metodo_pago = ? WHERE id_pago = ?`,
+        [metodoNorm, req.params.id]
       );
     } else {
       // Monto cambió → recalcular este pago y todos los posteriores
@@ -633,13 +633,12 @@ router.put("/:id", async (req, res) => {
         const capital    = parseFloat(Math.max(0, montoEste - interes).toFixed(2));
         const nuevoSaldo = parseFloat(Math.max(0, saldo - capital).toFixed(2));
         const metodoEste = pg.id_pago === parseInt(req.params.id) ? metodoNorm : pg.metodo_pago;
-        const descEste   = pg.id_pago === parseInt(req.params.id) ? (descripcion ?? pg.descripcion) : pg.descripcion;
 
         await connection.query(
           `UPDATE pagos_prestamo
-           SET monto_pagado = ?, monto_capital = ?, monto_interes = ?, saldo_restante = ?, metodo_pago = ?, descripcion = ?
+           SET monto_pagado = ?, monto_capital = ?, monto_interes = ?, saldo_restante = ?, metodo_pago = ?
            WHERE id_pago = ?`,
-          [montoEste, capital, interes, nuevoSaldo, metodoEste, descEste, pg.id_pago]
+          [montoEste, capital, interes, nuevoSaldo, metodoEste, pg.id_pago]
         );
         saldo = nuevoSaldo;
       }

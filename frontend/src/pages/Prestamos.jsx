@@ -1266,6 +1266,13 @@ function ModalPrestamo({
                     )}
                   </div>
 
+                  {/* Aviso pagos existentes al editar */}
+                  {editPrestamo && parseInt(editPrestamo.total_pagos) > 0 && (
+                    <div style={{ background: "#fffbeb", border: "1.5px solid #f59e0b", borderRadius: 8, padding: "8px 12px", fontSize: "0.8rem", color: "#78350f" }}>
+                      ⚠️ Este préstamo tiene <strong>{editPrestamo.total_pagos} pago{parseInt(editPrestamo.total_pagos) !== 1 ? "s" : ""}</strong> registrado{parseInt(editPrestamo.total_pagos) !== 1 ? "s" : ""}. El saldo actual es <strong>L. {parseFloat(editPrestamo.saldo_restante || 0).toLocaleString("es-HN", { minimumFractionDigits: 2 })}</strong>. Cambiar la tasa solo afecta los pagos futuros.
+                    </div>
+                  )}
+
                   {/* Monto */}
                   <div>
                     <label className="form-label fw-semibold small" style={{ color: "#2c3e50" }}>
@@ -1330,12 +1337,12 @@ function ModalPrestamo({
                         type="number"
                         className="form-control rounded-start"
                         name="tasa_interes"
-                        value={form.tasa_interes}
+                        value={form.tasa_interes !== "" ? parseFloat(form.tasa_interes) || "" : ""}
                         onChange={handleInput}
                         required
                         min="0.01"
                         max="100"
-                        step="0.001"
+                        step="0.01"
                         placeholder={form.tipo_tasa === "nominal_mensual" || form.tipo_tasa === "efectiva_mensual" ? "2.00" : "24.00"}
                         style={{ border: "2px solid #e2e8f0", padding: "6px 10px" }}
                       />

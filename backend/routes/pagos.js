@@ -559,6 +559,81 @@ router.get("/:id/comprobante", async (req, res) => {
 });
 
 // ============================================
+// EDITAR UN PAGO (monto, método, descripción)
+// Recalcula capital/interés/saldo de todos los pagos del préstamo en orden
+// ============================================
+router.put("/:id", async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    const { monto_pagado, metodo_pago, descripcion } = req.body;
+    const montoPagadoNum = parseFloat(monto_pagado);
+    if (isNaN(montoPagadoNum) || montoPagadoNum <= 0) {
+      return res.status(400).json({ message: "El monto debe ser un número positivo." });
+    }
+
+    // Obtener el pago y el préstamo
+    const [pagoRows] = await connection.query(
+      `SELECT p.*, pre.monto AS monto_original, pre.tasa_interes, pre.plazo_meses
+       FROM pagos_prestamo p
+       INNER JOIN prestamos pre ON p.id_prestamo = pre.id_prestamo
+       WHERE p.id_pago = ?`,
+      [req.params.id]
+    );
+    if (pagoRows.length === 0)
+      return res.status(404).json({ message: "Pago no encontrado." });
+
+    const pagoData  = pagoRows[0];
+    const idPrestamo = pagoData.id_prestamo;
+    const tasaMensual = parseFloat(pagoData.tasa_interes) / 100 / 12;
+
+    // Obtener todos los pagos del préstamo en orden cronológico
+    const [todosPagos] = await connection.query(
+      `SELECT * FROM pagos_prestamo WHERE id_prestamo = ? ORDER BY fecha_pago ASC, id_pago ASC`,
+      [idPrestamo]
+    );
+
+    await connection.beginTransaction();
+
+    // Recalcular todos los pagos en orden, sustituyendo el monto del editado
+    let saldo = parseFloat(pagoData.monto_original);
+    for (const pg of todosPagos) {
+      const montoEste = pg.id_pago === parseInt(req.params.id) ? montoPagadoNum : parseFloat(pg.monto_pagado);
+      const interes   = parseFloat((saldo * tasaMensual).toFixed(2));
+      const capital   = parseFloat(Math.max(0, montoEste - interes).toFixed(2));
+      const nuevoSaldo = parseFloat(Math.max(0, saldo - capital).toFixed(2));
+
+      const metodo = pg.id_pago === parseInt(req.params.id) ? (metodo_pago || pg.metodo_pago) : pg.metodo_pago;
+      const desc   = pg.id_pago === parseInt(req.params.id) ? (descripcion  ?? pg.descripcion)  : pg.descripcion;
+
+      await connection.query(
+        `UPDATE pagos_prestamo
+         SET monto_pagado = ?, monto_capital = ?, monto_interes = ?, saldo_restante = ?, metodo_pago = ?, descripcion = ?
+         WHERE id_pago = ?`,
+        [montoEste, capital, interes, nuevoSaldo, metodo, desc, pg.id_pago]
+      );
+
+      saldo = nuevoSaldo;
+    }
+
+    // Actualizar saldo del préstamo con el saldo del último pago
+    const nuevoEstado = saldo <= 0.01 ? 'pagado' : pagoData.estado || 'activo';
+    await connection.query(
+      `UPDATE prestamos SET saldo_restante = ?, estado = IF(? <= 0.01, 'pagado', estado) WHERE id_prestamo = ?`,
+      [saldo, saldo, idPrestamo]
+    );
+
+    await connection.commit();
+    res.json({ success: true, message: "Pago actualizado y saldos recalculados." });
+  } catch (error) {
+    await connection.rollback();
+    console.error("ERROR AL EDITAR PAGO:", error);
+    res.status(500).json({ message: "Error al editar el pago.", error: error.message });
+  } finally {
+    connection.release();
+  }
+});
+
+// ============================================
 // ANULAR/ELIMINAR UN PAGO (CON REVERSIÓN)
 // ============================================
 router.delete("/:id", async (req, res) => {

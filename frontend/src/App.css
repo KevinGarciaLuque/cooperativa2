@@ -1,0 +1,32 @@
+/* Estilos globales para modal de préstamos */
+.pmt-tipo-btn {
+  border: 1.5px solid #e2e8f0;
+  border-radius: 2rem;
+  padding: .25rem .75rem;
+  cursor: pointer;
+  transition: all .15s;
+  background: #fff;
+  white-space: nowrap;
+}
+.pmt-tipo-btn:hover {
+  border-color: #27ae60;
+  background: #f0faf4;
+}
+.pmt-tipo-btn.selected {
+  border-color: var(--tc);
+  background: var(--tb);
+}
+.pmt-sim-card {
+  background: linear-gradient(135deg, #27ae60, #1e8449);
+  border-radius: .75rem;
+  color: #fff;
+  padding: .9rem 1.1rem;
+}
+.pmt-sim-item {
+  background: rgba(255, 255, 255, .15);
+  border-radius: .5rem;
+  padding: .4rem .75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}

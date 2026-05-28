@@ -1104,16 +1104,6 @@ function ModalPrestamo({
 
   return (
     <>
-      <style>{`
-        .pmt-tipo-btn { border: 1.5px solid #e2e8f0; border-radius: 2rem; padding: .25rem .75rem;
-          cursor: pointer; transition: all .15s; background: #fff; white-space: nowrap; }
-        .pmt-tipo-btn:hover { border-color: #27ae60; background: #f0faf4; }
-        .pmt-tipo-btn.selected { border-color: var(--tc); background: var(--tb); }
-        .pmt-sim-card { background: linear-gradient(135deg,#27ae60,#1e8449);
-          border-radius: .75rem; color: #fff; padding: .9rem 1.1rem; }
-        .pmt-sim-item { background: rgba(255,255,255,.15); border-radius:.5rem;
-          padding:.4rem .75rem; display:flex; justify-content:space-between; align-items:center; }
-      `}</style>
       <div
         className="modal show"
         tabIndex="-1"
@@ -1741,7 +1731,9 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
 
     let saldo = montoP;
     const tabla = [];
-    const MAX_ITER = 1200;
+    // El sistema francés termina exactamente en plazoP cuotas; usarlo como tope
+    // evita que flotantes hagan el loop parar antes de tiempo.
+    const MAX_ITER = plazoP;
 
     while (saldo > 0.005 && tabla.length < MAX_ITER) {
       const saldoInicial = saldo;
@@ -2330,14 +2322,18 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
                   </div>
                 )}
 
-                <div className="table-responsive" style={{ maxHeight: "420px", overflowY: "auto", overflowX: "auto" }}>
-                  <table className="table table-sm table-hover align-middle mb-0">
+                <div style={{ overflowX: "auto" }}>
+                <div style={{ maxHeight: "420px", overflowY: "auto" }}>
+                  <table className="table table-sm table-hover align-middle mb-0" style={{ marginBottom: 0 }}>
                     <thead
                       style={{
                         background: usandoCustom
                           ? "linear-gradient(135deg, #1565c0 0%, #1976d2 100%)"
                           : "linear-gradient(135deg, #3498db 0%, #2980b9 100%)",
                         color: "white",
+                        position: "sticky",
+                        top: 0,
+                        zIndex: 1,
                       }}
                     >
                       <tr>
@@ -2513,47 +2509,35 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
                         );
                       })}
                     </tbody>
-                    <tfoot
-                      style={{
-                        background: "#2c3e50",
-                        color: "white",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      <tr>
-                        <td className="text-center" style={{ padding: "12px" }}>TOTAL</td>
-                        <td style={{ padding: "12px" }}>—</td>
-                        <td style={{ padding: "12px" }}>—</td>
-                        <td style={{ padding: "12px" }}>
-                          L. {fmt(tablaAmortizacion.reduce((acc, f) => acc + f.interes, 0))}
-                        </td>
-                        <td style={{ padding: "12px" }}>
-                          L. {fmt(tablaAmortizacion.reduce((acc, f) => acc + f.cuotaMensual, 0))}
-                        </td>
-                        <td style={{ padding: "12px" }}>
-                          L. {fmt(tablaAmortizacion.reduce((acc, f) => acc + f.capital, 0))}
-                        </td>
-                        {usandoCustom && (
-                          <td style={{ padding: "12px" }}>
-                            +L. {fmt(tablaAmortizacion.reduce((acc, f) => acc + f.abonoExtra, 0))}
-                          </td>
-                        )}
-                        <td style={{ padding: "12px" }}>L. 0.00</td>
-                        <td style={{ padding: "12px" }}>
-                          {estaLiquidado ? (
-                            <span style={{ color: "#27ae60" }}>✅ {pagosPrestamo.length} pagadas — Liquidado</span>
-                          ) : (
-                            <>
-                              <span style={{ color: "#27ae60" }}>{pagosPrestamo.length} pagadas</span>
-                              {" / "}
-                              <span style={{ color: "#95a5a6" }}>{tablaAmortizacion.length - pagosPrestamo.length} pend.</span>
-                            </>
-                          )}
-                        </td>
-                        <td style={{ padding: "12px" }}>—</td>
-                      </tr>
-                    </tfoot>
                   </table>
+                </div>
+                {/* Totales fijos fuera del scroll — siempre visibles sin importar cuántas cuotas haya */}
+                <div style={{
+                  background: "#2c3e50", color: "white", fontWeight: "600",
+                  padding: "10px 14px", display: "flex", flexWrap: "wrap", gap: "10px",
+                  alignItems: "center", fontSize: "0.82rem", borderRadius: "0 0 6px 6px",
+                }}>
+                  <span style={{ fontWeight: 800 }}>TOTAL</span>
+                  <span style={{ color: "#94a3b8" }}>·</span>
+                  <span>Int.: <strong style={{ color: "#fbbf24" }}>L. {fmt(tablaAmortizacion.reduce((acc, f) => acc + f.interes, 0))}</strong></span>
+                  <span>Pago: <strong style={{ color: "#4ade80" }}>L. {fmt(tablaAmortizacion.reduce((acc, f) => acc + f.cuotaMensual, 0))}</strong></span>
+                  <span>Capital: <strong>L. {fmt(tablaAmortizacion.reduce((acc, f) => acc + f.capital, 0))}</strong></span>
+                  {usandoCustom && (
+                    <span>Extra: <strong>+L. {fmt(tablaAmortizacion.reduce((acc, f) => acc + f.abonoExtra, 0))}</strong></span>
+                  )}
+                  <span>Saldo: <strong style={{ color: "#4ade80" }}>L. 0.00</strong></span>
+                  <span style={{ marginLeft: "auto" }}>
+                    {estaLiquidado ? (
+                      <span style={{ color: "#4ade80" }}>✅ {pagosPrestamo.length} pagadas — Liquidado</span>
+                    ) : (
+                      <>
+                        <span style={{ color: "#4ade80" }}>{pagosPrestamo.length} pagadas</span>
+                        {" / "}
+                        <span style={{ color: "#94a3b8" }}>{tablaAmortizacion.length - pagosPrestamo.length} pend.</span>
+                      </>
+                    )}
+                  </span>
+                </div>
                 </div>
               </div>
             </div>

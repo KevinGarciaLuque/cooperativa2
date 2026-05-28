@@ -1760,40 +1760,74 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
   const cuotaCustom = parseFloat(cuotaPersonalizada) || 0;
   const usandoCustom = cuotaCustom > cuotaEstandar + 0.005;
 
-  // La tabla siempre muestra exactamente plazoP cuotas según el plan del contrato
-  // (cuota francesa). Los pagos reales se solapan vía pagoMap para marcar "Pagado".
-  const calcularAmortizacion = (cuotaOverride = null) => {
-    if (montoP === 0 || plazoP === 0) return [];
-
-    const cuota =
-      cuotaOverride && cuotaOverride > cuotaFrances + 0.005
-        ? cuotaOverride
-        : cuotaFrances;
-
-    let saldo = montoP;
-    const tabla = [];
-
-    while (saldo > 0.005 && tabla.length < plazoP) {
+  // Función auxiliar: proyección pura desde un saldo dado (sin datos reales)
+  const proyectarDesde = (saldoInicio, cuota, cuotaNum0) => {
+    const filas = [];
+    let saldo = saldoInicio;
+    while (saldo > 0.005 && filas.length < 360) {
+      const numCuota = cuotaNum0 + filas.length;
       const saldoInicial = saldo;
-      const numCuota = tabla.length + 1;
       const interes = saldo * tasaMensualP;
       let pagoCapital = cuota - interes;
       if (pagoCapital <= 0) break;
       if (pagoCapital > saldo) pagoCapital = saldo;
       const pagoReal = pagoCapital + interes;
       saldo = Math.max(0, saldo - pagoCapital);
-      tabla.push({
+      filas.push({
         cuota: numCuota,
         fecha: calcularFechaVencimiento(numCuota),
         saldoInicial,
         capital: pagoCapital,
         interes,
         cuotaMensual: pagoReal,
-        abonoExtra:
-          cuotaOverride && cuotaOverride > cuotaFrances + 0.005
-            ? Math.max(0, pagoReal - cuotaFrances)
-            : 0,
+        abonoExtra: 0,
         saldo,
+      });
+    }
+    return filas;
+  };
+
+  // Tabla híbrida: filas pagadas = datos reales, filas futuras = proyección desde saldo real
+  const calcularAmortizacion = (cuotaOverride = null) => {
+    if (montoP === 0 || plazoP === 0) return [];
+
+    const cuota = cuotaOverride && cuotaOverride > cuotaFrances + 0.005
+      ? cuotaOverride
+      : cuotaFrances;
+
+    const tabla = [];
+
+    // Part 1 — filas con pago real registrado
+    for (let i = 0; i < pagosPrestamo.length; i++) {
+      const pago = pagosPrestamo[i];
+      const saldoInicial = i === 0
+        ? montoP
+        : parseFloat(pagosPrestamo[i - 1].saldo_restante ?? montoP);
+      tabla.push({
+        cuota: i + 1,
+        fecha: calcularFechaVencimiento(i + 1),
+        saldoInicial,
+        capital:      parseFloat(pago.monto_capital  || 0),
+        interes:      parseFloat(pago.monto_interes  || 0),
+        cuotaMensual: parseFloat(pago.monto_pagado   || 0),
+        abonoExtra: 0,
+        saldo: parseFloat(pago.saldo_restante ?? 0),
+      });
+    }
+
+    // Part 2 — proyección desde el saldo real actual
+    const numPagados = pagosPrestamo.length;
+    const saldoProy = numPagados > 0
+      ? parseFloat(pagosPrestamo[numPagados - 1].saldo_restante ?? saldoRestante)
+      : montoP;
+
+    if (saldoProy > 0.005) {
+      const futuras = proyectarDesde(saldoProy, cuota, numPagados + 1);
+      futuras.forEach((f) => {
+        if (cuotaOverride && cuotaOverride > cuotaFrances + 0.005) {
+          f.abonoExtra = Math.max(0, f.cuotaMensual - cuotaFrances);
+        }
+        tabla.push(f);
       });
     }
 
@@ -1827,10 +1861,10 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
     ? tablaIndefinido
     : calcularAmortizacion(usandoCustom ? cuotaCustom : null);
 
-  // Tabla estándar para comparación de ahorros
+  // Tabla estándar para comparación de ahorros (proyección pura desde monto original)
   const tablaEstandar = esIndefinido
     ? tablaIndefinido
-    : calcularAmortizacion(null);
+    : proyectarDesde(montoP, cuotaFrances, 1);
   const interesesEstandar = tablaEstandar.reduce((a, f) => a + f.interes, 0);
   const interesesCustom = tablaAmortizacion.reduce((a, f) => a + f.interes, 0);
   const cuotasAhorradas = tablaEstandar.length - tablaAmortizacion.length;

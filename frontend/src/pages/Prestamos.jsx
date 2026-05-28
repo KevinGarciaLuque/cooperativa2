@@ -1712,50 +1712,48 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
     return moda;
   })();
 
-  // Cuota estándar = la real detectada (si >= francés) o la mínima de francés
-  const cuotaEstandar = cuotaDetectada >= cuotaFrances - 0.005
-    ? cuotaDetectada
-    : cuotaFrances;
+  // La tabla base SIEMPRE usa la cuota francesa del plazo pactado (plazoP cuotas).
+  // Si los pagos reales son mayores, eso significa que el socio adelanta capital,
+  // pero la proyección del plan no cambia — se usa cuotaPersonalizada para simularlo.
+  const cuotaEstandar = cuotaFrances;
 
   const cuotaCustom = parseFloat(cuotaPersonalizada) || 0;
   const usandoCustom = cuotaCustom > cuotaEstandar + 0.005;
 
-  // Calcular tabla de amortización (estándar o personalizada)
+  // La tabla siempre muestra exactamente plazoP cuotas según el plan del contrato
+  // (cuota francesa). Los pagos reales se solapan vía pagoMap para marcar "Pagado".
   const calcularAmortizacion = (cuotaOverride = null) => {
     if (montoP === 0 || plazoP === 0) return [];
 
     const cuota =
-      cuotaOverride && cuotaOverride > cuotaEstandar + 0.005
+      cuotaOverride && cuotaOverride > cuotaFrances + 0.005
         ? cuotaOverride
-        : cuotaEstandar;
+        : cuotaFrances;
 
     let saldo = montoP;
     const tabla = [];
-    // El sistema francés termina exactamente en plazoP cuotas; usarlo como tope
-    // evita que flotantes hagan el loop parar antes de tiempo.
-    const MAX_ITER = plazoP;
 
-    while (saldo > 0.005 && tabla.length < MAX_ITER) {
+    while (saldo > 0.005 && tabla.length < plazoP) {
       const saldoInicial = saldo;
       const numCuota = tabla.length + 1;
       const interes = saldo * tasaMensualP;
       let pagoCapital = cuota - interes;
-      if (pagoCapital <= 0) break; // tasa mayor que cuota, evitar loop infinito
+      if (pagoCapital <= 0) break;
       if (pagoCapital > saldo) pagoCapital = saldo;
       const pagoReal = pagoCapital + interes;
       saldo = Math.max(0, saldo - pagoCapital);
       tabla.push({
         cuota: numCuota,
         fecha: calcularFechaVencimiento(numCuota),
-        saldoInicial: saldoInicial,
+        saldoInicial,
         capital: pagoCapital,
-        interes: interes,
+        interes,
         cuotaMensual: pagoReal,
         abonoExtra:
-          cuotaOverride && cuotaOverride > cuotaEstandar + 0.005
-            ? pagoReal - cuotaEstandar
+          cuotaOverride && cuotaOverride > cuotaFrances + 0.005
+            ? Math.max(0, pagoReal - cuotaFrances)
             : 0,
-        saldo: saldo,
+        saldo,
       });
     }
 
@@ -2245,11 +2243,11 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
                       )}
                     </div>
                     <div className="small mt-1" style={{ color: "#555" }}>
-                      Cuota acordada:{" "}
-                      <strong style={{ color: cuotaDetectada > 0 ? "#27ae60" : "#e67e22" }}>L. {fmt(cuotaEstandar)}</strong>
+                      Cuota francesa ({plazoP} meses):{" "}
+                      <strong style={{ color: "#27ae60" }}>L. {fmt(cuotaFrances)}</strong>
                       {cuotaDetectada > 0 && Math.abs(cuotaDetectada - cuotaFrances) > 0.05 && (
                         <span className="ms-1" style={{ color: "#7f8c8d" }}>
-                          (mín. francés: L. {fmt(cuotaFrances)})
+                          · pagando: L. {fmt(cuotaDetectada)}
                         </span>
                       )}
                     </div>
@@ -2260,6 +2258,24 @@ function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo,
                     )}
                   </div>}
                 </div>
+
+                {/* Aviso cuando el socio paga más que la cuota francesa */}
+                {!esIndefinido && cuotaDetectada > cuotaFrances + 0.5 && !usandoCustom && (
+                  <div className="rounded-3 mb-3 px-3 py-2 d-flex flex-wrap align-items-center gap-2"
+                    style={{ background: "rgba(243,156,18,0.08)", border: "1.5px solid #f39c12" }}>
+                    <span style={{ fontSize: "0.82rem", color: "#7d5a00" }}>
+                      💡 Este socio está pagando{" "}
+                      <strong>L. {fmt(cuotaDetectada)}/mes</strong>{" "}
+                      (<strong style={{ color: "#27ae60" }}>+L. {fmt(cuotaDetectada - cuotaFrances)}</strong> sobre la cuota del contrato).
+                      {" "}Si mantiene ese ritmo, terminará antes del plazo pactado.
+                    </span>
+                    <button type="button" className="btn btn-sm ms-auto"
+                      style={{ background: "#f39c12", color: "white", border: "none", borderRadius: 6, fontSize: "0.75rem", padding: "3px 10px", whiteSpace: "nowrap" }}
+                      onClick={() => setCuotaPersonalizada(String(cuotaDetectada.toFixed(2)))}>
+                      Ver proyección →
+                    </button>
+                  </div>
+                )}
 
                 {/* Banner de ahorro — solo para plazo fijo */}
                 {!esIndefinido && usandoCustom && (

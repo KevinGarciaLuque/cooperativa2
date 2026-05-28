@@ -39,7 +39,7 @@ export default function Prestamos() {
     id_usuario: "",
     monto: "",
     tasa_interes: "",
-    tipo_tasa: "nominal_anual",
+    tipo_tasa: "nominal_mensual",
     plazo_meses: "",
     fecha_otorgado: "",
     estado: "pendiente",
@@ -121,7 +121,7 @@ export default function Prestamos() {
         id_usuario: "",
         monto: "",
         tasa_interes: "",
-        tipo_tasa: "nominal_anual",
+        tipo_tasa: "nominal_mensual",
         plazo_meses: "",
         fecha_otorgado: "",
         estado: "pendiente",
@@ -255,13 +255,15 @@ export default function Prestamos() {
         icon: FaCheckCircle,
         label: "Pagado",
       },
-      rechazado: {
+      cancelado: {
         color: "#e74c3c",
         bg: "rgba(231, 76, 60, 0.1)",
         icon: FaTimesCircle,
-        label: "Rechazado",
+        label: "Cancelado",
       },
     };
+    // compatibilidad: "rechazado" antiguo se trata como "cancelado"
+    if (estado === "rechazado") return estados.cancelado;
     return estados[estado] || estados.pendiente;
   };
 
@@ -1010,18 +1012,18 @@ function ModalHistorialPrestamos({ grupo, onClose, onEdit, onDelete, onVerDetall
 // ==================== HELPERS TASA ====================
 const TIPOS_TASA = [
   {
-    value: "nominal_anual",
-    label: "Tasa Nominal Anual (TNA)",
-    desc: "La más usada en cooperativas. Se divide entre 12 para obtener la cuota mensual.",
-    abbr: "TNA",
-    color: "#27ae60",
-  },
-  {
     value: "nominal_mensual",
     label: "Tasa Nominal Mensual (TNM)",
-    desc: "Se multiplica por 12 para obtener la tasa anual equivalente.",
+    desc: "Estándar cooperativas: tasa por mes sobre saldo. Ej: 12% mensual = L.1,260/mes sobre L.10,500.",
     abbr: "TNM",
     color: "#2980b9",
+  },
+  {
+    value: "nominal_anual",
+    label: "Tasa Nominal Anual (TNA)",
+    desc: "Se divide entre 12 para obtener la tasa mensual. Ej: 12% TNA = 1% mensual.",
+    abbr: "TNA",
+    color: "#27ae60",
   },
   {
     value: "efectiva_anual",
@@ -1145,7 +1147,7 @@ function ModalPrestamo({
                   <span className="fw-bold" style={{ fontSize: "1rem" }}>
                     {editPrestamo ? "Editar Préstamo" : "Nuevo Préstamo"}
                   </span>
-                  <div style={{ fontSize: ".75rem", opacity: .8 }}>Sistema francés · cuota fija</div>
+                  <div style={{ fontSize: ".75rem", opacity: .8 }}>Sistema francés · tasa mensual (TNM)</div>
                 </div>
               </div>
               <button type="button" className="btn-close btn-close-white btn-sm" onClick={onClose} />
@@ -1446,7 +1448,7 @@ function ModalPrestamo({
                       <option value="activo">✅ Activo</option>
                       <option value="mora">⚠️ En Mora</option>
                       <option value="pagado">✅ Pagado Completamente</option>
-                      <option value="rechazado">❌ Rechazado</option>
+                      <option value="cancelado">❌ Cancelado</option>
                     </select>
                   </div>
                 </div>
@@ -1491,6 +1493,10 @@ function ModalPrestamo({
                         </div>
                         {esIndefinido ? (
                           <>
+                            <div className="pmt-sim-item" style={{ background: "#eaf6fb", border: "1px solid #2980b9" }}>
+                              <span className="small" style={{ color: "#1a5276" }}>Interés mensual</span>
+                              <strong style={{ color: "#1a5276" }}>L. {fmt(cuotaSimulada)}</strong>
+                            </div>
                             <div className="pmt-sim-item" style={{ background: "#fff3cd", border: "1px solid #ffc107" }}>
                               <span className="small" style={{ color: "#856404" }}>Interés anual estimado</span>
                               <strong style={{ color: "#b7791f" }}>L. {fmt(cuotaSimulada * 12)}</strong>
@@ -1503,18 +1509,45 @@ function ModalPrestamo({
                               ℹ El socio paga solo el interés cada mes. El capital permanece sin cambio hasta que se cancele el préstamo.
                             </div>
                           </>
-                        ) : (
-                          <>
-                            <div className="pmt-sim-item" style={{ background: "#fff3cd", border: "1px solid #ffc107" }}>
-                              <span className="small" style={{ color: "#856404" }}>Total intereses</span>
-                              <strong style={{ color: "#b7791f" }}>L. {fmt(totalIntereses)}</strong>
-                            </div>
-                            <div className="pmt-sim-item" style={{ background: "#d4edda", border: "1px solid #28a745" }}>
-                              <span className="small" style={{ color: "#155724" }}>Total a pagar</span>
-                              <strong style={{ color: "#155724" }}>L. {fmt(totalPagar)}</strong>
-                            </div>
-                          </>
-                        )}
+                        ) : (() => {
+                          const intMes1 = (parseFloat(form.monto) || 0) * (tasaMensualEquiv / 100);
+                          const capMes1 = Math.max(0, cuotaSimulada - intMes1);
+                          const pctInt = cuotaSimulada > 0 ? (intMes1 / cuotaSimulada) * 100 : 0;
+                          const pctCap = 100 - pctInt;
+                          return (
+                            <>
+                              {/* Desglose 1er mes */}
+                              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: ".5rem", padding: ".5rem .75rem" }}>
+                                <div className="small fw-semibold mb-2" style={{ color: "#475569" }}>Desglose cuota (1er mes)</div>
+                                <div className="d-flex justify-content-between align-items-center mb-1" style={{ fontSize: ".78rem" }}>
+                                  <span style={{ color: "#c0392b" }}>🔴 Interés</span>
+                                  <strong style={{ color: "#c0392b" }}>L. {fmt(intMes1)}</strong>
+                                </div>
+                                <div className="d-flex justify-content-between align-items-center mb-2" style={{ fontSize: ".78rem" }}>
+                                  <span style={{ color: "#27ae60" }}>🟢 Capital</span>
+                                  <strong style={{ color: "#27ae60" }}>L. {fmt(capMes1)}</strong>
+                                </div>
+                                {/* Barra visual */}
+                                <div style={{ height: 10, borderRadius: 5, overflow: "hidden", display: "flex", background: "#e2e8f0" }}>
+                                  <div style={{ width: `${pctInt.toFixed(1)}%`, background: "#e74c3c", transition: "width .3s" }} title={`Interés ${pctInt.toFixed(1)}%`} />
+                                  <div style={{ width: `${pctCap.toFixed(1)}%`, background: "#27ae60", transition: "width .3s" }} title={`Capital ${pctCap.toFixed(1)}%`} />
+                                </div>
+                                <div className="d-flex justify-content-between mt-1" style={{ fontSize: ".7rem", color: "#94a3b8" }}>
+                                  <span>{pctInt.toFixed(1)}% interés</span>
+                                  <span>{pctCap.toFixed(1)}% capital</span>
+                                </div>
+                              </div>
+                              <div className="pmt-sim-item" style={{ background: "#fff3cd", border: "1px solid #ffc107" }}>
+                                <span className="small" style={{ color: "#856404" }}>Total intereses</span>
+                                <strong style={{ color: "#b7791f" }}>L. {fmt(totalIntereses)}</strong>
+                              </div>
+                              <div className="pmt-sim-item" style={{ background: "#d4edda", border: "1px solid #28a745" }}>
+                                <span className="small" style={{ color: "#155724" }}>Total a pagar</span>
+                                <strong style={{ color: "#155724" }}>L. {fmt(totalPagar)}</strong>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
 
                       {/* Barra costo del crédito (solo préstamo con plazo fijo) */}
@@ -1556,11 +1589,11 @@ function ModalPrestamo({
                     </div>
                     <div className="d-flex flex-wrap gap-1">
                       {[
-                        { label: "12% TNA", v: "12", t: "nominal_anual" },
-                        { label: "18% TNA", v: "18", t: "nominal_anual" },
-                        { label: "24% TNA", v: "24", t: "nominal_anual" },
+                        { label: "1% TNM", v: "1",  t: "nominal_mensual" },
                         { label: "2% TNM", v: "2",  t: "nominal_mensual" },
                         { label: "3% TNM", v: "3",  t: "nominal_mensual" },
+                        { label: "5% TNM", v: "5",  t: "nominal_mensual" },
+                        { label: "12% TNA", v: "12", t: "nominal_anual" },
                       ].map((ref) => (
                         <button
                           key={ref.label}

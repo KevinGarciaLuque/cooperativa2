@@ -490,10 +490,10 @@ router.patch("/:id/estado", async (req, res) => {
   try {
     const { estado } = req.body;
 
-    const estadosValidos = ['pendiente', 'activo', 'pagado', 'mora'];
+    const estadosValidos = ['pendiente', 'aprobado', 'activo', 'pagado', 'mora', 'cancelado'];
     if (!estado || !estadosValidos.includes(estado)) {
-      return res.status(400).json({ 
-        message: "Estado inválido. Debe ser: pendiente, activo, pagado o mora" 
+      return res.status(400).json({
+        message: "Estado inválido. Debe ser: pendiente, aprobado, activo, pagado, mora o cancelado"
       });
     }
 
@@ -780,7 +780,8 @@ router.post("/", async (req, res) => {
       return res.status(404).json({ message: "Usuario no encontrado o inactivo" });
 
     const cuotaMensual = calcularCuotaMensual(montoNum, tasaNum, plazoNum);
-    const estadoPrestamo = estado || "pendiente";
+    const estadosPermitidos = ['pendiente', 'aprobado', 'activo', 'mora', 'pagado', 'cancelado'];
+    const estadoPrestamo = (estado && estadosPermitidos.includes(estado)) ? estado : 'pendiente';
     const fechaOtorgado = fecha_otorgado || null;
     const tipoTasaGuardar = tipo_tasa || "nominal_anual";
     const tasaOriginalGuardar = tasa_original != null ? parseFloat(tasa_original) : tasaNum;
@@ -833,7 +834,8 @@ router.put("/:id", async (req, res) => {
     const plazoNum = (plazo_meses !== undefined && plazo_meses !== null && plazo_meses !== '')
       ? parseInt(plazo_meses)
       : existing[0].plazo_meses;
-    const nuevoEstado = estado || existing[0].estado;
+    const estadosPermitidosPut = ['pendiente', 'aprobado', 'activo', 'mora', 'pagado', 'cancelado'];
+    const nuevoEstado = (estado && estadosPermitidosPut.includes(estado)) ? estado : existing[0].estado;
     const nuevaFecha = fecha_otorgado || existing[0].fecha_otorgado;
     const tipoTasaGuardar = tipo_tasa || existing[0].tipo_tasa || "nominal_anual";
     const tasaOriginalGuardar = tasa_original != null ? parseFloat(tasa_original) : (existing[0].tasa_original || tasaNum);

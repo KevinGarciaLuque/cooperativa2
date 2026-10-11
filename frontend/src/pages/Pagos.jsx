@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import useAccionRapida from "../hooks/useAccionRapida";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
@@ -117,6 +118,16 @@ export default function Pagos() {
       coincideFechaFin &&
       coincidePrestamo
     );
+  });
+
+  // Acciones rápidas que llegan desde la Ventanilla
+  useAccionRapida(!loading, ({ accion, prestamo, q }) => {
+    if (accion === "ver") {
+      setFiltro(q);
+    } else if (accion === "nuevo") {
+      openCrearModal();
+      if (prestamo) setForm((f) => ({ ...f, id_prestamo: prestamo }));
+    }
   });
 
   const openCrearModal = () => {

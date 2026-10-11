@@ -6,6 +6,7 @@ const { verificarToken } = require("../middleware/auth");
 // Módulos disponibles en el sistema
 const MODULOS_SISTEMA = [
   { key: "dashboard",     label: "Dashboard" },
+  { key: "ventanilla",    label: "Ventanilla" },
   { key: "usuarios",      label: "Usuarios" },
   { key: "roles",         label: "Roles" },
   { key: "cuentas",       label: "Cuentas" },

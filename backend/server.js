@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const path = require("path");
+const { ocultarInteresSocio } = require("./middleware/ocultarInteres");
 
 // Cargar variables de entorno
 dotenv.config();
@@ -41,13 +42,13 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // Rutas principales
 app.use("/api/usuarios", require("./routes/usuarios"));
 app.use("/api/cuentas", require("./routes/cuentas"));
-app.use("/api/prestamos", require("./routes/prestamos"));
+app.use("/api/prestamos", ocultarInteresSocio, require("./routes/prestamos"));
 app.use("/api/aportaciones", require("./routes/aportaciones"));
-app.use("/api/pagos", require("./routes/pagos"));
+app.use("/api/pagos", ocultarInteresSocio, require("./routes/pagos"));
 app.use("/api/movimientos", require("./routes/movimientos"));
 app.use("/api/bitacora", require("./routes/bitacora"));
 app.use("/api/actividades", require("./routes/actividades"));
-app.use("/api/liquidaciones", require("./routes/liquidaciones"));
+app.use("/api/liquidaciones", ocultarInteresSocio, require("./routes/liquidaciones"));
 app.use("/api/reportes", require("./routes/reportes"));
 app.use("/api/dashboard", require("./routes/dashboard"));
 app.use("/api/roles", require("./routes/roles"));

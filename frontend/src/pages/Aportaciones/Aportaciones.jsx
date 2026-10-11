@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import useAccionRapida from "../../hooks/useAccionRapida";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import { useAlerta } from "../../context/AlertaContext";
@@ -88,6 +89,16 @@ export default function Aportaciones() {
     const coincideFechaFin = fechaFin ? fechaAportacion <= fechaFin : true;
 
     return coincideBusqueda && coincideFechaInicio && coincideFechaFin;
+  });
+
+  // Acciones rápidas que llegan desde la Ventanilla
+  useAccionRapida(!loading, ({ accion, socio, q }) => {
+    if (accion === "ver") {
+      setFiltro(q);
+    } else if (accion === "nuevo") {
+      openCrearModal();
+      if (socio) setForm((f) => ({ ...f, id_usuario: socio }));
+    }
   });
 
   const openCrearModal = () => {

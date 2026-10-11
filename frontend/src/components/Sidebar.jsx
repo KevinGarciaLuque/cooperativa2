@@ -22,6 +22,7 @@ import {
   FaAngleDoubleRight,
   FaDatabase,
   FaShieldAlt,
+  FaConciergeBell,
 } from "react-icons/fa";
 import LogoCoop from "./LogoCoop";
 
@@ -37,6 +38,7 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 // Todos los módulos del sistema (lista maestra)
 const TODOS_MODULOS = [
   { key: "dashboard",     to: "/dashboard",     icon: <FaTachometerAlt />, label: "Dashboard" },
+  { key: "ventanilla",    to: "/ventanilla",    icon: <FaConciergeBell />,  label: "Ventanilla" },
   { key: "usuarios",      to: "/usuarios",      icon: <FaUsers />,          label: "Usuarios" },
   { key: "roles",         to: "/roles",         icon: <FaUserShield />,     label: "Roles" },
   { key: "cuentas",       to: "/cuentas",       icon: <FaUniversity />,     label: "Cuentas" },

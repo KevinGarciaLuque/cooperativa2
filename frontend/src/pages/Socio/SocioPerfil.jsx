@@ -72,11 +72,6 @@ export default function SocioPerfil() {
   const [fotoSubiendo, setFotoSubiendo]   = useState(false);
   const [fotoError, setFotoError]         = useState("");
 
-  const TIPOS_TASA_LABEL = {
-    nominal_anual: "TNA", nominal_mensual: "TNM",
-    efectiva_anual: "TEA", efectiva_mensual: "TEM",
-  };
-
   const handleFotoChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -419,6 +414,75 @@ export default function SocioPerfil() {
                   </div>
                 </div>
               </div>
+
+              {/* Mis Préstamos */}
+              <div className="col-12">
+                <div className="card border-0 shadow-sm rounded-4">
+                  <div className="card-body p-4">
+                    <div className="d-flex align-items-center justify-content-between mb-3">
+                      <div className="d-flex align-items-center gap-2">
+                        <div style={{ background: "#dbeafe", borderRadius: ".75rem", padding: ".6rem", color: "#1e40af" }}>
+                          <FaHandHoldingUsd size={20} />
+                        </div>
+                        <h6 className="mb-0 fw-bold" style={{ fontSize: "1.05rem", color: AZUL }}>Mis Préstamos</h6>
+                      </div>
+                      {prestamos.length > 0 && (
+                        <button className="btn btn-link btn-sm p-0 text-decoration-none"
+                          style={{ color: VERDE, fontWeight: 600 }}
+                          onClick={() => setTab("prestamos")}>
+                          Ver detalle e historial →
+                        </button>
+                      )}
+                    </div>
+                    {loading ? (
+                      <div className="text-center py-3"><div className="spinner-border spinner-border-sm text-primary" /></div>
+                    ) : prestamos.length === 0 ? (
+                      <div className="sp-empty"><FaHandHoldingUsd /><p className="mb-0 mt-1">Sin préstamos registrados</p></div>
+                    ) : (
+                      <div className="row g-3">
+                        {prestamos.map((p) => {
+                          const monto = parseFloat(p.monto || 0);
+                          const saldo = parseFloat(p.saldo_restante || 0);
+                          const liquidado = (p.estado || "").toLowerCase() === "pagado" || saldo <= 0.01;
+                          const progreso = liquidado ? 100 : monto > 0 ? Math.min(100, Math.max(0, ((monto - saldo) / monto) * 100)) : 0;
+                          const cuota = parseFloat(p.cuota_minima ?? p.cuota_mensual ?? 0);
+                          return (
+                            <div className="col-md-6" key={p.id_prestamo}>
+                              <div className="rounded-3 p-3 h-100" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+                                <div className="d-flex justify-content-between align-items-start mb-2">
+                                  <div>
+                                    <div className="fw-bold" style={{ color: AZUL, fontSize: "1.1rem" }}>L. {fmt(monto)}</div>
+                                    <div className="small text-muted">
+                                      Otorgado: {p.fecha_otorgado ? p.fecha_otorgado.substring(0, 10) : "-"}
+                                    </div>
+                                  </div>
+                                  {estadoBadge(p.estado)}
+                                </div>
+                                <div className="row g-2 mb-2 text-center">
+                                  <div className="col-6">
+                                    <div className="small text-muted">Cuota mensual</div>
+                                    <div className="fw-bold" style={{ color: "#065f46" }}>L. {fmt(cuota)}</div>
+                                  </div>
+                                  <div className="col-6">
+                                    <div className="small text-muted">Saldo restante</div>
+                                    <div className="fw-bold" style={{ color: liquidado ? "#065f46" : "#92400e" }}>
+                                      {liquidado ? "Liquidado" : `L. ${fmt(saldo)}`}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="sp-progress-bar" style={{ height: 8 }}>
+                                  <div className="sp-progress-fill" style={{ width: `${progreso}%` }} />
+                                </div>
+                                <div className="small text-muted mt-1 text-end">{progreso.toFixed(0)}% pagado</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -449,18 +513,8 @@ export default function SocioPerfil() {
                 // Progreso correcto: capital amortizado, no total pagado (que incluye intereses)
                 const capitalAmortizado = Math.max(0, monto - saldo);
                 const progreso     = monto > 0 ? Math.min(100, (capitalAmortizado / monto) * 100) : 0;
-                const tipoLabel    = TIPOS_TASA_LABEL[p.tipo_tasa] || "TNA";
-                const tasaDisplay  = p.tasa_original != null ? parseFloat(p.tasa_original) : parseFloat(p.tasa_interes);
-                // Cuota calculada client-side con la tasa correcta (mensual real)
-                const tasaMensualSocio = p.tasa_original != null
-                  ? parseFloat(p.tasa_original) / 100
-                  : parseFloat(p.tasa_interes) / 100 / 12;
-                const cuotaCalcSocio = monto === 0 || p.plazo_meses === 0
-                  ? 0
-                  : tasaMensualSocio === 0
-                  ? monto / parseInt(p.plazo_meses)
-                  : (monto * tasaMensualSocio * Math.pow(1 + tasaMensualSocio, parseInt(p.plazo_meses)))
-                    / (Math.pow(1 + tasaMensualSocio, parseInt(p.plazo_meses)) - 1);
+                // La cuota viene calculada del servidor; el socio no recibe tasas ni intereses
+                const cuotaCalcSocio = parseFloat(p.cuota_minima ?? p.cuota_mensual ?? 0);
                 const abierto      = pagosExpandidos[p.id_prestamo];
                 const pagos        = pagosData[p.id_prestamo] || [];
                 const loadingPagos = pagosLoading[p.id_prestamo];
@@ -513,10 +567,8 @@ export default function SocioPerfil() {
                       <div className="row g-2 mb-3">
                         <div className="col-6 col-md-3">
                           <div className="rounded-3 p-2 text-center" style={{ background: "#f0f4f8" }}>
-                            <div className="small text-muted mb-1">Tasa</div>
-                            <div className="fw-bold" style={{ color: "#2980b9", fontSize: ".95rem" }}>
-                              {tasaDisplay}% <span className="badge" style={{ background: "#2980b910", color: "#2980b9", fontSize: ".7rem" }}>{tipoLabel}</span>
-                            </div>
+                            <div className="small text-muted mb-1">Monto otorgado</div>
+                            <div className="fw-bold" style={{ color: "#2980b9", fontSize: ".95rem" }}>L. {fmt(monto)}</div>
                           </div>
                         </div>
                         <div className="col-6 col-md-3">
@@ -527,7 +579,7 @@ export default function SocioPerfil() {
                         </div>
                         <div className="col-6 col-md-3">
                           <div className="rounded-3 p-2 text-center" style={{ background: "#f0f4f8" }}>
-                            <div className="small text-muted mb-1">Cuota mínima</div>
+                            <div className="small text-muted mb-1">Cuota mensual</div>
                             <div className="fw-bold" style={{ color: "#065f46", fontSize: ".95rem" }}>L. {fmt(cuotaCalcSocio)}</div>
                           </div>
                         </div>
@@ -549,7 +601,7 @@ export default function SocioPerfil() {
                       {/* Barra de progreso */}
                       <div className="mb-3">
                         <div className="d-flex justify-content-between small text-muted mb-1">
-                          <span>Capital amortizado: <strong style={{ color: "#065f46" }}>L. {fmt(capitalAmortizado)}</strong></span>
+                          <span>Amortizado: <strong style={{ color: "#065f46" }}>L. {fmt(capitalAmortizado)}</strong></span>
                           <span><strong style={{ color: estaPagado ? "#065f46" : "inherit" }}>{progresoFinal.toFixed(1)}%</strong></span>
                         </div>
                         <div className="sp-progress-bar" style={{ height: 10 }}>
@@ -633,19 +685,7 @@ export default function SocioPerfil() {
                                         </div>
                                       </div>
                                       <div className="text-end">
-                                        <div className="d-flex gap-2 flex-wrap justify-content-end">
-                                          {parseFloat(pago.monto_capital || 0) > 0 && (
-                                            <span className="badge" style={{ background: "#d1fae5", color: "#065f46", fontSize: ".72rem" }}>
-                                              Capital: L.{fmt(pago.monto_capital)}
-                                            </span>
-                                          )}
-                                          {parseFloat(pago.monto_interes || 0) > 0 && (
-                                            <span className="badge" style={{ background: "#fef3c7", color: "#92400e", fontSize: ".72rem" }}>
-                                              Interés: L.{fmt(pago.monto_interes)}
-                                            </span>
-                                          )}
-                                        </div>
-                                        <div className="small mt-1" style={{ color: "#6b7280" }}>
+                                        <div className="small" style={{ color: "#6b7280" }}>
                                           Saldo: <strong>L. {fmt(pago.saldo_restante)}</strong>
                                         </div>
                                       </div>

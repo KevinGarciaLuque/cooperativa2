@@ -19,6 +19,7 @@ import Recuperar from "../pages/Recuperar";
 import Reportes from "../pages/Reportes";
 import Roles from "../pages/Roles";
 import Usuarios from "../pages/Usuarios/Usuarios";
+import Ventanilla from "../pages/Ventanilla";
 // Vistas de usuario socio
 import SocioPerfil from "../pages/Socio/SocioPerfil";
 // Vista para restablecimiento por token
@@ -69,6 +70,14 @@ export default function Rutas() {
             element={
               <PrivateRoute>
                 <Dashboard />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/ventanilla"
+            element={
+              <PrivateRoute>
+                <Ventanilla />
               </PrivateRoute>
             }
           />

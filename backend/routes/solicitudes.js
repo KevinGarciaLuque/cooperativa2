@@ -186,6 +186,36 @@ router.get("/", soloPersonal, async (req, res) => {
   }
 });
 
+// Solicitudes de un socio con su aval y referencia (ficha del socio en Ventanilla)
+router.get("/socio/:id", soloPersonal, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT pr.id_prestamo, pr.monto, pr.plazo_meses, pr.estado,
+              s.proposito, s.descripcion, s.ocupacion, s.lugar_trabajo, s.ingreso_mensual, s.referencias, s.creada_en
+       FROM solicitudes_prestamo s
+       INNER JOIN prestamos pr ON s.id_prestamo = pr.id_prestamo
+       WHERE s.id_usuario = ?
+       ORDER BY s.creada_en DESC LIMIT 10`,
+      [parseInt(req.params.id)]
+    );
+    res.json({
+      success: true,
+      data: rows.map((f) => {
+        let referencias = [];
+        try {
+          referencias = f.referencias ? JSON.parse(f.referencias) : [];
+        } catch {
+          referencias = [];
+        }
+        return { ...f, referencias, monto: num(f.monto), ingreso_mensual: num(f.ingreso_mensual) };
+      }),
+    });
+  } catch (error) {
+    console.error("ERROR AL LISTAR SOLICITUDES DEL SOCIO:", error);
+    res.status(500).json({ message: "No se pudieron cargar las solicitudes del socio" });
+  }
+});
+
 // Activa a un socio pendiente y le crea sus cuentas
 const activarSocio = async (conn, idUsuario, aprobadoPor) => {
   const [[u]] = await conn.query(`SELECT id_usuario, nombre_completo, estado FROM usuarios WHERE id_usuario = ? FOR UPDATE`, [idUsuario]);

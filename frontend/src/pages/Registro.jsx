@@ -86,9 +86,28 @@ export default function Registro() {
     irA(2);
   };
 
+  // Reglas de la contraseña (las mismas que valida el servidor), visibles mientras se escribe
+  const reglasPassword = [
+    ["Al menos 8 caracteres", form.password.length >= 8],
+    ["Letras", /[A-Za-z]/.test(form.password)],
+    ["Números", /\d/.test(form.password)],
+  ];
+  const passwordValida = reglasPassword.every(([, ok]) => ok);
+  const coinciden = form.confirmar !== "" && form.password === form.confirmar;
+
+  const Regla = ({ ok, children }) => (
+    <span className="me-3 text-nowrap" style={{ color: ok ? "#15803d" : "#94a3b8", fontWeight: ok ? 600 : 400 }}>
+      {ok ? "✓" : "○"} {children}
+    </span>
+  );
+
   // Paso 2: datos personales
   const continuarDatos = (e) => {
     e.preventDefault();
+    if (!passwordValida) {
+      setError("La contraseña debe tener al menos 8 caracteres, con letras y números.");
+      return;
+    }
     if (form.password !== form.confirmar) {
       setError("Las contraseñas no coinciden.");
       return;
@@ -310,12 +329,24 @@ export default function Registro() {
                     {campo("Contraseña", "password", {
                       requerido: true,
                       col: "col-12 col-md-6",
-                      ayuda: "Mínimo 8 caracteres, con letras y números.",
+                      ayuda: (
+                        <span className="d-flex flex-wrap">
+                          {reglasPassword.map(([texto, ok]) => (
+                            <Regla key={texto} ok={ok}>{texto}</Regla>
+                          ))}
+                        </span>
+                      ),
                       input: { type: "password", required: true, autoComplete: "new-password" },
                     })}
                     {campo("Confirmar contraseña", "confirmar", {
                       requerido: true,
                       col: "col-12 col-md-6",
+                      ayuda:
+                        form.confirmar === "" ? null : coinciden ? (
+                          <Regla ok>Las contraseñas coinciden</Regla>
+                        ) : (
+                          <span style={{ color: "#dc2626" }}>✗ Las contraseñas no coinciden</span>
+                        ),
                       input: { type: "password", required: true, autoComplete: "new-password" },
                     })}
 

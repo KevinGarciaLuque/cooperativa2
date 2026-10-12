@@ -43,14 +43,20 @@ const validarSolicitud = (b = {}) => {
   if (!(ingreso > 0)) return { error: "Indica tu ingreso mensual aproximado." };
   if (b.acepta !== true) return { error: "Debes confirmar que la información es verdadera." };
 
-  const referencias = (Array.isArray(b.referencias) ? b.referencias : [])
-    .slice(0, 2)
-    .map((r) => ({
-      nombre: formatearNombre(aTexto(r?.nombre, 100)),
-      telefono: aTexto(r?.telefono, 20),
-      parentesco: aTexto(r?.parentesco, 50),
-    }))
-    .filter((r) => r.nombre && r.telefono);
+  // Primero el aval (obligatorio) y después una referencia personal (opcional).
+  // Si no traen "tipo" (formularios anteriores), el primero se toma como aval.
+  const lista = (Array.isArray(b.referencias) ? b.referencias : []).slice(0, 2).map((r, i) => ({
+    tipo: r?.tipo === "referencia" || r?.tipo === "aval" ? r.tipo : i === 0 ? "aval" : "referencia",
+    nombre: formatearNombre(aTexto(r?.nombre, 100)),
+    telefono: aTexto(r?.telefono, 20),
+    parentesco: aTexto(r?.parentesco, 50),
+  }));
+  const aval = lista.find((r) => r.tipo === "aval");
+  if (!aval || !aval.nombre || !aval.telefono) {
+    return { error: "Indica el nombre y el teléfono de tu aval." };
+  }
+  const referencia = lista.find((r) => r.tipo === "referencia" && r.nombre && r.telefono);
+  const referencias = referencia ? [aval, referencia] : [aval];
 
   return {
     datos: {

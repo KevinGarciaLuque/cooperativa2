@@ -9,6 +9,7 @@ import InputMonto from "../ui/InputMonto";
 import DesembolsoModal from "../components/DesembolsoModal";
 import ReciboModal from "../components/ReciboModal";
 import FotosIdentidad from "../components/FotosIdentidad";
+import AvalReferencias from "../components/AvalReferencias";
 import { useConfigSitio } from "../hooks/useConfigSitio";
 import { OCUPACIONES, PROPOSITOS, fmt } from "../utils/solicitud";
 import { compartirCarta, descargarCarta } from "../utils/cartaAprobacion";
@@ -367,18 +368,9 @@ export default function Solicitudes() {
                         pagados: {p.prestamos_pagados}
                       </div>
 
-                      {p.referencias.length > 0 && (
-                        <div className="small mb-3">
-                          <strong>Referencias:</strong>{" "}
-                          {p.referencias.map((r, i) => (
-                            <span key={i}>
-                              {i > 0 && " · "}
-                              {r.nombre} ({r.telefono}
-                              {r.parentesco ? `, ${r.parentesco}` : ""})
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      <div className="mb-3">
+                        <AvalReferencias referencias={p.referencias} vacio="Sin aval registrado." />
+                      </div>
 
                       <div className="small mb-3">
                         <strong>Identidad:</strong>{" "}

@@ -8,6 +8,7 @@ import EstadoCuentaSocio from "./EstadoCuentaSocio";
 import RecibosSocioModal from "../components/RecibosSocioModal";
 import CartasAprobacionSocio from "../components/CartasAprobacionSocio";
 import FotosIdentidad from "../components/FotosIdentidad";
+import SolicitudesSocioFicha from "../components/SolicitudesSocioFicha";
 import {
   FaSearch,
   FaUserCircle,
@@ -21,6 +22,7 @@ import {
   FaTimes,
   FaIdCard,
   FaFileSignature,
+  FaUserShield,
 } from "react-icons/fa";
 
 const ACCENT = "#a8cd3a";
@@ -450,6 +452,15 @@ export default function Ventanilla() {
               Identidad del socio
             </h6>
             <FotosIdentidad key={socio.id_usuario} idSocio={socio.id_usuario} headers={headers} />
+          </div>
+
+          {/* Aval y referencias de sus solicitudes */}
+          <div className="vt-card p-4 mb-4">
+            <h6 className="fw-bold mb-3" style={{ color: AZUL }}>
+              <FaUserShield className="me-2" />
+              Aval y referencias
+            </h6>
+            <SolicitudesSocioFicha key={socio.id_usuario} idSocio={socio.id_usuario} headers={headers} />
           </div>
 
           {/* Acciones */}

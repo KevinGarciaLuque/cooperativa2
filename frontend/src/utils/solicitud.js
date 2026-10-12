@@ -49,8 +49,13 @@ export const solicitudDesde = (form, acepta) => ({
   ocupacion: form.ocupacion,
   lugar_trabajo: form.lugar_trabajo,
   ingreso_mensual: parseFloat(form.ingreso_mensual) || 0,
-  referencias: [1, 2]
-    .map((n) => ({
+  // ref1 = aval (obligatorio), ref2 = referencia personal (opcional)
+  referencias: [
+    ["aval", 1],
+    ["referencia", 2],
+  ]
+    .map(([tipo, n]) => ({
+      tipo,
       nombre: form[`ref${n}_nombre`],
       telefono: form[`ref${n}_telefono`],
       parentesco: form[`ref${n}_parentesco`],

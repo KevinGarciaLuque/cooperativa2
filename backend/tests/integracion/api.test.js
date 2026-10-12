@@ -42,6 +42,9 @@ const registrar = async (datos, { frente = true, reverso = true } = {}) => {
   return { s: r.status, b: await r.json().catch(() => null) };
 };
 
+// Toda solicitud de préstamo lleva un aval
+const AVAL = [{ tipo: "aval", nombre: "aval prueba", telefono: "99990000", parentesco: "Hermano" }];
+
 const subirFoto = async (id, lado, token, tipo = "image/png") => {
   const f = new FormData();
   f.append("foto", new Blob([PNG], { type: tipo }), `${lado}.png`);
@@ -212,10 +215,16 @@ test("identidad: fotos privadas, el socio sube las suyas y el personal las ve", 
 test("solicitud de préstamo: validaciones y una sola en trámite", async () => {
   const sol = {
     monto: 5000, plazo_meses: 6, cuota_posible: 1100, proposito: "negocio", ocupacion: "negocio_propio",
-    ingreso_mensual: 9000, acepta: true,
+    ingreso_mensual: 9000, acepta: true, referencias: AVAL,
   };
   assert.equal((await api("POST", "/solicitudes/prestamo", { ...sol, monto: 99999999 }, ids.tNuevo)).s, 400);
   assert.equal((await api("POST", "/solicitudes/prestamo", { ...sol, acepta: false }, ids.tNuevo)).s, 400);
+  // el aval es obligatorio; la referencia, opcional
+  assert.equal((await api("POST", "/solicitudes/prestamo", { ...sol, referencias: [] }, ids.tNuevo)).s, 400);
+  assert.equal(
+    (await api("POST", "/solicitudes/prestamo", { ...sol, referencias: [{ tipo: "referencia", nombre: "Ana", telefono: "1" }] }, ids.tNuevo)).s,
+    400
+  );
 
   const ok = await api("POST", "/solicitudes/prestamo", sol, ids.tNuevo);
   assert.equal(ok.s, 201);
@@ -277,7 +286,7 @@ test("carta de aprobación: PDF para el personal y para el socio dueño", async 
   // aprobar desde la pantalla de Préstamos también deja la carta lista y lo avisa
   const sol = await api(
     "POST", "/solicitudes/prestamo",
-    { monto: 1000, plazo_meses: 2, cuota_posible: 600, proposito: "otro", ocupacion: "empleado", ingreso_mensual: 8000, acepta: true },
+    { monto: 1000, plazo_meses: 2, cuota_posible: 600, proposito: "otro", ocupacion: "empleado", ingreso_mensual: 8000, acepta: true, referencias: AVAL },
     ids.tSocio
   );
   assert.equal(sol.s, 201);
@@ -316,7 +325,7 @@ test("tras la aprobación el socio ve su tasa y puede pedir otro préstamo", asy
     "POST", "/solicitudes/prestamo",
     {
       monto: 2000, plazo_meses: 4, cuota_posible: 700, proposito: "salud", ocupacion: "empleado",
-      ingreso_mensual: 8000, acepta: true,
+      ingreso_mensual: 8000, acepta: true, referencias: AVAL,
     },
     t
   );
@@ -326,7 +335,7 @@ test("tras la aprobación el socio ve su tasa y puede pedir otro préstamo", asy
     "POST", "/solicitudes/prestamo",
     {
       monto: 1000, plazo_meses: 2, cuota_posible: 600, proposito: "otro", ocupacion: "empleado",
-      ingreso_mensual: 8000, acepta: true,
+      ingreso_mensual: 8000, acepta: true, referencias: AVAL,
     },
     t
   );
@@ -628,6 +637,14 @@ test("registro por enlace con préstamo: cuenta y solicitud llegan juntas", asyn
   assert.ok(sol);
   assert.equal(sol.estado_socio, "pendiente");
   assert.equal(sol.referencias.length, 1);
+  assert.equal(sol.referencias[0].tipo, "aval"); // sin "tipo", el primero es el aval
+  assert.equal(sol.referencias[0].nombre, "Ana Prueba");
+
+  // la ficha del socio muestra su aval; un socio no puede consultarla
+  const ficha = await api("GET", `/solicitudes/socio/${ok.b.id_usuario}`, null, ids.tSuper);
+  assert.equal(ficha.s, 200);
+  assert.equal(ficha.b.data[0].referencias[0].tipo, "aval");
+  assert.equal((await api("GET", `/solicitudes/socio/${ok.b.id_usuario}`, null, ids.tSocio)).s, 403);
 
   // el socio la ve en su panel al entrar
   const t = (await api("POST", "/usuarios/login", { dni: datos.dni, password: datos.password })).b.token;

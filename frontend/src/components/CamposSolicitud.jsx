@@ -72,7 +72,7 @@ export function CamposMonto({ param, form, setForm }) {
   );
 }
 
-// Destino del préstamo, ingresos y referencias
+// Destino del préstamo, ingresos, aval (obligatorio) y referencia personal (opcional)
 export function CamposIngresos({ form, setForm }) {
   const cambiar = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
@@ -116,37 +116,39 @@ export function CamposIngresos({ form, setForm }) {
         />
       </div>
 
-      <div className="col-12">
-        <div className="fw-semibold small mb-2">Referencias personales (recomendado)</div>
-        <div className="row g-2">
-          {[1, 2].map((n) => (
-            <div className="col-12" key={n}>
-              <div className="row g-2">
-                <div className="col-12 col-md-5">
-                  <input
-                    className="form-control" placeholder={`Referencia ${n}: nombre`} maxLength={100}
-                    name={`ref${n}_nombre`} value={form[`ref${n}_nombre`]} onChange={cambiar}
-                    autoCapitalize="words"
-                    onBlur={(e) => setForm((f) => ({ ...f, [e.target.name]: formatearNombre(f[e.target.name]) }))}
-                  />
-                </div>
-                <div className="col-6 col-md-3">
-                  <input
-                    className="form-control" placeholder="Teléfono" maxLength={20}
-                    name={`ref${n}_telefono`} value={form[`ref${n}_telefono`]} onChange={cambiar}
-                  />
-                </div>
-                <div className="col-6 col-md-4">
-                  <input
-                    className="form-control" placeholder="Parentesco o relación" maxLength={50}
-                    name={`ref${n}_parentesco`} value={form[`ref${n}_parentesco`]} onChange={cambiar}
-                  />
-                </div>
-              </div>
+      {[
+        [1, "Aval", "Persona que respalda tu préstamo y responde si no puedes pagar.", true],
+        [2, "Referencia personal (opcional)", "Alguien que te conozca y pueda dar referencias tuyas.", false],
+      ].map(([n, titulo, ayuda, obligatorio]) => (
+        <div className="col-12" key={n}>
+          <div className="fw-semibold small">
+            {titulo} {obligatorio && <span className="text-danger">*</span>}
+          </div>
+          <div className="form-text mt-0 mb-2">{ayuda}</div>
+          <div className="row g-2">
+            <div className="col-12 col-md-5">
+              <input
+                className="form-control" placeholder="Nombre completo" maxLength={100} required={obligatorio}
+                name={`ref${n}_nombre`} value={form[`ref${n}_nombre`]} onChange={cambiar}
+                autoCapitalize="words"
+                onBlur={(e) => setForm((f) => ({ ...f, [e.target.name]: formatearNombre(f[e.target.name]) }))}
+              />
             </div>
-          ))}
+            <div className="col-6 col-md-3">
+              <input
+                className="form-control" placeholder="Teléfono" maxLength={20} required={obligatorio} inputMode="tel"
+                name={`ref${n}_telefono`} value={form[`ref${n}_telefono`]} onChange={cambiar}
+              />
+            </div>
+            <div className="col-6 col-md-4">
+              <input
+                className="form-control" placeholder="Parentesco o relación" maxLength={50}
+                name={`ref${n}_parentesco`} value={form[`ref${n}_parentesco`]} onChange={cambiar}
+              />
+            </div>
+          </div>
         </div>
-      </div>
+      ))}
     </div>
   );
 }

@@ -295,6 +295,27 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_10_012_marca_smartcoop",
+    descripcion: "La marca del sitio pasa a ser SmartCoop: nombre, textos que decían Demo y logo predeterminado",
+    async up(conn) {
+      await conn.query(
+        "INSERT INTO configuracion_sitio (clave, valor) VALUES ('site_name', 'SmartCoop') ON DUPLICATE KEY UPDATE valor = 'SmartCoop'"
+      );
+      // Sin logo subido se usa el de SmartCoop
+      await conn.query("DELETE FROM configuracion_sitio WHERE clave = 'logo_url'");
+      // Textos de la portada y del inicio de sesión que decían "Demo" o "Tu logo"
+      const [filas] = await conn.query(
+        "SELECT clave, valor FROM configuracion_sitio WHERE clave LIKE 'home\\_%' OR clave LIKE 'login\\_%'"
+      );
+      for (const { clave, valor } of filas) {
+        const nuevo = String(valor).replace(/\btu logo\b/gi, "SmartCoop").replace(/\bdemo\b/gi, "SmartCoop");
+        if (nuevo !== valor) {
+          await conn.query("UPDATE configuracion_sitio SET valor = ? WHERE clave = ?", [nuevo, clave]);
+        }
+      }
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

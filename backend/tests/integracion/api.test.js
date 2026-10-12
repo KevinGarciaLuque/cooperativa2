@@ -227,6 +227,15 @@ test("carta de aprobación: PDF para el personal y para el socio dueño", async 
   assert.equal((await pdf(`/solicitudes/prestamos/${sol.b.id_prestamo}/carta`, ids.tSocio)).s, 200);
   await pool.query("DELETE FROM solicitudes_prestamo WHERE id_prestamo = ?", [sol.b.id_prestamo]);
   await pool.query("DELETE FROM prestamos WHERE id_prestamo = ?", [sol.b.id_prestamo]);
+
+  // un préstamo registrado directamente (activo, sin fecha de aprobación) también tiene carta
+  const [directo] = await pool.query(
+    `INSERT INTO prestamos (id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado)
+     VALUES (?, 3000, 24, 6, 3000, 'activo', NOW())`,
+    [ids.socio]
+  );
+  assert.equal((await pdf(`/solicitudes/prestamos/${directo.insertId}/carta`, ids.tSuper)).s, 200);
+  await pool.query("DELETE FROM prestamos WHERE id_prestamo = ?", [directo.insertId]);
 });
 
 test("tras la aprobación el socio ve su tasa y puede pedir otro préstamo", async () => {

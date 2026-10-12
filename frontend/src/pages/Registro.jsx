@@ -2,20 +2,27 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { FaUserPlus, FaCheckCircle, FaExclamationTriangle } from "react-icons/fa";
+import { FaHandHoldingUsd, FaCheckCircle, FaExclamationTriangle, FaArrowLeft } from "react-icons/fa";
+import { CamposMonto, CamposIngresos, AvisoRelacion } from "../components/CamposSolicitud";
+import { SOLICITUD_VACIA, fmt, solicitudDesde, simular } from "../utils/solicitud";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const AZUL = "#1a2035";
 const ACCENT = "#a8cd3a";
 
-// Pantalla pública a la que llega el nuevo socio desde el enlace que comparte la cooperativa
+// Pantalla pública a la que llega el nuevo socio desde el enlace que comparte la cooperativa.
+// Va por pasos: primero el préstamo que necesita (con su cuota estimada), luego sus datos y
+// al final sus ingresos y referencias. Todo se envía junto en un solo registro.
 export default function Registro() {
   const [params] = useSearchParams();
   const codigo = params.get("c") || "";
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [estado, setEstado] = useState(null); // { cooperativa, habilitado, valido }
+  const [estado, setEstado] = useState(null); // { cooperativa, habilitado, valido, parametros }
+  const [paso, setPaso] = useState(1);
+  const [quierePrestamo, setQuierePrestamo] = useState(true);
+  const [solicitud, setSolicitud] = useState(SOLICITUD_VACIA);
   const [form, setForm] = useState({
     nombre_completo: "",
     dni: "",
@@ -35,7 +42,7 @@ export default function Registro() {
     axios
       .get(`${API_URL}/registro/estado`, { params: { c: codigo } })
       .then((r) => setEstado(r.data))
-      .catch(() => setEstado({ cooperativa: "Cooperativa", habilitado: false, valido: false }));
+      .catch(() => setEstado({ cooperativa: "SmartCoop", habilitado: false, valido: false, parametros: null }));
   }, [codigo]);
 
   const cambiar = (e) => {
@@ -46,13 +53,50 @@ export default function Registro() {
     setForm((f) => ({ ...f, [name]: v }));
   };
 
-  const enviar = async (e) => {
-    e.preventDefault();
+  const param = estado?.parametros;
+  const totalPasos = quierePrestamo ? 3 : 2;
+  const irA = (n) => {
     setError("");
+    setPaso(n);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Paso 1: el préstamo que necesita
+  const continuarPrestamo = (e) => {
+    e.preventDefault();
+    const monto = parseFloat(solicitud.monto) || 0;
+    const plazo = parseInt(solicitud.plazo_meses) || 0;
+    if (param && monto > param.monto_max) {
+      setError(`El monto máximo es ${fmt(param.monto_max)}.`);
+      return;
+    }
+    if (param && (plazo < 1 || plazo > param.plazo_max)) {
+      setError(`El plazo debe estar entre 1 y ${param.plazo_max} meses.`);
+      return;
+    }
+    setQuierePrestamo(true);
+    irA(2);
+  };
+
+  const soloSocio = () => {
+    setQuierePrestamo(false);
+    irA(2);
+  };
+
+  // Paso 2: datos personales
+  const continuarDatos = (e) => {
+    e.preventDefault();
     if (form.password !== form.confirmar) {
       setError("Las contraseñas no coinciden.");
       return;
     }
+    if (quierePrestamo) irA(3);
+    else enviar();
+  };
+
+  const enviar = async (e) => {
+    e?.preventDefault();
+    setError("");
     if (!form.acepta) {
       setError("Debes aceptar que los datos son verdaderos.");
       return;
@@ -68,9 +112,10 @@ export default function Registro() {
         fecha_nacimiento: form.fecha_nacimiento,
         password: form.password,
         codigo,
+        prestamo: quierePrestamo ? solicitudDesde(solicitud, true) : undefined,
         website: form.website,
       });
-      // Inicia sesión automáticamente para que pueda enviar su solicitud de préstamo
+      // Inicia sesión automáticamente: en su panel verá el estado de su solicitud
       const ok = await login(form.dni, form.password);
       navigate(ok === true ? "/perfil" : "/login");
     } catch (err) {
@@ -78,6 +123,47 @@ export default function Registro() {
     } finally {
       setEnviando(false);
     }
+  };
+
+  const declaracion = (
+    <div className="col-12">
+      <div className="form-check">
+        <input id="acepta" name="acepta" type="checkbox" className="form-check-input" checked={form.acepta} onChange={cambiar} />
+        <label htmlFor="acepta" className="form-check-label small">
+          Declaro que los datos son verdaderos y autorizo a la cooperativa a verificarlos y usarlos para gestionar mi
+          membresía{quierePrestamo ? " y mi solicitud de préstamo" : ""}.
+        </label>
+      </div>
+    </div>
+  );
+
+  const avisoError = error && (
+    <div className="col-12">
+      <div className="alert alert-danger py-2 mb-0">{error}</div>
+    </div>
+  );
+
+  const botonPrincipal = (texto, textoEnviando) => (
+    <button
+      type="submit"
+      className="btn btn-lg w-100 fw-bold"
+      style={{ background: ACCENT, color: "#1a2a00", borderRadius: 12 }}
+      disabled={enviando}
+    >
+      {enviando ? textoEnviando : texto}
+    </button>
+  );
+
+  const volver = (n) => (
+    <button type="button" className="btn btn-link text-decoration-none px-0 mb-2" style={{ color: AZUL }} onClick={() => irA(n)}>
+      <FaArrowLeft className="me-1" /> Atrás
+    </button>
+  );
+
+  const titulos = {
+    1: "Tu préstamo",
+    2: "Tus datos",
+    3: "Tus ingresos y referencias",
   };
 
   const campo = (etiqueta, nombre, props = {}) => (
@@ -105,10 +191,10 @@ export default function Registro() {
             className="d-inline-flex align-items-center justify-content-center mb-2"
             style={{ width: 64, height: 64, borderRadius: "50%", background: ACCENT, color: "#1a2a00" }}
           >
-            <FaUserPlus size={26} />
+            <FaHandHoldingUsd size={26} />
           </div>
-          <h2 className="fw-bold mb-1">Únete a {estado?.cooperativa || "la cooperativa"}</h2>
-          <div style={{ opacity: 0.8 }}>Crea tu cuenta de socio en pocos minutos.</div>
+          <h2 className="fw-bold mb-1">Solicita tu préstamo en {estado?.cooperativa || "la cooperativa"}</h2>
+          <div style={{ opacity: 0.8 }}>Calcula tu cuota, hazte socio y envía tu solicitud en pocos minutos.</div>
         </div>
 
         <div className="p-4" style={{ background: "#fff", borderRadius: 18, boxShadow: "0 12px 40px rgba(0,0,0,.25)" }}>
@@ -131,93 +217,125 @@ export default function Registro() {
           )}
 
           {estado && estado.valido && (
-            <form onSubmit={enviar}>
-              <div className="row g-3">
-                {campo("Nombre completo", "nombre_completo", {
-                  requerido: true,
-                  input: { required: true, maxLength: 100, placeholder: "Nombre y apellidos", autoComplete: "name" },
-                })}
-                {campo("Número de identidad", "dni", {
-                  requerido: true,
-                  col: "col-12 col-md-6",
-                  ayuda: "13 dígitos, sin guiones.",
-                  input: { required: true, inputMode: "numeric", placeholder: "0801199012345", autoComplete: "off" },
-                })}
-                {campo("Teléfono (WhatsApp)", "telefono", {
-                  requerido: true,
-                  col: "col-12 col-md-6",
-                  ayuda: "8 dígitos.",
-                  input: { required: true, inputMode: "numeric", placeholder: "98765432", autoComplete: "tel" },
-                })}
-                {campo("Fecha de nacimiento", "fecha_nacimiento", {
-                  requerido: true,
-                  col: "col-12 col-md-6",
-                  input: { type: "date", required: true },
-                })}
-                {campo("Correo electrónico", "correo", {
-                  requerido: true,
-                  col: "col-12 col-md-6",
-                  ayuda: "Aquí recibirás tus recibos.",
-                  input: { type: "email", required: true, maxLength: 100, placeholder: "tucorreo@ejemplo.com", autoComplete: "email" },
-                })}
-                {campo("Dirección", "direccion", {
-                  input: { maxLength: 200, placeholder: "Colonia, barrio o aldea y municipio", autoComplete: "street-address" },
-                })}
-                {campo("Contraseña", "password", {
-                  requerido: true,
-                  col: "col-12 col-md-6",
-                  ayuda: "Mínimo 8 caracteres, con letras y números.",
-                  input: { type: "password", required: true, autoComplete: "new-password" },
-                })}
-                {campo("Confirmar contraseña", "confirmar", {
-                  requerido: true,
-                  col: "col-12 col-md-6",
-                  input: { type: "password", required: true, autoComplete: "new-password" },
-                })}
-
-                {/* Campo trampa para robots: oculto para las personas */}
-                <div style={{ position: "absolute", left: "-9999px" }} aria-hidden="true">
-                  <input name="website" tabIndex={-1} autoComplete="off" value={form.website} onChange={cambiar} />
-                </div>
-
-                <div className="col-12">
-                  <div className="form-check">
-                    <input id="acepta" name="acepta" type="checkbox" className="form-check-input" checked={form.acepta} onChange={cambiar} />
-                    <label htmlFor="acepta" className="form-check-label small">
-                      Declaro que los datos son verdaderos y autorizo a la cooperativa a usarlos para gestionar mi
-                      membresía.
-                    </label>
-                  </div>
-                </div>
-
-                {error && (
-                  <div className="col-12">
-                    <div className="alert alert-danger py-2 mb-0">{error}</div>
-                  </div>
-                )}
-
-                <div className="col-12">
-                  <button
-                    type="submit"
-                    className="btn btn-lg w-100 fw-bold"
-                    style={{ background: ACCENT, color: "#1a2a00", borderRadius: 12 }}
-                    disabled={enviando}
-                  >
-                    {enviando ? "Creando tu cuenta..." : "Crear mi cuenta"}
-                  </button>
-                  <div className="text-center small text-muted mt-3">
-                    <FaCheckCircle className="me-1 text-success" />
-                    Tu cuenta quedará pendiente hasta que la cooperativa la apruebe.
-                  </div>
-                  <div className="text-center small mt-2">
-                    ¿Ya tienes cuenta?{" "}
-                    <a href="/login" style={{ color: AZUL, fontWeight: 600 }}>
-                      Inicia sesión
-                    </a>
-                  </div>
-                </div>
+            <>
+              <div className="d-flex justify-content-between align-items-baseline mb-1">
+                <h5 className="fw-bold mb-0">{titulos[paso]}</h5>
+                <span className="small text-muted text-nowrap ms-2">
+                  Paso {paso} de {totalPasos}
+                </span>
               </div>
-            </form>
+              <div className="progress mb-4" style={{ height: 6 }}>
+                <div className="progress-bar" style={{ width: `${(paso / totalPasos) * 100}%`, background: ACCENT }} />
+              </div>
+
+              {/* Paso 1: el préstamo */}
+              {paso === 1 && (
+                <form onSubmit={continuarPrestamo}>
+                  <CamposMonto param={param} form={solicitud} setForm={setSolicitud} />
+                  <div className="row g-3 mt-0">
+                    {avisoError}
+                    <div className="col-12">{botonPrincipal("Continuar", "")}</div>
+                    <div className="col-12 text-center">
+                      <button type="button" className="btn btn-link small text-decoration-none" style={{ color: AZUL }} onClick={soloSocio}>
+                        Solo quiero hacerme socio, sin préstamo por ahora
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              )}
+
+              {/* Paso 2: datos personales */}
+              {paso === 2 && (
+                <form onSubmit={continuarDatos}>
+                  {volver(1)}
+                  {quierePrestamo && simular(param, solicitud).cuotaEstimada > 0 && (
+                    <div className="small mb-3 p-2 px-3" style={{ background: "#f0f7e6", borderRadius: 10 }}>
+                      Préstamo de <strong>{fmt(solicitud.monto)}</strong> a {solicitud.plazo_meses} meses · cuota estimada{" "}
+                      <strong>{fmt(simular(param, solicitud).cuotaEstimada)}</strong>
+                    </div>
+                  )}
+                  <div className="row g-3">
+                    {campo("Nombre completo", "nombre_completo", {
+                      requerido: true,
+                      input: { required: true, maxLength: 100, placeholder: "Nombre y apellidos", autoComplete: "name" },
+                    })}
+                    {campo("Número de identidad", "dni", {
+                      requerido: true,
+                      col: "col-12 col-md-6",
+                      ayuda: "13 dígitos, sin guiones.",
+                      input: { required: true, inputMode: "numeric", placeholder: "0801199012345", autoComplete: "off" },
+                    })}
+                    {campo("Teléfono (WhatsApp)", "telefono", {
+                      requerido: true,
+                      col: "col-12 col-md-6",
+                      ayuda: "8 dígitos.",
+                      input: { required: true, inputMode: "numeric", placeholder: "98765432", autoComplete: "tel" },
+                    })}
+                    {campo("Fecha de nacimiento", "fecha_nacimiento", {
+                      requerido: true,
+                      col: "col-12 col-md-6",
+                      input: { type: "date", required: true },
+                    })}
+                    {campo("Correo electrónico", "correo", {
+                      requerido: true,
+                      col: "col-12 col-md-6",
+                      ayuda: "Aquí recibirás tus recibos.",
+                      input: { type: "email", required: true, maxLength: 100, placeholder: "tucorreo@ejemplo.com", autoComplete: "email" },
+                    })}
+                    {campo("Dirección", "direccion", {
+                      input: { maxLength: 200, placeholder: "Colonia, barrio o aldea y municipio", autoComplete: "street-address" },
+                    })}
+                    {campo("Contraseña", "password", {
+                      requerido: true,
+                      col: "col-12 col-md-6",
+                      ayuda: "Mínimo 8 caracteres, con letras y números.",
+                      input: { type: "password", required: true, autoComplete: "new-password" },
+                    })}
+                    {campo("Confirmar contraseña", "confirmar", {
+                      requerido: true,
+                      col: "col-12 col-md-6",
+                      input: { type: "password", required: true, autoComplete: "new-password" },
+                    })}
+
+                    {/* Campo trampa para robots: oculto para las personas */}
+                    <div style={{ position: "absolute", left: "-9999px" }} aria-hidden="true">
+                      <input name="website" tabIndex={-1} autoComplete="off" value={form.website} onChange={cambiar} />
+                    </div>
+
+                    {!quierePrestamo && declaracion}
+                    {avisoError}
+                    <div className="col-12">
+                      {quierePrestamo ? botonPrincipal("Continuar", "") : botonPrincipal("Crear mi cuenta", "Creando tu cuenta...")}
+                    </div>
+                  </div>
+                </form>
+              )}
+
+              {/* Paso 3: ingresos y referencias */}
+              {paso === 3 && (
+                <form onSubmit={enviar}>
+                  {volver(2)}
+                  <CamposIngresos form={solicitud} setForm={setSolicitud} />
+                  <AvisoRelacion sim={simular(param, solicitud)} />
+                  <div className="row g-3 mt-0">
+                    {declaracion}
+                    {avisoError}
+                    <div className="col-12">{botonPrincipal("Enviar mi solicitud", "Enviando tu solicitud...")}</div>
+                  </div>
+                </form>
+              )}
+
+              <div className="text-center small text-muted mt-3">
+                <FaCheckCircle className="me-1 text-success" />
+                La cooperativa revisará tus datos{quierePrestamo ? " y tu solicitud" : ""} y te responderá por correo.
+              </div>
+              <div className="text-center small mt-2">
+                ¿Ya tienes cuenta?{" "}
+                <a href="/login" style={{ color: AZUL, fontWeight: 600 }}>
+                  Inicia sesión
+                </a>
+              </div>
+            </>
           )}
         </div>
       </div>

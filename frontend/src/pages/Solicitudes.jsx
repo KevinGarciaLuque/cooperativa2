@@ -3,41 +3,23 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
-import { FaInbox, FaLink, FaCopy, FaWhatsapp, FaSyncAlt } from "react-icons/fa";
+import { FaInbox, FaLink, FaCopy, FaWhatsapp, FaSyncAlt, FaFilePdf, FaEnvelope } from "react-icons/fa";
 import { EmptyState, PageHeader } from "../ui/Componentes";
 import InputMonto from "../ui/InputMonto";
 import DesembolsoModal from "../components/DesembolsoModal";
 import ReciboModal from "../components/ReciboModal";
+import { useConfigSitio } from "../hooks/useConfigSitio";
+import { OCUPACIONES, PROPOSITOS, fmt } from "../utils/solicitud";
+import { compartirCarta, descargarCarta } from "../utils/cartaAprobacion";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const ACCENT = "#a8cd3a";
-
-const fmt = (n) =>
-  `L. ${parseFloat(n || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-const PROPOSITOS = {
-  negocio: "Negocio o capital de trabajo",
-  vivienda: "Vivienda o mejoras del hogar",
-  educacion: "Educación",
-  salud: "Salud o emergencia",
-  agricultura: "Agricultura o ganadería",
-  consumo: "Consumo personal",
-  otro: "Otro",
-};
-
-const OCUPACIONES = {
-  empleado: "Empleado",
-  negocio_propio: "Negocio propio",
-  agricultor: "Agricultor / ganadero",
-  independiente: "Trabajador independiente",
-  jubilado: "Jubilado o pensionado",
-  otro: "Otro",
-};
 
 export default function Solicitudes() {
   const { token } = useAuth();
   const { mostrarAlerta } = useAlerta();
   const navigate = useNavigate();
+  const { config: sitio } = useConfigSitio();
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   const [tab, setTab] = useState("prestamos");
@@ -52,6 +34,7 @@ export default function Solicitudes() {
   const [reciboAbierto, setReciboAbierto] = useState(null);
   const [sinFirma, setSinFirma] = useState([]);
   const [recibidos, setRecibidos] = useState([]);
+  const [enviandoCarta, setEnviandoCarta] = useState(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -92,7 +75,7 @@ export default function Solicitudes() {
   };
 
   const compartirWhatsapp = () => {
-    const texto = `Te invitamos a unirte a nuestra cooperativa. Crea tu cuenta de socio aquí: ${urlRegistro}`;
+    const texto = `Te invitamos a nuestra cooperativa. Calcula tu cuota, hazte socio y solicita tu préstamo aquí: ${urlRegistro}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank", "noopener");
   };
 
@@ -143,7 +126,7 @@ export default function Solicitudes() {
   const aprobarPrestamo = async () => {
     setProcesando(true);
     try {
-      await axios.post(
+      const r = await axios.post(
         `${API_URL}/solicitudes/prestamos/${revisando.id_prestamo}/aprobar`,
         {
           monto: parseFloat(condiciones.monto),
@@ -153,7 +136,7 @@ export default function Solicitudes() {
         },
         { headers }
       );
-      mostrarAlerta("Solicitud aprobada. Falta registrar el desembolso en Préstamos.", "success");
+      mostrarAlerta(r.data.message, "success");
       setRevisando(null);
       cargar();
     } catch (err) {
@@ -173,6 +156,36 @@ export default function Solicitudes() {
       cargar();
     } catch (err) {
       mostrarAlerta(err.response?.data?.message || "No se pudo rechazar.", "error");
+    }
+  };
+
+  // Carta de aprobación: descargar, compartir por WhatsApp o reenviar al correo del socio
+  const bajarCarta = async (p) => {
+    try {
+      await descargarCarta(p.id_prestamo, token);
+    } catch {
+      mostrarAlerta("No se pudo descargar la carta.", "error");
+    }
+  };
+
+  const whatsappCarta = async (p) => {
+    try {
+      const aviso = await compartirCarta(p.id_prestamo, token, { telefono: p.telefono, cooperativa: sitio?.site_name });
+      if (aviso) mostrarAlerta(aviso, "success");
+    } catch {
+      mostrarAlerta("No se pudo preparar la carta para compartir.", "error");
+    }
+  };
+
+  const correoCarta = async (p) => {
+    setEnviandoCarta(p.id_prestamo);
+    try {
+      const r = await axios.post(`${API_URL}/solicitudes/prestamos/${p.id_prestamo}/carta/enviar`, {}, { headers });
+      mostrarAlerta(r.data.message, "success");
+    } catch (err) {
+      mostrarAlerta(err.response?.data?.message || "No se pudo enviar la carta.", "error");
+    } finally {
+      setEnviandoCarta(null);
     }
   };
 
@@ -247,13 +260,35 @@ export default function Solicitudes() {
                       {fmt(p.monto)} a {p.plazo_meses} meses · Préstamo #{p.id_prestamo}
                     </div>
                   </div>
-                  <button
-                    className="btn fw-semibold"
-                    style={{ background: ACCENT, color: "#1a2a00" }}
-                    onClick={() => setADesembolsar(p)}
-                  >
-                    Desembolsar
-                  </button>
+                  <div className="d-flex flex-wrap gap-2">
+                    <div className="btn-group">
+                      <button className="btn btn-outline-dark" title="Descargar carta de aprobación" onClick={() => bajarCarta(p)}>
+                        <FaFilePdf className="me-1" /> Carta
+                      </button>
+                      <button
+                        className="btn btn-outline-dark"
+                        title="Enviar la carta por WhatsApp"
+                        onClick={() => whatsappCarta(p)}
+                      >
+                        <FaWhatsapp />
+                      </button>
+                      <button
+                        className="btn btn-outline-dark"
+                        title="Reenviar la carta al correo del socio"
+                        disabled={enviandoCarta === p.id_prestamo}
+                        onClick={() => correoCarta(p)}
+                      >
+                        <FaEnvelope />
+                      </button>
+                    </div>
+                    <button
+                      className="btn fw-semibold"
+                      style={{ background: ACCENT, color: "#1a2a00" }}
+                      onClick={() => setADesembolsar(p)}
+                    >
+                      Desembolsar
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -486,8 +521,8 @@ export default function Solicitudes() {
             Enlace para nuevos socios
           </h5>
           <p className="text-muted small">
-            Comparte este enlace. Quien lo abra podrá crear su cuenta y pedir un préstamo; nada se activa hasta que lo
-            apruebes aquí.
+            Comparte este enlace. Quien lo abra indica el préstamo que necesita, ve su cuota estimada y luego llena sus
+            datos; la cuenta y la solicitud llegan juntas aquí. Nada se activa hasta que lo apruebes.
           </p>
 
           <div className="input-group mb-3">
@@ -566,8 +601,8 @@ export default function Solicitudes() {
               </div>
               <div className="modal-body">
                 <p className="small text-muted">
-                  Puedes ajustar las condiciones antes de aprobar. El dinero se entrega después, al registrar el
-                  desembolso en Préstamos.
+                  Puedes ajustar las condiciones antes de aprobar. Al aprobar, el socio recibe por correo la carta de
+                  aprobación en PDF. El dinero se entrega después, al registrar el desembolso.
                 </p>
                 <div className="row g-2">
                   <div className="col-12 col-md-4">

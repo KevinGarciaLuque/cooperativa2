@@ -11,13 +11,14 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-async function sendEmail({ to, subject, html, text }) {
+async function sendEmail({ to, subject, html, text, attachments }) {
   const mailOptions = {
-    from: `"Cooperativa" <${process.env.EMAIL_USER}>`,
+    from: `"SmartCoop" <${process.env.EMAIL_USER}>`,
     to,
     subject,
     html,
     text,
+    attachments,
   };
   return transporter.sendMail(mailOptions);
 }

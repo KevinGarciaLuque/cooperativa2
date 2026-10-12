@@ -153,10 +153,10 @@ export default function Prestamos() {
   const aprobarPrestamo = async (p) => {
     if (!window.confirm(`¿Aprobar el préstamo #${p.id_prestamo} por L. ${parseFloat(p.monto).toLocaleString("es-HN")}? El dinero se entrega al registrar el desembolso.`)) return;
     try {
-      await axios.patch(`${API_URL}/prestamos/${p.id_prestamo}/aprobar`, {}, {
+      const r = await axios.patch(`${API_URL}/prestamos/${p.id_prestamo}/aprobar`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      mostrarAlerta("Préstamo aprobado. Falta registrar el desembolso.", "success");
+      mostrarAlerta(r.data.message, "success");
       fetchData();
     } catch (err) {
       mostrarAlerta(err.response?.data?.message || "No se pudo aprobar el préstamo.", "error");

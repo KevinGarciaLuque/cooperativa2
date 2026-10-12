@@ -186,6 +186,49 @@ test("aprobación: el socio y el préstamo se aprueban juntos", async () => {
   assert.equal(cuentas.length, 3);
 });
 
+test("carta de aprobación: PDF para el personal y para el socio dueño", async () => {
+  const pdf = async (ruta, token) => {
+    const r = await fetch(`${base}/api${ruta}`, { headers: { Authorization: `Bearer ${token}` } });
+    return { s: r.status, tipo: r.headers.get("content-type") || "", cuerpo: Buffer.from(await r.arrayBuffer()) };
+  };
+  const ruta = `/solicitudes/prestamos/${ids.prestamoNuevo}/carta`;
+
+  const personal = await pdf(ruta, ids.tSuper);
+  assert.equal(personal.s, 200);
+  assert.match(personal.tipo, /application\/pdf/);
+  assert.equal(personal.cuerpo.subarray(0, 4).toString(), "%PDF");
+
+  const dueno = (await api("POST", "/usuarios/login", { dni: "0801000000010", password: "Clave1234" })).b.token;
+  assert.equal((await pdf(ruta, dueno)).s, 200);
+  assert.equal((await pdf(ruta, ids.tSocio)).s, 403); // la de otro socio, no
+
+  // una solicitud sin aprobar no tiene carta
+  const [[pend]] = await pool.query(
+    "SELECT id_prestamo FROM prestamos WHERE estado <> 'aprobado' OR fecha_aprobacion IS NULL LIMIT 1"
+  );
+  if (pend) assert.equal((await pdf(`/solicitudes/prestamos/${pend.id_prestamo}/carta`, ids.tSuper)).s, 404);
+
+  // sin servidor de correo configurado, el reenvío lo dice en vez de fallar en silencio
+  const reenvio = await api("POST", `${ruta.replace("/carta", "/carta/enviar")}`, {}, ids.tSuper);
+  assert.equal(reenvio.s, 400);
+  assert.ok(reenvio.b.message);
+  assert.equal((await api("POST", `${ruta}/enviar`, {}, dueno)).s, 403);
+
+  // aprobar desde la pantalla de Préstamos también deja la carta lista y lo avisa
+  const sol = await api(
+    "POST", "/solicitudes/prestamo",
+    { monto: 1000, plazo_meses: 2, cuota_posible: 600, proposito: "otro", ocupacion: "empleado", ingreso_mensual: 8000, acepta: true },
+    ids.tSocio
+  );
+  assert.equal(sol.s, 201);
+  const ap = await api("PATCH", `/prestamos/${sol.b.id_prestamo}/aprobar`, {}, ids.tSuper);
+  assert.equal(ap.s, 200);
+  assert.match(ap.b.message, /carta de aprobación/);
+  assert.equal((await pdf(`/solicitudes/prestamos/${sol.b.id_prestamo}/carta`, ids.tSocio)).s, 200);
+  await pool.query("DELETE FROM solicitudes_prestamo WHERE id_prestamo = ?", [sol.b.id_prestamo]);
+  await pool.query("DELETE FROM prestamos WHERE id_prestamo = ?", [sol.b.id_prestamo]);
+});
+
 test("tras la aprobación el socio ve su tasa y puede pedir otro préstamo", async () => {
   const login = await api("POST", "/usuarios/login", { dni: "0801000000010", password: "Clave1234" });
   const t = login.b.token;
@@ -480,6 +523,53 @@ test("fotos de perfil: se guardan en la base de datos y sobreviven al disco", as
   assert.equal(otra.s, 200);
   assert.equal((await fetch(`${base}${ok.b.foto}`)).status, 404);
   assert.equal((await fetch(`${base}${otra.b.foto}`)).status, 200);
+});
+
+test("registro por enlace con préstamo: cuenta y solicitud llegan juntas", async () => {
+  const codigo = (await api("GET", "/solicitudes/enlace", null, ids.tSuper)).b.codigo;
+
+  // el formulario recibe los parámetros para la cuota estimada solo con un enlace válido
+  const estado = await api("GET", `/registro/estado?c=${codigo}`);
+  assert.equal(estado.s, 200);
+  assert.ok(estado.b.parametros.monto_max > 0);
+  assert.equal((await api("GET", "/registro/estado?c=otro")).b.parametros, null);
+
+  const datos = {
+    nombre_completo: "Socio Con Prestamo", dni: "0801000000020", telefono: "98761111",
+    correo: "con.prestamo@prueba.hn", fecha_nacimiento: "1990-05-06", password: "Clave1234", codigo,
+  };
+  const prestamo = {
+    monto: 5000, plazo_meses: 6, cuota_posible: 1100, proposito: "negocio", ocupacion: "negocio_propio",
+    ingreso_mensual: 9000, acepta: true, referencias: [{ nombre: "Ana Prueba", telefono: "99990000" }],
+  };
+
+  // si la solicitud viene mal, no se crea nada
+  const mal = await api("POST", "/registro", { ...datos, prestamo: { ...prestamo, proposito: "" } });
+  assert.equal(mal.s, 400);
+  const [[nadie]] = await pool.query("SELECT COUNT(*) AS n FROM usuarios WHERE dni = ?", [datos.dni]);
+  assert.equal(nadie.n, 0);
+
+  const ok = await api("POST", "/registro", { ...datos, prestamo });
+  assert.equal(ok.s, 201);
+  assert.ok(ok.b.id_prestamo);
+  cerca(ok.b.cuota_estimada, 1148.04);
+
+  const lista = await api("GET", "/solicitudes", null, ids.tSuper);
+  const sol = lista.b.prestamos.find((x) => x.id_prestamo === ok.b.id_prestamo);
+  assert.ok(sol);
+  assert.equal(sol.estado_socio, "pendiente");
+  assert.equal(sol.referencias.length, 1);
+
+  // el socio la ve en su panel al entrar
+  const t = (await api("POST", "/usuarios/login", { dni: datos.dni, password: datos.password })).b.token;
+  const mias = await api("GET", "/solicitudes/mias", null, t);
+  assert.equal(mias.b.data.length, 1);
+  assert.equal(mias.b.data[0].estado, "pendiente");
+
+  // rechazar al socio también cierra su solicitud
+  assert.equal((await api("POST", `/solicitudes/socios/${ok.b.id_usuario}/rechazar`, { motivo: "Prueba" }, ids.tSuper)).s, 200);
+  const [[pr]] = await pool.query("SELECT estado FROM prestamos WHERE id_prestamo = ?", [ok.b.id_prestamo]);
+  assert.equal(pr.estado, "rechazado");
 });
 
 test("monitoreo: el estado del servicio responde", async () => {

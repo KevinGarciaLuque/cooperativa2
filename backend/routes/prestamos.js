@@ -4,6 +4,8 @@ const pool = require("../db");
 const { registrarCaja } = require("../utils/caja");
 const { crearRecibo } = require("../utils/recibos");
 const { actualizarEstadosMora } = require("../utils/moraScheduler");
+const { notificarSocio, escaparHtml } = require("../utils/notificaciones");
+const { avisarAprobacion } = require("../utils/cartaAprobacion");
 const {
   calcularCuotaMensual,
   generarTablaAmortizacion,
@@ -342,7 +344,8 @@ router.patch("/:id/aprobar", async (req, res) => {
       [p.id_usuario, "Préstamo aprobado", `Préstamo #${req.params.id} por L. ${parseFloat(p.monto).toFixed(2)} aprobado. Pendiente de desembolso.`]
     );
     await connection.commit();
-    res.json({ success: true, message: "Préstamo aprobado. Falta registrar el desembolso." });
+    const avisoCarta = await avisarAprobacion(p.id_prestamo, p.id_usuario);
+    res.json({ success: true, message: `Préstamo aprobado. Falta registrar el desembolso.${avisoCarta}` });
   } catch (error) {
     await connection.rollback().catch(() => {});
     console.error("ERROR AL APROBAR PRÉSTAMO:", error);
@@ -482,6 +485,13 @@ router.patch("/:id/rechazar", async (req, res) => {
       [motivo.substring(0, 255), req.params.id]
     );
     await registrarBitacora(p.id_usuario, "Préstamo rechazado", `Préstamo #${req.params.id} rechazado. Motivo: ${motivo}`);
+    notificarSocio(
+      p.id_usuario,
+      "Respuesta a tu solicitud de préstamo",
+      `<p>Lamentamos informarte que tu solicitud de préstamo por L. ${parseFloat(p.monto).toLocaleString("es-HN", { minimumFractionDigits: 2 })} no fue aprobada.</p>
+       <p><strong>Motivo:</strong> ${escaparHtml(motivo)}</p>
+       <p>Si tienes dudas, comunícate con la cooperativa.</p>`
+    );
 
     res.json({ success: true, message: "Solicitud rechazada" });
   } catch (error) {

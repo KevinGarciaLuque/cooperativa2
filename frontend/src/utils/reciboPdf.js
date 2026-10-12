@@ -46,7 +46,7 @@ async function generarFiniquitoPdf(recibo) {
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text(String(recibo.cooperativa || "Cooperativa"), ancho / 2, y, { align: "center" });
+  doc.text(String(recibo.cooperativa || "SmartCoop"), ancho / 2, y, { align: "center" });
   y += 9;
   doc.setFontSize(12);
   doc.text("CONSTANCIA DE CANCELACIÓN DE PRÉSTAMO", ancho / 2, y, { align: "center" });
@@ -134,7 +134,7 @@ export async function generarReciboPdf(recibo) {
   // Encabezado
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text(String(recibo.cooperativa || "Cooperativa"), ancho / 2, y, { align: "center" });
+  doc.text(String(recibo.cooperativa || "SmartCoop"), ancho / 2, y, { align: "center" });
   y += 7;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);

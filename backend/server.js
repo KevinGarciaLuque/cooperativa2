@@ -114,6 +114,9 @@ app.use("/api/basedatos", require("./routes/basedatos"));
 app.use("/api/permisos", require("./routes/permisos"));
 app.use("/api/configuracion", require("./routes/configuracion"));
 app.use("/api/caja", require("./routes/caja"));
+app.use("/api/recibos", require("./routes/recibos"));
+app.use("/api/cobranza", require("./routes/cobranza"));
+app.use("/api/socios", ocultarInteresSocio, require("./routes/socios"));
 
 // Iniciar el scheduler de backups automáticos
 const { iniciarScheduler } = require("./utils/backupScheduler");

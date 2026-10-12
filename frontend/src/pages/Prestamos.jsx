@@ -4,6 +4,8 @@ import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
 import ModalConfirmacion from "../components/ModalConfirmacion";
+import ReciboModal from "../components/ReciboModal";
+import DesembolsoModal from "../components/DesembolsoModal";
 import {
   FaMoneyBillWave,
   FaPlus,
@@ -48,6 +50,9 @@ export default function Prestamos() {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [prestamoParaEliminar, setPrestamoParaEliminar] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [aDesembolsar, setADesembolsar] = useState(null); // préstamo aprobado en proceso de desembolso
+  const [desembolsando, setDesembolsando] = useState(false);
+  const [reciboNuevo, setReciboNuevo] = useState(null);
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -157,6 +162,57 @@ export default function Prestamos() {
     setShowModal(true);
   };
 
+  // ── Flujo de aprobación ───────────────────────────────────────────────
+  const aprobarPrestamo = async (p) => {
+    if (!window.confirm(`¿Aprobar el préstamo #${p.id_prestamo} por L. ${parseFloat(p.monto).toLocaleString("es-HN")}? El dinero se entrega al registrar el desembolso.`)) return;
+    try {
+      await axios.patch(`${API_URL}/prestamos/${p.id_prestamo}/aprobar`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      mostrarAlerta("Préstamo aprobado. Falta registrar el desembolso.", "success");
+      fetchData();
+    } catch (err) {
+      mostrarAlerta(err.response?.data?.message || "No se pudo aprobar el préstamo.", "error");
+    }
+  };
+
+  const rechazarPrestamo = async (p) => {
+    const motivo = window.prompt(`Motivo del rechazo del préstamo #${p.id_prestamo}:`);
+    if (motivo === null) return;
+    if (motivo.trim().length < 3) {
+      mostrarAlerta("El motivo del rechazo es obligatorio.", "error");
+      return;
+    }
+    try {
+      await axios.patch(`${API_URL}/prestamos/${p.id_prestamo}/rechazar`, { motivo: motivo.trim() }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      mostrarAlerta("Solicitud rechazada.", "success");
+      fetchData();
+    } catch (err) {
+      mostrarAlerta(err.response?.data?.message || "No se pudo rechazar la solicitud.", "error");
+    }
+  };
+
+  const confirmarDesembolso = async ({ metodo, referencia }) => {
+    setDesembolsando(true);
+    try {
+      const r = await axios.post(
+        `${API_URL}/prestamos/${aDesembolsar.id_prestamo}/desembolsar`,
+        { metodo, referencia },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      mostrarAlerta("Préstamo desembolsado correctamente.", "success");
+      setADesembolsar(null);
+      if (r.data?.id_recibo) setReciboNuevo(r.data.id_recibo);
+      fetchData();
+    } catch (err) {
+      mostrarAlerta(err.response?.data?.message || "No se pudo registrar el desembolso.", "error");
+    } finally {
+      setDesembolsando(false);
+    }
+  };
+
   const handleDelete = (id) => {
     setPrestamoParaEliminar(id);
     setShowConfirmDelete(true);
@@ -225,7 +281,7 @@ export default function Prestamos() {
   // Estadísticas
   const totalPrestamos = prestamos.length;
   const prestamosActivos = prestamos.filter((p) => p.estado === "activo").length;
-  const prestamosPendientes = prestamos.filter((p) => p.estado === "pendiente").length;
+  const prestamosPendientes = prestamos.filter((p) => ["pendiente", "aprobado"].includes(p.estado)).length;
   const prestamosMora = prestamos.filter((p) => p.estado === "mora").length;
   const prestamosPagados = prestamos.filter((p) => p.estado === "pagado").length;
   const montoTotal = prestamos.reduce((acc, p) => acc + parseFloat(p.monto || 0), 0);
@@ -563,6 +619,9 @@ export default function Prestamos() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onVerDetalle={verDetalle}
+          onAprobar={aprobarPrestamo}
+          onRechazar={rechazarPrestamo}
+          onDesembolsar={setADesembolsar}
           getEstadoInfo={getEstadoInfo}
         />
       )}
@@ -596,9 +655,23 @@ export default function Prestamos() {
         />
       )}
 
+      {aDesembolsar && (
+        <DesembolsoModal
+          prestamo={aDesembolsar}
+          nombreSocio={usuarios.find((u) => u.id_usuario === aDesembolsar.id_usuario)?.nombre_completo || ""}
+          enviando={desembolsando}
+          onConfirmar={confirmarDesembolso}
+          onCancelar={() => setADesembolsar(null)}
+        />
+      )}
+
+      {reciboNuevo && (
+        <ReciboModal idRecibo={reciboNuevo} onClose={() => setReciboNuevo(null)} />
+      )}
+
       <ModalConfirmacion
         show={showConfirmDelete}
-        mensaje="¿Estás seguro que deseas eliminar este préstamo? Se eliminarán también todos sus pagos y cuotas registrados. Esta acción no se puede deshacer."
+        mensaje="¿Estás seguro que deseas eliminar este préstamo? Solo se pueden eliminar préstamos sin pagos registrados. Esta acción no se puede deshacer."
         onConfirm={confirmarEliminar}
         onCancel={() => {
           setShowConfirmDelete(false);
@@ -610,7 +683,7 @@ export default function Prestamos() {
 }
 
 // ==================== COMPONENTE TABLA PRÉSTAMOS (agrupada por socio) ====================
-function TablaPrestamos({ prestamos, usuarios, onEdit, onDelete, onVerDetalle, getEstadoInfo }) {
+function TablaPrestamos({ prestamos, usuarios, onEdit, onDelete, onVerDetalle, onAprobar, onRechazar, onDesembolsar, getEstadoInfo }) {
   const [socioModal, setSocioModal] = useState(null);
 
   if (!prestamos || prestamos.length === 0) {
@@ -846,6 +919,9 @@ function TablaPrestamos({ prestamos, usuarios, onEdit, onDelete, onVerDetalle, g
           onEdit={onEdit}
           onDelete={onDelete}
           onVerDetalle={onVerDetalle}
+          onAprobar={onAprobar}
+          onRechazar={onRechazar}
+          onDesembolsar={onDesembolsar}
           getEstadoInfo={getEstadoInfo}
         />
       )}
@@ -854,7 +930,7 @@ function TablaPrestamos({ prestamos, usuarios, onEdit, onDelete, onVerDetalle, g
 }
 
 // ==================== MODAL HISTORIAL DE PRÉSTAMOS POR SOCIO ====================
-function ModalHistorialPrestamos({ grupo, onClose, onEdit, onDelete, onVerDetalle, getEstadoInfo }) {
+function ModalHistorialPrestamos({ grupo, onClose, onEdit, onDelete, onVerDetalle, onAprobar, onRechazar, onDesembolsar, getEstadoInfo }) {
   const montoTotal = grupo.prestamos.reduce((s, p) => s + parseFloat(p.monto || 0), 0);
   const saldoTotal = grupo.prestamos.reduce((s, p) => s + parseFloat(p.saldo_restante || p.monto || 0), 0);
   const iniciales = grupo.nombre.split(" ").slice(0, 2).map(n => n[0] || "").join("").toUpperCase();
@@ -948,6 +1024,33 @@ function ModalHistorialPrestamos({ grupo, onClose, onEdit, onDelete, onVerDetall
                       </div>
 
                       {/* Acciones */}
+                      <div className="d-flex gap-1 flex-shrink-0 flex-wrap justify-content-end">
+                        {p.estado === "pendiente" && (
+                          <>
+                            <button className="btn btn-sm btn-success fw-semibold"
+                              onClick={() => { onClose(); setTimeout(() => onAprobar(p), 60); }}>
+                              Aprobar
+                            </button>
+                            <button className="btn btn-sm btn-outline-danger"
+                              onClick={() => { onClose(); setTimeout(() => onRechazar(p), 60); }}>
+                              Rechazar
+                            </button>
+                          </>
+                        )}
+                        {p.estado === "aprobado" && (
+                          <>
+                            <button className="btn btn-sm fw-semibold"
+                              style={{ background: "#a8cd3a", color: "#1a2a00" }}
+                              onClick={() => { onClose(); setTimeout(() => onDesembolsar(p), 60); }}>
+                              Desembolsar
+                            </button>
+                            <button className="btn btn-sm btn-outline-danger"
+                              onClick={() => { onClose(); setTimeout(() => onRechazar(p), 60); }}>
+                              Rechazar
+                            </button>
+                          </>
+                        )}
+                      </div>
                       <div className="d-flex gap-1 flex-shrink-0">
                         <button className="btn btn-sm" title="Ver detalle"
                           onClick={() => { onClose(); setTimeout(() => onVerDetalle(p), 60); }}

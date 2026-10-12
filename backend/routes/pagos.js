@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require("../db");
 const jwt = require("jsonwebtoken");
 const { registrarCaja } = require("../utils/caja");
+const { crearRecibo } = require("../utils/recibos");
 const {
   DIAS_MES,
   calcularCuotaMensual,
@@ -366,6 +367,29 @@ router.post("/", async (req, res) => {
       [nuevoSaldo, id_prestamo]
     );
 
+    // Recibo numerado del pago
+    const idRecibo = await crearRecibo(connection, {
+      tipo: "pago_prestamo",
+      referencia_tipo: "pago",
+      referencia_id: nuevoPagoId,
+      id_socio: prestamoData.id_usuario,
+      monto: montoPagadoNum,
+      metodo: metodo_pago,
+      concepto: `Pago de préstamo #${id_prestamo}`,
+      detalle: {
+        id_prestamo,
+        capital: capitalDelPeriodo,
+        interes: interesEfectivo,
+        mora: parseFloat(interesMoratorio.toFixed(2)),
+        mora_condonada: moraCondonada ? parseFloat(moraGenerada.toFixed(2)) : 0,
+        saldo_anterior: saldoActual,
+        saldo_nuevo: nuevoSaldo,
+        liquidado: prestamoLiquidado,
+      },
+      fecha: fechaPagoStr === hoy ? null : `${fechaPagoStr} 12:00:00`,
+      emitido_por: req.usuario?.id_usuario,
+    });
+
     // Si el préstamo fue liquidado, cambiar estado
     if (prestamoLiquidado) {
       await connection.query(
@@ -406,6 +430,7 @@ router.post("/", async (req, res) => {
       success: true,
       message: prestamoLiquidado ? "Pago registrado. ¡PRÉSTAMO LIQUIDADO!" : "Pago registrado correctamente",
       id_pago: nuevoPagoId,
+      id_recibo: idRecibo,
       detalles: {
         monto_pagado: montoPagadoNum,
         monto_capital: capitalDelPeriodo,
@@ -831,6 +856,11 @@ router.delete("/:id", async (req, res) => {
     await connection.query(
       `DELETE FROM pagos_prestamo WHERE id_pago = ?`,
       [req.params.id]
+    );
+
+    await connection.query(
+      `UPDATE recibos SET anulado = 1 WHERE referencia_tipo = 'pago' AND referencia_id = ?`,
+      [pagoData.id_pago]
     );
 
     // Contrapartida en caja: sale el dinero que había entrado por este pago

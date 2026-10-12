@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
 import DetallePrestamoVentanilla from "./DetallePrestamoVentanilla";
+import EstadoCuentaSocio from "./EstadoCuentaSocio";
+import RecibosSocioModal from "../components/RecibosSocioModal";
 import {
   FaSearch,
   FaUserCircle,
@@ -44,6 +46,8 @@ export default function Ventanilla() {
   const [ficha, setFicha] = useState(null); // { prestamos, cuentas, aportaciones, proximos }
   const [cargandoFicha, setCargandoFicha] = useState(false);
   const [detalle, setDetalle] = useState(null); // id del préstamo cuyo detalle se está viendo
+  const [verEstadoCuenta, setVerEstadoCuenta] = useState(false);
+  const [verRecibos, setVerRecibos] = useState(false);
 
   // Búsqueda de socios con retardo para no consultar en cada tecla
   useEffect(() => {
@@ -77,6 +81,7 @@ export default function Ventanilla() {
       // sin almacenamiento disponible: solo se pierde la restauración al volver
     }
     setDetalle(null);
+    setVerEstadoCuenta(false);
     setSocio(u);
     setBusqueda("");
     setResultados([]);
@@ -144,7 +149,7 @@ export default function Ventanilla() {
     const vigentes = ficha.prestamos.filter(esVigente);
     return {
       vigentes,
-      pendientes: ficha.prestamos.filter((p) => (p.estado || "").toLowerCase() === "pendiente"),
+      pendientes: ficha.prestamos.filter((p) => ["pendiente", "aprobado"].includes((p.estado || "").toLowerCase())),
       deuda: vigentes.reduce((s, p) => s + parseFloat(p.saldo_restante || 0), 0),
       saldoCuentas: ficha.cuentas.reduce((s, c) => s + parseFloat(c.saldo_actual || 0), 0),
       aportado: ficha.aportaciones.reduce((s, a) => s + parseFloat(a.monto || 0), 0),
@@ -212,6 +217,20 @@ export default function Ventanilla() {
           onClick: () => irVer("/cuentas"),
         },
         {
+          icon: <FaFileInvoiceDollar />,
+          color: "#0e7490",
+          titulo: "Recibos",
+          desc: "Ver, reimprimir o enviar por WhatsApp",
+          onClick: () => setVerRecibos(true),
+        },
+        {
+          icon: <FaFileInvoiceDollar />,
+          color: "#2c3e50",
+          titulo: "Estado de cuenta",
+          desc: "Resumen imprimible del socio",
+          onClick: () => setVerEstadoCuenta(true),
+        },
+        {
           icon: <FaHistory />,
           color: "#566573",
           titulo: "Historial de pagos",
@@ -220,6 +239,17 @@ export default function Ventanilla() {
         },
       ]
     : [];
+
+  if (socio && verEstadoCuenta) {
+    return (
+      <EstadoCuentaSocio
+        idSocio={socio.id_usuario}
+        headers={headers}
+        onBack={() => setVerEstadoCuenta(false)}
+        textoVolver={`Volver a la ficha de ${socio.nombre_completo}`}
+      />
+    );
+  }
 
   if (socio && detalle) {
     return (
@@ -306,6 +336,15 @@ export default function Ventanilla() {
           </div>
         )}
       </div>
+
+      {verRecibos && socio && (
+        <RecibosSocioModal
+          idSocio={socio.id_usuario}
+          nombreSocio={socio.nombre_completo}
+          headers={headers}
+          onClose={() => setVerRecibos(false)}
+        />
+      )}
 
       {!socio && (
         <div className="text-center text-muted py-5">

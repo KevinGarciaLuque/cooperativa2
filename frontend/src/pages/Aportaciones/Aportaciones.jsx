@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import useAccionRapida from "../../hooks/useAccionRapida";
+import ReciboModal from "../../components/ReciboModal";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import { useAlerta } from "../../context/AlertaContext";
@@ -38,6 +39,7 @@ export default function Aportaciones() {
   const [fechaFin, setFechaFin] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editAportacion, setEditAportacion] = useState(null);
+  const [reciboNuevo, setReciboNuevo] = useState(null);
   const [form, setForm] = useState({
     id_usuario: "",
     monto: "",
@@ -149,10 +151,11 @@ export default function Aportaciones() {
         );
         mostrarAlerta("Aportación actualizada correctamente.", "success");
       } else {
-        await axios.post(`${API_URL}/aportaciones`, form, {
+        const resp = await axios.post(`${API_URL}/aportaciones`, form, {
           headers: { Authorization: `Bearer ${token}` },
         });
         mostrarAlerta("Aportación registrada correctamente.", "success");
+        if (resp.data?.id_recibo) setReciboNuevo(resp.data.id_recibo);
       }
       setForm({
         id_usuario: "",
@@ -695,6 +698,10 @@ export default function Aportaciones() {
           onEdit={handleEdit}
           onDelete={handleDelete}
         />
+      )}
+
+      {reciboNuevo && (
+        <ReciboModal idRecibo={reciboNuevo} onClose={() => setReciboNuevo(null)} />
       )}
 
       {/* Modal */}

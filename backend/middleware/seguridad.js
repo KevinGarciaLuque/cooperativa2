@@ -26,6 +26,9 @@ const MODULO_POR_PREFIJO = {
   basedatos: "basedatos",
   dashboard: "dashboard",
   caja: "caja",
+  cobranza: "cobranza",
+  recibos: "pagos",
+  socios: "usuarios",
 };
 
 // ── Qué puede consultar/hacer un Socio: solo lo suyo ──────────────────────
@@ -33,6 +36,7 @@ const SQL_PRESTAMO = "SELECT id_usuario FROM prestamos WHERE id_prestamo = ?";
 const SQL_CUENTA = "SELECT id_usuario FROM cuentas WHERE id_cuenta = ?";
 const REGLAS_SOCIO = [
   { metodo: "GET", re: /^\/usuarios\/(\d+)$/, propio: 1 },
+  { metodo: "GET", re: /^\/socios\/(\d+)\/estado-cuenta$/, propio: 1 },
   { metodo: "PUT", re: /^\/usuarios\/(\d+)\/foto$/, propio: 1 },
   { metodo: "POST", re: /^\/usuarios\/(\d+)\/cambiar-password$/, propio: 1 },
   { metodo: "GET", re: /^\/(cuentas|aportaciones|prestamos|pagos)$/, forzarUsuario: true },
@@ -181,7 +185,7 @@ const guardiaApi = async (req, res, next) => {
 
     const permisos = await permisosDelRol(usuario.rol_id);
     const tieneModulo = permisos[modulo] !== false;
-    const lecturaCatalogo = !esEscritura && (segmento === "usuarios" || segmento === "roles");
+    const lecturaCatalogo = !esEscritura && ["usuarios", "roles", "socios"].includes(segmento);
 
     // Su propia actividad reciente (pantalla Mi Perfil) siempre es visible para el usuario
     const bitacoraPropia = (ruta.match(/^\/bitacora\/usuario\/(\d+)$/) || [])[1];

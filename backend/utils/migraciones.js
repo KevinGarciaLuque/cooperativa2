@@ -99,6 +99,69 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_10_004_flujo_prestamos",
+    descripcion: "Estados aprobado/rechazado y datos de aprobación en préstamos",
+    async up(conn) {
+      const [[col]] = await conn.query(
+        `SELECT COLUMN_TYPE AS tipo FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'prestamos' AND COLUMN_NAME = 'estado'`
+      );
+      if (col && !col.tipo.includes("'aprobado'")) {
+        await conn.query(
+          `ALTER TABLE prestamos MODIFY estado ENUM('pendiente','aprobado','activo','pagado','mora','rechazado') NOT NULL DEFAULT 'pendiente'`
+        );
+      }
+      const agregar = async (nombre, definicion) => {
+        const [[existe]] = await conn.query(
+          `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'prestamos' AND COLUMN_NAME = ?`,
+          [nombre]
+        );
+        if (!existe.n) await conn.query(`ALTER TABLE prestamos ADD COLUMN ${nombre} ${definicion}`);
+      };
+      await agregar("aprobado_por", "INT NULL");
+      await agregar("fecha_aprobacion", "DATETIME NULL");
+      await agregar("motivo_rechazo", "VARCHAR(255) NULL");
+    },
+  },
+  {
+    id: "2026_10_005_recibos_cobranza",
+    descripcion: "Recibos numerados y gestiones de cobranza",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS recibos (
+          id_recibo INT AUTO_INCREMENT PRIMARY KEY,
+          tipo VARCHAR(30) NOT NULL,
+          referencia_tipo VARCHAR(30) NULL,
+          referencia_id INT NULL,
+          id_socio INT NULL,
+          monto DECIMAL(12,2) NOT NULL,
+          metodo VARCHAR(30) NULL,
+          concepto VARCHAR(255) NULL,
+          detalle TEXT NULL,
+          fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          emitido_por INT NULL,
+          anulado TINYINT(1) NOT NULL DEFAULT 0,
+          INDEX idx_recibo_ref (referencia_tipo, referencia_id),
+          INDEX idx_recibo_socio (id_socio)
+        )
+      `);
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS gestiones_cobro (
+          id_gestion INT AUTO_INCREMENT PRIMARY KEY,
+          id_prestamo INT NOT NULL,
+          fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          medio VARCHAR(30) NOT NULL DEFAULT 'llamada',
+          nota VARCHAR(500) NOT NULL,
+          promesa_fecha DATE NULL,
+          promesa_monto DECIMAL(12,2) NULL,
+          id_usuario INT NULL,
+          INDEX idx_gestion_prestamo (id_prestamo)
+        )
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

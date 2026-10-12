@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const { registrarCaja } = require("../utils/caja");
+const { crearRecibo } = require("../utils/recibos");
 
 // ============================================
 // FUNCIONES AUXILIARES
@@ -260,6 +261,22 @@ router.post("/", async (req, res) => {
       id_registrado_por: req.usuario?.id_usuario,
     });
 
+    const idRecibo = await crearRecibo(connection, {
+      tipo: "aportacion",
+      referencia_tipo: "aportacion",
+      referencia_id: nuevaAportacionId,
+      id_socio: id_usuario,
+      monto: montoNum,
+      metodo: req.body.metodo_pago,
+      concepto: descripcion || "Aportación",
+      detalle: {
+        cuenta: cuentaDestino.tipo_cuenta,
+        saldo_anterior: parseFloat(cuentaDestino.saldo_actual),
+        saldo_nuevo: nuevoSaldo,
+      },
+      emitido_por: req.usuario?.id_usuario,
+    });
+
     // Registrar en bitácora
     await connection.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) 
@@ -277,6 +294,7 @@ router.post("/", async (req, res) => {
       success: true,
       message: "Aportación registrada correctamente y cuenta actualizada",
       id_aportacion: nuevaAportacionId,
+      id_recibo: idRecibo,
       cuenta_actualizada: {
         id_cuenta: cuentaDestino.id_cuenta,
         tipo_cuenta: cuentaDestino.tipo_cuenta,

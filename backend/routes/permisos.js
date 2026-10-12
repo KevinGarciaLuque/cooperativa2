@@ -14,6 +14,7 @@ const MODULOS_SISTEMA = [
   { key: "aportaciones",  label: "Aportaciones" },
   { key: "pagos",         label: "Pagos" },
   { key: "caja",          label: "Caja" },
+  { key: "cobranza",      label: "Cobranza" },
   { key: "movimientos",   label: "Movimientos" },
   { key: "reportes",      label: "Reportes" },
   { key: "actividades",   label: "Actividades" },

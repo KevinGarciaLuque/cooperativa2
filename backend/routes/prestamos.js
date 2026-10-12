@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const { registrarCaja } = require("../utils/caja");
+const { crearRecibo } = require("../utils/recibos");
 const { actualizarEstadosMora } = require("../utils/moraScheduler");
 const {
   calcularCuotaMensual,
@@ -308,163 +309,184 @@ router.post("/solicitar", async (req, res) => {
 });
 
 // ============================================
-// APROBAR UN PRÉSTAMO Y DESEMBOLSAR
+// FLUJO DE APROBACIÓN: pendiente → aprobado → (desembolso) → activo
 // ============================================
+
+// Aprobar una solicitud pendiente (todavía no sale dinero)
 router.patch("/:id/aprobar", async (req, res) => {
   const connection = await pool.getConnection();
-  
   try {
-    const { desembolsar_a_cuenta } = req.body;
-
-    // Obtener el préstamo
-    const [prestamo] = await connection.query(
-      `SELECT p.*, u.nombre_completo 
-       FROM prestamos p
-       INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
-       WHERE p.id_prestamo = ?`,
+    await connection.beginTransaction();
+    const [rows] = await connection.query(
+      `SELECT * FROM prestamos WHERE id_prestamo = ? FOR UPDATE`,
       [req.params.id]
     );
-
-    if (prestamo.length === 0) {
+    if (!rows.length) {
+      await connection.rollback();
       return res.status(404).json({ message: "Préstamo no encontrado" });
     }
-
-    if (prestamo[0].estado !== 'pendiente') {
-      return res.status(400).json({ 
-        message: `El préstamo no está pendiente de aprobación (estado actual: ${prestamo[0].estado})` 
+    const p = rows[0];
+    if (p.estado !== "pendiente") {
+      await connection.rollback();
+      return res.status(400).json({
+        message: `Solo se puede aprobar una solicitud pendiente (estado actual: ${p.estado}).`,
       });
     }
 
-    await connection.beginTransaction();
-
-    // Actualizar estado  a "activo"
     await connection.query(
-      `UPDATE prestamos SET estado = 'activo', fecha_otorgado = NOW() WHERE id_prestamo = ?`,
-      [req.params.id]
+      `UPDATE prestamos SET estado = 'aprobado', aprobado_por = ?, fecha_aprobacion = NOW() WHERE id_prestamo = ?`,
+      [req.usuario?.id_usuario || null, req.params.id]
     );
-
-    // Si se solicita desembolsar a cuenta, agregar monto a cuenta del usuario
-    if (desembolsar_a_cuenta) {
-      // Buscar cuenta de Aportaciones del usuario
-      const [cuenta] = await connection.query(
-        `SELECT * FROM cuentas WHERE id_usuario = ? AND tipo_cuenta = 'Aportaciones' AND estado = 'activa' LIMIT 1`,
-        [prestamo[0].id_usuario]
-      );
-
-      if (cuenta.length > 0) {
-        const nuevoSaldo = parseFloat(cuenta[0].saldo_actual) + parseFloat(prestamo[0].monto);
-        
-        // Actualizar saldo
-        await connection.query(
-          `UPDATE cuentas SET saldo_actual = ? WHERE id_cuenta = ?`,
-          [nuevoSaldo, cuenta[0].id_cuenta]
-        );
-
-        // Registrar movimiento
-        await connection.query(
-          `INSERT INTO movimientos_cuenta (id_cuenta, tipo_movimiento, monto, descripcion, fecha) 
-           VALUES (?, 'aporte', ?, ?, NOW())`,
-          [
-            cuenta[0].id_cuenta,
-            parseFloat(prestamo[0].monto),
-            `Desembolso de préstamo #${req.params.id}`
-          ]
-        );
-      }
-    }
-
-    // Desembolso en efectivo: sale de caja (si va a la cuenta del socio no sale efectivo)
-    if (!desembolsar_a_cuenta) {
-      await registrarCaja(connection, {
-        tipo: "egreso",
-        categoria: "desembolso_prestamo",
-        monto: prestamo[0].monto,
-        metodo: "efectivo",
-        descripcion: `Desembolso de préstamo #${req.params.id}`,
-        referencia_tipo: "prestamo",
-        referencia_id: parseInt(req.params.id),
-        id_socio: prestamo[0].id_usuario,
-        id_registrado_por: req.usuario?.id_usuario,
-      });
-    }
-
-    // Registrar en bitácora
     await connection.query(
-      `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) 
-       VALUES (?, ?, ?, NOW())`,
-      [
-        prestamo[0].id_usuario,
-        "Préstamo aprobado",
-        `Préstamo #${req.params.id} aprobado por L. ${parseFloat(prestamo[0].monto).toFixed(2)}${desembolsar_a_cuenta ? ' y desembolsado a cuenta' : ''}`
-      ]
+      `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
+      [p.id_usuario, "Préstamo aprobado", `Préstamo #${req.params.id} por L. ${parseFloat(p.monto).toFixed(2)} aprobado. Pendiente de desembolso.`]
     );
-
     await connection.commit();
-
-    res.json({
-      success: true,
-      message: `Préstamo aprobado correctamente${desembolsar_a_cuenta ? ' y fondos desembolsados' : ''}`,
-    });
-
+    res.json({ success: true, message: "Préstamo aprobado. Falta registrar el desembolso." });
   } catch (error) {
-    await connection.rollback();
+    await connection.rollback().catch(() => {});
     console.error("ERROR AL APROBAR PRÉSTAMO:", error);
-    res.status(500).json({ 
-      message: "Error al aprobar el préstamo", 
-      error: error.message 
-    });
+    res.status(500).json({ message: "Error al aprobar el préstamo" });
   } finally {
     connection.release();
   }
 });
 
-// ============================================
-// RECHAZAR UN PRÉSTAMO
-// ============================================
-router.patch("/:id/rechazar", async (req, res) => {
+// Desembolsar un préstamo aprobado: sale el dinero, empieza el plazo y se emite el comprobante
+router.post("/:id/desembolsar", async (req, res) => {
+  const connection = await pool.getConnection();
   try {
-    const { motivo } = req.body;
+    const metodosValidos = ["efectivo", "transferencia", "cheque", "cuenta"];
+    const metodo = metodosValidos.includes(String(req.body.metodo || "").toLowerCase())
+      ? String(req.body.metodo).toLowerCase()
+      : "efectivo";
+    const referencia = String(req.body.referencia || "").trim().substring(0, 100);
 
-    // Obtener el préstamo
-    const [prestamo] = await pool.query(
-      `SELECT * FROM prestamos WHERE id_prestamo = ?`,
+    await connection.beginTransaction();
+    const [rows] = await connection.query(
+      `SELECT p.*, u.nombre_completo FROM prestamos p
+       INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
+       WHERE p.id_prestamo = ? FOR UPDATE OF p`,
       [req.params.id]
     );
-
-    if (prestamo.length === 0) {
+    if (!rows.length) {
+      await connection.rollback();
       return res.status(404).json({ message: "Préstamo no encontrado" });
     }
-
-    if (prestamo[0].estado !== 'pendiente') {
-      return res.status(400).json({ 
-        message: "Solo se pueden rechazar préstamos pendientes" 
+    const p = rows[0];
+    if (p.estado !== "aprobado") {
+      await connection.rollback();
+      return res.status(400).json({
+        message: p.estado === "pendiente"
+          ? "El préstamo debe aprobarse antes de desembolsarse."
+          : `Este préstamo no se puede desembolsar (estado actual: ${p.estado}).`,
       });
     }
 
-    // Eliminar el préstamo
-    await pool.query(
-      `DELETE FROM prestamos WHERE id_prestamo = ?`,
+    const monto = parseFloat(p.monto);
+    let detalleCuenta = null;
+
+    if (metodo === "cuenta") {
+      const [cuenta] = await connection.query(
+        `SELECT * FROM cuentas WHERE id_usuario = ? AND tipo_cuenta = 'Aportaciones' AND estado = 'activa' LIMIT 1 FOR UPDATE`,
+        [p.id_usuario]
+      );
+      if (!cuenta.length) {
+        await connection.rollback();
+        return res.status(400).json({ message: "El socio no tiene una cuenta de Aportaciones activa para recibir el desembolso." });
+      }
+      const nuevoSaldo = parseFloat(cuenta[0].saldo_actual) + monto;
+      await connection.query(`UPDATE cuentas SET saldo_actual = ? WHERE id_cuenta = ?`, [nuevoSaldo, cuenta[0].id_cuenta]);
+      await connection.query(
+        `INSERT INTO movimientos_cuenta (id_cuenta, tipo_movimiento, monto, descripcion, saldo_anterior, saldo_nuevo, fecha)
+         VALUES (?, 'aporte', ?, ?, ?, ?, NOW())`,
+        [cuenta[0].id_cuenta, monto, `Desembolso de préstamo #${req.params.id}`, cuenta[0].saldo_actual, nuevoSaldo]
+      );
+      detalleCuenta = `cuenta ${cuenta[0].tipo_cuenta} #${cuenta[0].id_cuenta}`;
+    }
+
+    await connection.query(
+      `UPDATE prestamos SET estado = 'activo', fecha_otorgado = NOW(), saldo_restante = monto WHERE id_prestamo = ?`,
       [req.params.id]
     );
 
-    // Registrar en bitácora
-    await registrarBitacora(
-      prestamo[0].id_usuario,
-      "Préstamo rechazado",
-      `Préstamo #${req.params.id} rechazado. Motivo: ${motivo || 'No especificado'}`
+    // El efectivo o la transferencia sale de caja; el depósito a cuenta no mueve caja
+    if (metodo !== "cuenta") {
+      await registrarCaja(connection, {
+        tipo: "egreso",
+        categoria: "desembolso_prestamo",
+        monto,
+        metodo,
+        descripcion: `Desembolso de préstamo #${req.params.id}${referencia ? ` (ref. ${referencia})` : ""}`,
+        referencia_tipo: "prestamo",
+        referencia_id: parseInt(req.params.id),
+        id_socio: p.id_usuario,
+        id_registrado_por: req.usuario?.id_usuario,
+      });
+    }
+
+    const idRecibo = await crearRecibo(connection, {
+      tipo: "desembolso",
+      referencia_tipo: "prestamo",
+      referencia_id: parseInt(req.params.id),
+      id_socio: p.id_usuario,
+      monto,
+      metodo,
+      concepto: `Desembolso de préstamo #${req.params.id}`,
+      detalle: {
+        id_prestamo: parseInt(req.params.id),
+        plazo_meses: p.plazo_meses,
+        referencia: referencia || null,
+        destino: detalleCuenta,
+      },
+      emitido_por: req.usuario?.id_usuario,
+    });
+
+    await connection.query(
+      `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
+      [p.id_usuario, "Desembolso de préstamo", `Préstamo #${req.params.id} desembolsado por L. ${monto.toFixed(2)} (${metodo}${detalleCuenta ? ", " + detalleCuenta : ""})`]
     );
 
+    await connection.commit();
     res.json({
       success: true,
-      message: "Préstamo rechazado",
+      message: "Préstamo desembolsado correctamente.",
+      id_recibo: idRecibo,
     });
+  } catch (error) {
+    await connection.rollback().catch(() => {});
+    console.error("ERROR AL DESEMBOLSAR PRÉSTAMO:", error);
+    res.status(500).json({ message: "Error al desembolsar el préstamo" });
+  } finally {
+    connection.release();
+  }
+});
 
+// Rechazar una solicitud (queda archivada con su motivo; no se borra)
+router.patch("/:id/rechazar", async (req, res) => {
+  try {
+    const motivo = String(req.body.motivo || "").trim();
+    if (motivo.length < 3) {
+      return res.status(400).json({ message: "Indica el motivo del rechazo (mínimo 3 caracteres)." });
+    }
+
+    const [rows] = await pool.query(`SELECT * FROM prestamos WHERE id_prestamo = ?`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ message: "Préstamo no encontrado" });
+    const p = rows[0];
+    if (!["pendiente", "aprobado"].includes(p.estado)) {
+      return res.status(400).json({ message: "Solo se pueden rechazar solicitudes pendientes o aprobadas sin desembolsar." });
+    }
+
+    await pool.query(
+      `UPDATE prestamos SET estado = 'rechazado', motivo_rechazo = ? WHERE id_prestamo = ?`,
+      [motivo.substring(0, 255), req.params.id]
+    );
+    await registrarBitacora(p.id_usuario, "Préstamo rechazado", `Préstamo #${req.params.id} rechazado. Motivo: ${motivo}`);
+
+    res.json({ success: true, message: "Solicitud rechazada" });
   } catch (error) {
     console.error("ERROR AL RECHAZAR PRÉSTAMO:", error);
-    res.status(500).json({ 
-      message: "Error al rechazar el préstamo", 
-      error: error.message 
-    });
+    res.status(500).json({ message: "Error al rechazar el préstamo" });
   }
 });
 
@@ -475,10 +497,10 @@ router.patch("/:id/estado", async (req, res) => {
   try {
     const { estado } = req.body;
 
-    const estadosValidos = ['pendiente', 'activo', 'pagado', 'mora'];
+    const estadosValidos = ['pendiente', 'aprobado', 'activo', 'pagado', 'mora', 'rechazado'];
     if (!estado || !estadosValidos.includes(estado)) {
       return res.status(400).json({
-        message: "Estado inválido. Debe ser: pendiente, activo, pagado o mora"
+        message: "Estado inválido. Debe ser: pendiente, aprobado, activo, pagado, mora o rechazado"
       });
     }
 
@@ -768,9 +790,8 @@ router.post("/", async (req, res) => {
       return res.status(404).json({ message: "Usuario no encontrado o inactivo" });
 
     const cuotaMensual = calcularCuotaMensual(montoNum, tasaNum, plazoNum);
-    const estadosPermitidos = ['pendiente', 'activo', 'mora', 'pagado'];
-    const estadoSolicitado = estado === 'aprobado' ? 'activo' : estado;
-    const estadoPrestamo = (estadoSolicitado && estadosPermitidos.includes(estadoSolicitado)) ? estadoSolicitado : 'pendiente';
+    const estadosPermitidos = ['pendiente', 'aprobado', 'activo', 'mora', 'pagado', 'rechazado'];
+    const estadoPrestamo = (estado && estadosPermitidos.includes(estado)) ? estado : 'pendiente';
     const fechaOtorgado = fecha_otorgado || null;
     const tipoTasaGuardar = tipo_tasa || "nominal_anual";
     const tasaOriginalGuardar = tasa_original != null ? parseFloat(tasa_original) : tasaNum;
@@ -867,10 +888,9 @@ router.put("/:id", async (req, res) => {
       });
     }
 
-    const estadosPermitidosPut = ['pendiente', 'activo', 'mora', 'pagado'];
-    const estadoSolicitado = estado === 'aprobado' ? 'activo' : estado;
-    const nuevoEstado = (estadoSolicitado && estadosPermitidosPut.includes(estadoSolicitado))
-      ? estadoSolicitado
+    const estadosPermitidosPut = ['pendiente', 'aprobado', 'activo', 'mora', 'pagado', 'rechazado'];
+    const nuevoEstado = (estado && estadosPermitidosPut.includes(estado))
+      ? estado
       : actual.estado;
 
     // Un préstamo solo pasa a "pagado" cuando su saldo ya es cero (se salda registrando el pago)

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import useAccionRapida from "../hooks/useAccionRapida";
+import ReciboModal from "../components/ReciboModal";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
@@ -49,6 +50,7 @@ export default function Pagos() {
   const [prestamoFiltro, setPrestamoFiltro] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editPago, setEditPago] = useState(null);
+  const [reciboNuevo, setReciboNuevo] = useState(null); // id del recibo recién emitido
   const [tipoInicial, setTipoInicial] = useState(""); // tipo de pago sugerido desde la Ventanilla
   const [form, setForm] = useState({
     id_prestamo: "",
@@ -202,10 +204,11 @@ export default function Pagos() {
         });
         mostrarAlerta("Pago actualizado correctamente.", "success");
       } else {
-        await axios.post(`${API_URL}/pagos`, payload, {
+        const resp = await axios.post(`${API_URL}/pagos`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
         mostrarAlerta("Pago registrado correctamente.", "success");
+        if (resp.data?.id_recibo) setReciboNuevo(resp.data.id_recibo);
       }
       setForm({
         id_prestamo: "",
@@ -634,6 +637,10 @@ export default function Pagos() {
         />
       )}
 
+      {reciboNuevo && (
+        <ReciboModal idRecibo={reciboNuevo} onClose={() => setReciboNuevo(null)} />
+      )}
+
       {/* Modal */}
       {showModal && (
         <ModalPago
@@ -918,6 +925,7 @@ function TablaPagos({ pagos, prestamos, usuarios, onEdit, onDelete }) {
 
 // ==================== MODAL HISTORIAL DE PAGOS POR SOCIO ====================
 function ModalHistorialPagos({ grupo, prestamos, onClose, onEdit, onDelete }) {
+  const [reciboPago, setReciboPago] = useState(null);
   const getPrestamo = (id_prestamo) => prestamos.find((pr) => pr.id_prestamo === id_prestamo);
 
   // Agrupar pagos del socio por préstamo
@@ -1069,6 +1077,11 @@ function ModalHistorialPagos({ grupo, prestamos, onClose, onEdit, onDelete }) {
 
                           {/* Acciones */}
                           <div className="ms-auto d-flex gap-1 flex-shrink-0">
+                            <button className="btn btn-sm btn-outline-dark" title="Ver / imprimir recibo"
+                              onClick={() => setReciboPago(pago.id_pago)}
+                              style={{ padding: "3px 8px", fontSize: 12, marginRight: 4 }}>
+                              Recibo
+                            </button>
                             <button className="btn btn-sm" title="Editar"
                               onClick={() => { onClose(); setTimeout(() => onEdit(pago), 60); }}
                               style={{ background: "rgba(52,152,219,0.1)", color: "#3498db", border: "1px solid #3498db", borderRadius: "6px 0 0 6px", padding: "3px 8px" }}
@@ -1098,6 +1111,10 @@ function ModalHistorialPagos({ grupo, prestamos, onClose, onEdit, onDelete }) {
               );
             })}
           </div>
+
+          {reciboPago && (
+            <ReciboModal referenciaTipo="pago" referenciaId={reciboPago} onClose={() => setReciboPago(null)} />
+          )}
 
           {/* Footer */}
           <div className="modal-footer border-0 bg-white px-4 py-2 d-flex justify-content-between align-items-center">

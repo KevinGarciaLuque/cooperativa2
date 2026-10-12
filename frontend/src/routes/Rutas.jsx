@@ -21,6 +21,7 @@ import Roles from "../pages/Roles";
 import Usuarios from "../pages/Usuarios/Usuarios";
 import Ventanilla from "../pages/Ventanilla";
 import Caja from "../pages/Caja";
+import Cobranza from "../pages/Cobranza";
 import ParametrosFinancieros from "../pages/SuperAdmin/ParametrosFinancieros";
 // Vistas de usuario socio
 import SocioPerfil from "../pages/Socio/SocioPerfil";
@@ -80,6 +81,14 @@ export default function Rutas() {
             element={
               <PrivateRoute>
                 <Ventanilla />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/cobranza"
+            element={
+              <PrivateRoute>
+                <Cobranza />
               </PrivateRoute>
             }
           />

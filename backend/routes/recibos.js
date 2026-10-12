@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const multer = require("multer");
+const { notificarAdministradores } = require("../utils/notificaciones");
 const { numeroRecibo, emitirFiniquito } = require("../utils/recibos");
 
 const formatear = (r, cooperativa) => {
@@ -157,6 +158,16 @@ router.post("/:id/comprobante-firmado", (req, res) => {
         ]
       );
 
+      // Aviso al Super Administrador cuando lo sube el socio
+      if (req.usuario.rol === "Socio") {
+        const [[socio]] = await pool.query("SELECT nombre_completo FROM usuarios WHERE id_usuario = ?", [r.id_socio]);
+        notificarAdministradores(
+          "Comprobante firmado recibido",
+          `<p><strong>${socio?.nombre_completo || "Un socio"}</strong> subió el comprobante firmado de su desembolso ` +
+            `<strong>${numeroRecibo(r.id_recibo, r.tipo)}</strong> (préstamo #${r.referencia_id}).</p>`
+        );
+      }
+
       res.status(201).json({ success: true, message: "Comprobante firmado recibido." });
     } catch (error) {
       console.error("ERROR AL GUARDAR COMPROBANTE FIRMADO:", error);
@@ -174,6 +185,15 @@ router.get("/:id/comprobante-firmado", async (req, res) => {
       [req.params.id]
     );
     if (!rows.length) return res.status(404).json({ message: "Aún no hay comprobante firmado." });
+
+    // Cuando el personal lo abre, queda marcado como revisado
+    if (req.usuario.rol !== "Socio") {
+      await pool.query(
+        `UPDATE comprobantes_firmados SET revisado_en = NOW(), revisado_por = ?
+         WHERE id_recibo = ? AND revisado_en IS NULL`,
+        [req.usuario.id_usuario, req.params.id]
+      );
+    }
     res.setHeader("Content-Type", rows[0].mime);
     res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(rows[0].nombre_archivo)}"`);
     res.send(rows[0].contenido);

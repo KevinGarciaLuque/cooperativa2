@@ -291,6 +291,12 @@ test("comprobante de entrega firmado: lo sube el socio y lo ve el personal", asy
   const ok = await enviar(t, "firmado.jpg", "image/jpeg", Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]));
   assert.equal(ok.s, 201);
 
+  // el Super Administrador recibe el aviso: aparece en el contador y en la lista
+  const resumen = await api("GET", "/solicitudes/resumen", null, ids.tSuper);
+  assert.equal(resumen.b.comprobantes_por_revisar, 1);
+  const lista = await api("GET", "/solicitudes/comprobantes-recibidos", null, ids.tSuper);
+  assert.ok(lista.b.data.some((d) => d.id_recibo === idRecibo));
+
   // el personal ve el estado y descarga el archivo
   const recibo = await api("GET", `/recibos/${idRecibo}`, null, ids.tSuper);
   assert.ok(recibo.b.data.comprobante_firmado);
@@ -300,6 +306,10 @@ test("comprobante de entrega firmado: lo sube el socio y lo ve el personal", asy
   assert.equal(archivo.status, 200);
   assert.equal(archivo.headers.get("content-type"), "image/jpeg");
   assert.equal((await archivo.arrayBuffer()).byteLength, 7);
+
+  // al abrirlo, el comprobante queda revisado y deja de contar como novedad
+  const despues = await api("GET", "/solicitudes/resumen", null, ids.tSuper);
+  assert.equal(despues.b.comprobantes_por_revisar, 0);
 
   // ya no aparece entre los desembolsos pendientes de firma
   const pend = await api("GET", "/solicitudes/desembolsos-sin-firma", null, ids.tSuper);

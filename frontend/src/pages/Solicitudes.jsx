@@ -51,18 +51,21 @@ export default function Solicitudes() {
   const [desembolsando, setDesembolsando] = useState(false);
   const [reciboAbierto, setReciboAbierto] = useState(null);
   const [sinFirma, setSinFirma] = useState([]);
+  const [recibidos, setRecibidos] = useState([]);
 
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      const [s, e, f] = await Promise.all([
+      const [s, e, f, rc] = await Promise.all([
         axios.get(`${API_URL}/solicitudes`, { headers }),
         axios.get(`${API_URL}/solicitudes/enlace`, { headers }),
         axios.get(`${API_URL}/solicitudes/desembolsos-sin-firma`, { headers }).catch(() => ({ data: { data: [] } })),
+        axios.get(`${API_URL}/solicitudes/comprobantes-recibidos`, { headers }).catch(() => ({ data: { data: [] } })),
       ]);
       setData(s.data);
       setEnlace(e.data);
       setSinFirma(f.data.data || []);
+      setRecibidos(rc.data.data || []);
     } catch {
       mostrarAlerta("No se pudieron cargar las solicitudes.", "error");
     } finally {
@@ -208,7 +211,7 @@ export default function Solicitudes() {
         {[
           ["prestamos", `Solicitudes de préstamo${nPrestamos ? ` (${nPrestamos})` : ""}`],
           ["socios", `Nuevos socios${nSocios ? ` (${nSocios})` : ""}`],
-          ["firmas", `Comprobantes firmados${sinFirma.length ? ` (${sinFirma.length})` : ""}`],
+          ["firmas", `Comprobantes firmados${recibidos.length ? ` (${recibidos.length} nuevos)` : ""}`],
           ["enlace", "Enlace de registro"],
         ].map(([k, t]) => (
           <li className="nav-item" key={k}>
@@ -408,8 +411,34 @@ export default function Solicitudes() {
       )}
 
       {/* ── Comprobantes de entrega sin firma ── */}
+      {tab === "firmas" && recibidos.length > 0 && (
+        <div className="ui-card p-3 mb-3" style={{ border: "1.5px solid #a7f3d0" }}>
+          <div className="fw-bold mb-2" style={{ color: "#065f46" }}>
+            Recibidos de los socios, por revisar ({recibidos.length})
+          </div>
+          {recibidos.map((d) => (
+            <div
+              key={d.id_recibo}
+              className="d-flex flex-wrap justify-content-between align-items-center gap-2 py-2 border-top"
+            >
+              <div>
+                <div className="fw-semibold">{d.nombre_completo}</div>
+                <div className="small text-muted">
+                  Préstamo #{d.id_prestamo} · {fmt(d.monto)} · subido el {String(d.subido_en).substring(0, 16).replace("T", " ")}
+                </div>
+              </div>
+              <button className="btn btn-sm btn-success" onClick={() => setReciboAbierto(d.id_recibo)}>
+                Ver comprobante firmado
+              </button>
+            </div>
+          ))}
+          <div className="small text-muted mt-2">Al abrir el comprobante firmado queda marcado como revisado.</div>
+        </div>
+      )}
+
       {tab === "firmas" && (
         <div className="ui-card">
+          <div className="fw-bold px-3 pt-3">Pendientes de firma</div>
           {sinFirma.length === 0 ? (
             <EmptyState titulo="Todos los comprobantes de entrega tienen su copia firmada" />
           ) : (

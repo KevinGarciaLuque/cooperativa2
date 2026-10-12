@@ -258,6 +258,24 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_10_010_comprobantes_revision",
+    descripcion: "Seguimiento de comprobantes firmados revisados por el personal",
+    async up(conn) {
+      const agregar = async (nombre, definicion) => {
+        const [[e]] = await conn.query(
+          `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'comprobantes_firmados' AND COLUMN_NAME = ?`,
+          [nombre]
+        );
+        if (!e.n) await conn.query(`ALTER TABLE comprobantes_firmados ADD COLUMN ${nombre} ${definicion}`);
+      };
+      await agregar("revisado_en", "DATETIME NULL");
+      await agregar("revisado_por", "INT NULL");
+      // Lo recibido antes de este cambio se considera ya revisado
+      await conn.query("UPDATE comprobantes_firmados SET revisado_en = subido_en WHERE revisado_en IS NULL");
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

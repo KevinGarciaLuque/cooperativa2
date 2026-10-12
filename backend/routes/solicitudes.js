@@ -189,7 +189,17 @@ router.get("/resumen", soloPersonal, async (req, res) => {
       `SELECT COUNT(*) AS n FROM solicitudes_prestamo sp
        INNER JOIN prestamos pr ON sp.id_prestamo = pr.id_prestamo WHERE pr.estado = 'pendiente'`
     );
-    res.json({ success: true, socios_pendientes: s.n, prestamos_pendientes: p.n, total: s.n + p.n });
+    const [[c]] = await pool.query(
+      `SELECT COUNT(DISTINCT id_recibo) AS n FROM comprobantes_firmados
+       WHERE subido_por_rol = 'Socio' AND revisado_en IS NULL`
+    );
+    res.json({
+      success: true,
+      socios_pendientes: s.n,
+      prestamos_pendientes: p.n,
+      comprobantes_por_revisar: c.n,
+      total: s.n + p.n + c.n,
+    });
   } catch (error) {
     res.status(500).json({ message: "No se pudo obtener el resumen" });
   }
@@ -394,6 +404,26 @@ router.post("/prestamos/:id/aprobar", soloPersonal, async (req, res) => {
     res.status(500).json({ message: "No se pudo aprobar la solicitud" });
   } finally {
     connection.release();
+  }
+});
+
+// Comprobantes firmados que subieron los socios y nadie ha revisado
+router.get("/comprobantes-recibidos", soloPersonal, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT r.id_recibo, r.referencia_id AS id_prestamo, r.monto,
+              u.nombre_completo, u.telefono, MAX(c.subido_en) AS subido_en
+       FROM comprobantes_firmados c
+       INNER JOIN recibos r ON c.id_recibo = r.id_recibo
+       INNER JOIN usuarios u ON r.id_socio = u.id_usuario
+       WHERE c.subido_por_rol = 'Socio' AND c.revisado_en IS NULL AND r.anulado = 0
+       GROUP BY r.id_recibo, r.referencia_id, r.monto, u.nombre_completo, u.telefono
+       ORDER BY subido_en DESC LIMIT 100`
+    );
+    res.json({ success: true, data: rows.map((r) => ({ ...r, monto: num(r.monto) })) });
+  } catch (error) {
+    console.error("ERROR AL LISTAR COMPROBANTES RECIBIDOS:", error);
+    res.status(500).json({ message: "No se pudo cargar la lista" });
   }
 });
 

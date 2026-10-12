@@ -3,7 +3,7 @@ const router = express.Router();
 const pool = require("../db");
 
 const esFecha = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v));
-const hoyISO = () => new Date().toISOString().split("T")[0];
+const { hoyISO } = require("./../utils/fechas");
 const num = (v) => parseFloat(v || 0);
 
 // Resumen del efectivo de un día: saldo inicial (último cierre previo) + ingresos - egresos

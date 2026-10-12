@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node tests/run.js",
+    "test:unit": "node tests/run.js --unit",
+    "db:exportar": "node scripts/exportar_esquema.js",
+    "db:crear": "node scripts/crear_bd.js",
+    "backup:verificar": "node scripts/verificar_backup.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
@@ -18,5 +23,8 @@
     "mysql2": "^3.14.1",
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.3"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

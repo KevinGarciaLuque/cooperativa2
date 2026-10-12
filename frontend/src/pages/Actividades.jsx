@@ -1,3 +1,4 @@
+import { hoyLocal } from "../utils/fechas";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
@@ -42,7 +43,7 @@ export default function Actividades() {
   const [form, setForm] = useState({
     nombre: "",
     tipo: "",
-    fecha: new Date().toISOString().split("T")[0],
+    fecha: hoyLocal(),
     monto: "",
     descripcion: "",
   });
@@ -101,7 +102,7 @@ export default function Actividades() {
       setForm({
         nombre: "",
         tipo: "",
-        fecha: new Date().toISOString().split("T")[0],
+        fecha: hoyLocal(),
         monto: "",
         descripcion: "",
       });
@@ -121,7 +122,7 @@ export default function Actividades() {
     setForm({
       nombre: act.nombre,
       tipo: act.tipo,
-      fecha: act.fecha ? act.fecha.substring(0, 10) : new Date().toISOString().split("T")[0],
+      fecha: act.fecha ? act.fecha.substring(0, 10) : hoyLocal(),
       monto: act.monto,
       descripcion: act.descripcion || "",
     });
@@ -133,7 +134,7 @@ export default function Actividades() {
     setForm({
       nombre: "",
       tipo: "",
-      fecha: new Date().toISOString().split("T")[0],
+      fecha: hoyLocal(),
       monto: "",
       descripcion: "",
     });

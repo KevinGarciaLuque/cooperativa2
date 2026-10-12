@@ -1,4 +1,5 @@
 // routes/reportes.js
+const { hoyISO } = require("../utils/fechas");
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
@@ -148,7 +149,7 @@ router.get("/estado-cuenta/:id_usuario", async (req, res) => {
     );
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=estado_cuenta_${socio[0].dni}_${new Date().toISOString().split('T')[0]}.xlsx`
+      `attachment; filename=estado_cuenta_${socio[0].dni}_${hoyISO()}.xlsx`
     );
     await workbook.xlsx.write(res);
     res.end();
@@ -314,7 +315,7 @@ router.get("/balance-general", async (req, res) => {
 
     // Exportar
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename=balance_general_${new Date().toISOString().split('T')[0]}.xlsx`);
+    res.setHeader("Content-Disposition", `attachment; filename=balance_general_${hoyISO()}.xlsx`);
     await workbook.xlsx.write(res);
     res.end();
   } catch (error) {
@@ -437,7 +438,7 @@ router.get("/prestamos-activos", async (req, res) => {
 
     // Exportar
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename=prestamos_${estado}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    res.setHeader("Content-Disposition", `attachment; filename=prestamos_${estado}_${hoyISO()}.xlsx`);
     await workbook.xlsx.write(res);
     res.end();
   } catch (error) {
@@ -597,7 +598,7 @@ router.get("/morosidad", async (req, res) => {
 
     // Exportar
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename=reporte_morosidad_${new Date().toISOString().split('T')[0]}.xlsx`);
+    res.setHeader("Content-Disposition", `attachment; filename=reporte_morosidad_${hoyISO()}.xlsx`);
     await workbook.xlsx.write(res);
     res.end();
   } catch (error) {
@@ -724,7 +725,7 @@ router.get("/aportaciones", async (req, res) => {
 
     // Exportar
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename=reporte_aportaciones_${new Date().toISOString().split('T')[0]}.xlsx`);
+    res.setHeader("Content-Disposition", `attachment; filename=reporte_aportaciones_${hoyISO()}.xlsx`);
     await workbook.xlsx.write(res);
     res.end();
   } catch (error) {
@@ -852,7 +853,7 @@ router.get("/liquidaciones", async (req, res) => {
 
     // Exportar
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename=reporte_liquidaciones_${new Date().toISOString().split('T')[0]}.xlsx`);
+    res.setHeader("Content-Disposition", `attachment; filename=reporte_liquidaciones_${hoyISO()}.xlsx`);
     await workbook.xlsx.write(res);
     res.end();
   } catch (error) {
@@ -1027,7 +1028,7 @@ router.get("/flujo-caja", async (req, res) => {
 
     // Exportar
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename=flujo_caja_${new Date().toISOString().split('T')[0]}.xlsx`);
+    res.setHeader("Content-Disposition", `attachment; filename=flujo_caja_${hoyISO()}.xlsx`);
     await workbook.xlsx.write(res);
     res.end();
   } catch (error) {

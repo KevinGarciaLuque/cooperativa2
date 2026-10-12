@@ -1,4 +1,5 @@
 const express = require("express");
+const { hoyISO, anioMesActual } = require("../utils/fechas");
 const router = express.Router();
 const pool = require("../db");
 
@@ -169,8 +170,8 @@ const resumenMes = async (anio, mes) => {
 router.get("/cierre-mensual", async (req, res) => {
   try {
     const hoy = new Date();
-    const anio = parseInt(req.query.anio) || hoy.getUTCFullYear();
-    const mes = parseInt(req.query.mes) || hoy.getUTCMonth() + 1;
+    const anio = parseInt(req.query.anio) || anioMesActual().anio;
+    const mes = parseInt(req.query.mes) || anioMesActual().mes;
     if (mes < 1 || mes > 12 || anio < 2000 || anio > 2100) {
       return res.status(400).json({ message: "Mes o año inválido" });
     }

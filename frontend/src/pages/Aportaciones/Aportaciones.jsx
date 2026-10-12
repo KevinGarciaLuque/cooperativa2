@@ -1,3 +1,4 @@
+import { hoyLocal } from "../../utils/fechas";
 import { useState, useEffect } from "react";
 import useAccionRapida from "../../hooks/useAccionRapida";
 import ReciboModal from "../../components/ReciboModal";
@@ -43,7 +44,7 @@ export default function Aportaciones() {
   const [form, setForm] = useState({
     id_usuario: "",
     monto: "",
-    fecha: new Date().toISOString().split("T")[0],
+    fecha: hoyLocal(),
     descripcion: "",
   });
 
@@ -108,7 +109,7 @@ export default function Aportaciones() {
     setForm({
       id_usuario: "",
       monto: "",
-      fecha: new Date().toISOString().split("T")[0],
+      fecha: hoyLocal(),
       descripcion: "",
     });
     setShowModal(true);
@@ -121,7 +122,7 @@ export default function Aportaciones() {
       monto: aportacion.monto,
       fecha: aportacion.fecha
         ? aportacion.fecha.substring(0, 10)
-        : new Date().toISOString().split("T")[0],
+        : hoyLocal(),
       descripcion: aportacion.descripcion || "",
     });
     setShowModal(true);
@@ -160,7 +161,7 @@ export default function Aportaciones() {
       setForm({
         id_usuario: "",
         monto: "",
-        fecha: new Date().toISOString().split("T")[0],
+        fecha: hoyLocal(),
         descripcion: "",
       });
       setEditAportacion(null);

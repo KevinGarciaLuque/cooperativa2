@@ -1,3 +1,4 @@
+import { hoyLocal } from "../utils/fechas";
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import ReciboModal from "../components/ReciboModal";
@@ -83,7 +84,7 @@ export default function DetallePrestamoVentanilla({
     const tasaMensual = parseFloat(p.tasa_interes || 0) / 100 / 12;
     const cuota = parseFloat(p.cuota_mensual || 0);
     const otorgado = soloFecha(p.fecha_otorgado);
-    const hoy = new Date().toISOString().substring(0, 10);
+    const hoy = hoyLocal();
 
     // Pagos en orden cronológico
     const pagos = [...(data.historial_pagos || [])].sort(

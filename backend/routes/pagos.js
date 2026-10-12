@@ -619,7 +619,7 @@ router.get("/:id/comprobante", async (req, res) => {
 
     const comprobante = {
       numero_comprobante: `PAGO-${String(req.params.id).padStart(6, '0')}`,
-      fecha_emision: new Date().toISOString().split('T')[0],
+      fecha_emision: hoyISO(),
       fecha_pago: pagoData.fecha_pago,
       
       // Datos del socio
@@ -1103,7 +1103,7 @@ router.get("/reportes/morosidad", async (req, res) => {
 
     res.json({
       success: true,
-      fecha_reporte: new Date().toISOString().split('T')[0],
+      fecha_reporte: hoyISO(),
       totales: totales,
       prestamos_en_mora: prestamosConMora,
     });

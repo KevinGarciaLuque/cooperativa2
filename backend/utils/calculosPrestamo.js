@@ -22,7 +22,7 @@ const soloFecha = (valor) => {
 
 const esFechaISO = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v));
 
-const hoyISO = () => new Date().toISOString().split("T")[0];
+const { hoyISO } = require("./fechas");
 
 // Días entre dos fechas "YYYY-MM-DD"
 const diasEntre = (desde, hasta) => {

@@ -1,3 +1,4 @@
+import { hoyLocal } from "../utils/fechas";
 import { useEffect, useState } from "react";
 import useAccionRapida from "../hooks/useAccionRapida";
 import ReciboModal from "../components/ReciboModal";
@@ -31,7 +32,7 @@ export default function Pagos() {
     id_prestamo: "",
     monto: "",
     metodo_pago: "Efectivo",
-    fecha: new Date().toISOString().split("T")[0],
+    fecha: hoyLocal(),
     descripcion: "",
   });
 
@@ -118,7 +119,7 @@ export default function Pagos() {
       id_prestamo: "",
       monto: "",
       metodo_pago: "Efectivo",
-      fecha: new Date().toISOString().split("T")[0],
+      fecha: hoyLocal(),
       descripcion: "",
     });
     setShowModal(true);
@@ -132,7 +133,7 @@ export default function Pagos() {
       metodo_pago: pago.metodo_pago || "Efectivo",
       fecha: pago.fecha_pago
         ? pago.fecha_pago.substring(0, 10)
-        : new Date().toISOString().split("T")[0],
+        : hoyLocal(),
       descripcion: pago.descripcion || "",
     });
     setShowModal(true);
@@ -189,7 +190,7 @@ export default function Pagos() {
         id_prestamo: "",
         monto: "",
         metodo_pago: "Efectivo",
-        fecha: new Date().toISOString().split("T")[0],
+        fecha: hoyLocal(),
         descripcion: "",
       });
       setEditPago(null);

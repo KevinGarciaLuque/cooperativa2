@@ -1,6 +1,5 @@
 // Parámetros financieros configurables por el Super Administrador.
 // Se guardan en configuracion_sitio con prefijo "fin_" y se mantienen en caché.
-const pool = require("../db");
 
 const DEFAULTS = {
   mora_tasa_anual: 24, // 24% anual = 2% mensual
@@ -21,6 +20,7 @@ const DEFAULTS = {
 let cache = { ...DEFAULTS };
 
 const refrescar = async () => {
+  const pool = require("../db");
   try {
     const [rows] = await pool.query(
       "SELECT clave, valor FROM configuracion_sitio WHERE clave LIKE 'fin\\_%'"
@@ -38,7 +38,12 @@ const refrescar = async () => {
 
 const obtener = () => cache;
 
-refrescar();
-setInterval(refrescar, 30 * 1000).unref();
+let iniciado = false;
+const iniciar = () => {
+  if (iniciado) return;
+  iniciado = true;
+  refrescar();
+  setInterval(refrescar, 30 * 1000).unref();
+};
 
-module.exports = { obtener, refrescar, DEFAULTS };
+module.exports = { obtener, refrescar, iniciar, DEFAULTS };

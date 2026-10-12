@@ -1,4 +1,5 @@
 const express = require("express");
+const { hoyISO, anioMesActual } = require("../utils/fechas");
 const router = express.Router();
 const ExcelJS = require("exceljs");
 const pool = require("../db");
@@ -228,8 +229,8 @@ const construirCierre = async (anio, mes) => {
 router.get("/cierre-mensual", async (req, res) => {
   try {
     const hoy = new Date();
-    const anio = parseInt(req.query.anio) || hoy.getUTCFullYear();
-    const mes = parseInt(req.query.mes) || hoy.getUTCMonth() + 1;
+    const anio = parseInt(req.query.anio) || anioMesActual().anio;
+    const mes = parseInt(req.query.mes) || anioMesActual().mes;
     if (mes < 1 || mes > 12 || anio < 2000 || anio > 2100) {
       return res.status(400).json({ message: "Mes o año inválido" });
     }
@@ -352,7 +353,7 @@ router.get("/antiguedad-cartera", async (req, res) => {
     const { resumen, totales } = resumirCartera(filas);
     res.json({
       success: true,
-      fecha: new Date().toISOString().substring(0, 10),
+      fecha: hoyISO(),
       etiquetas: ETIQUETAS_CARTERA,
       resumen,
       totales,
@@ -378,8 +379,8 @@ router.get("/estado-resultados", async (req, res) => {
       hasta = h.toISOString().substring(0, 10);
     } else {
       const hoy = new Date();
-      const anio = parseInt(req.query.anio) || hoy.getUTCFullYear();
-      const mes = parseInt(req.query.mes) || hoy.getUTCMonth() + 1;
+      const anio = parseInt(req.query.anio) || anioMesActual().anio;
+      const mes = parseInt(req.query.mes) || anioMesActual().mes;
       ({ desde, hasta } = rangoDelMes(anio, mes));
     }
     res.json({ success: true, data: await estadoResultados(desde, hasta) });
@@ -394,7 +395,7 @@ router.get("/estado-resultados", async (req, res) => {
 // ============================================
 router.get("/situacion-financiera", async (req, res) => {
   try {
-    res.json({ success: true, fecha: new Date().toISOString().substring(0, 10), data: await situacionFinanciera() });
+    res.json({ success: true, fecha: hoyISO(), data: await situacionFinanciera() });
   } catch (error) {
     console.error("ERROR EN SITUACIÓN FINANCIERA:", error);
     res.status(500).json({ message: "Error al calcular la situación financiera" });
@@ -457,7 +458,7 @@ router.get("/exportar/antiguedad-cartera", async (req, res) => {
     ws.getColumn(4).numFmt = "#,##0.00";
     ws.getColumn(5).numFmt = "0%";
     ws.getColumn(6).numFmt = "#,##0.00";
-    await enviarExcel(res, wb, `antiguedad_cartera_${new Date().toISOString().substring(0, 10)}.xlsx`);
+    await enviarExcel(res, wb, `antiguedad_cartera_${hoyISO()}.xlsx`);
   } catch (error) {
     console.error("ERROR AL EXPORTAR ANTIGÜEDAD:", error);
     res.status(500).json({ message: "Error al exportar" });
@@ -467,8 +468,8 @@ router.get("/exportar/antiguedad-cartera", async (req, res) => {
 router.get("/exportar/estado-resultados", async (req, res) => {
   try {
     const hoy = new Date();
-    const anio = parseInt(req.query.anio) || hoy.getUTCFullYear();
-    const mes = parseInt(req.query.mes) || hoy.getUTCMonth() + 1;
+    const anio = parseInt(req.query.anio) || anioMesActual().anio;
+    const mes = parseInt(req.query.mes) || anioMesActual().mes;
     const { desde, hasta } = rangoDelMes(anio, mes);
     const r = await estadoResultados(desde, hasta);
 
@@ -530,7 +531,7 @@ router.get("/exportar/situacion-financiera", async (req, res) => {
 
     ws.columns = [{ width: 48 }, { width: 18 }];
     ws.getColumn(2).numFmt = "#,##0.00";
-    await enviarExcel(res, wb, `situacion_financiera_${new Date().toISOString().substring(0, 10)}.xlsx`);
+    await enviarExcel(res, wb, `situacion_financiera_${hoyISO()}.xlsx`);
   } catch (error) {
     console.error("ERROR AL EXPORTAR SITUACIÓN:", error);
     res.status(500).json({ message: "Error al exportar" });

@@ -275,4 +275,27 @@ router.post(
   }
 );
 
+// ============================================
+// POST /api/basedatos/verificar-backup/:filename
+// Prueba de restauración en una base temporal (no toca los datos reales)
+// ============================================
+router.post("/verificar-backup/:filename", verificarToken, soloAdmin, async (req, res) => {
+  const safeName = path.basename(req.params.filename);
+  if (!/^DBcooperativa_\d{2}_\d{2}_\d{4}_\d{2}h\d{2}\.sql$/.test(safeName)) {
+    return res.status(400).json({ success: false, message: "Nombre de archivo inválido" });
+  }
+  const filePath = path.join(BACKUPS_DIR, safeName);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ success: false, message: "Archivo no encontrado" });
+  }
+  try {
+    const { verificarRespaldo } = require("../scripts/verificar_backup");
+    const r = await verificarRespaldo(filePath);
+    res.json({ success: true, ok: r.ok, archivo: r.archivo, tablas: r.tablas, diferencias: r.diferencias });
+  } catch (error) {
+    console.error("ERROR AL VERIFICAR RESPALDO:", error);
+    res.status(500).json({ success: false, message: "No se pudo verificar el respaldo" });
+  }
+});
+
 module.exports = router;

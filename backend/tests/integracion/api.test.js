@@ -1,0 +1,349 @@
+// Pruebas de integración: la API completa contra una base aparte (siempre *_test).
+const { baseDePruebas } = require("../helpers/entorno");
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+
+const { crearBaseDeDatos } = require("../../scripts/crear_bd");
+
+let app;
+let servidor;
+let base;
+let pool;
+const ids = {};
+
+const api = async (metodo, ruta, cuerpo, token) => {
+  const r = await fetch(`${base}/api${ruta}`, {
+    method: metodo,
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+  });
+  let b = null;
+  try {
+    b = await r.json();
+  } catch {
+    b = null;
+  }
+  return { s: r.status, b };
+};
+
+const tokenDe = (u, rol, rolId) =>
+  jwt.sign({ id_usuario: u, rol, rol_id: rolId, nombre_completo: `Usuario ${u}` }, process.env.JWT_SECRET, {
+    expiresIn: "10m",
+  });
+
+const cerca = (a, b, tol = 0.01) => assert.ok(Math.abs(a - b) <= tol, `${a} no está cerca de ${b}`);
+
+test.before(async () => {
+  await crearBaseDeDatos(baseDePruebas, { reiniciar: true });
+  pool = require("../../db");
+  const { aplicarMigraciones } = require("../../utils/migraciones");
+  await aplicarMigraciones();
+  const hash = await bcrypt.hash("Clave1234", 4);
+
+  const crear = async (nombre, dni, rolId, estado = "activo") => {
+    const [r] = await pool.query(
+      `INSERT INTO usuarios (nombre_completo, dni, telefono, correo, password, rol_id, estado, fecha_registro)
+       VALUES (?, ?, '98765432', ?, ?, ?, ?, NOW())`,
+      [nombre, dni, `${dni}@prueba.hn`, hash, rolId, estado]
+    );
+    return r.insertId;
+  };
+  ids.super = await crear("Super Prueba", "0801000000001", 5);
+  ids.admin = await crear("Admin Prueba", "0801000000002", 1);
+  ids.socio = await crear("Socio Uno Prueba", "0801000000003", 2);
+  ids.socio2 = await crear("Socio Dos Prueba", "0801000000004", 2);
+  for (const id of [ids.socio, ids.socio2]) {
+    for (const tipo of ["Aportaciones", "Vivienda", "Pensiones"]) {
+      await pool.query(
+        `INSERT INTO cuentas (id_usuario, tipo_cuenta, saldo_actual, estado, fecha_apertura) VALUES (?, ?, 0, 'activa', NOW())`,
+        [id, tipo]
+      );
+    }
+  }
+  ids.tSuper = tokenDe(ids.super, "Super Administrador", 5);
+  ids.tAdmin = tokenDe(ids.admin, "Administrador", 1);
+  ids.tSocio = tokenDe(ids.socio, "Socio", 2);
+  ids.tSocio2 = tokenDe(ids.socio2, "Socio", 2);
+
+  app = require("../../app");
+  await new Promise((ok) => {
+    servidor = app.listen(0, ok);
+  });
+  base = `http://127.0.0.1:${servidor.address().port}`;
+});
+
+test.after(async () => {
+  if (servidor) await new Promise((ok) => servidor.close(ok));
+  if (pool) await pool.end();
+});
+
+// ─────────────────────────────────────────────────────────────
+test("seguridad: sin sesión no hay acceso", async () => {
+  assert.equal((await api("GET", "/usuarios")).s, 401);
+  assert.equal((await api("GET", "/prestamos")).s, 401);
+  assert.equal((await api("POST", "/pagos", { id_prestamo: 1, monto_pagado: 1 })).s, 401);
+  assert.equal((await api("GET", "/configuracion")).s, 200); // pública (pantalla de login)
+});
+
+test("seguridad: un token de recuperación no es una sesión", async () => {
+  const reset = jwt.sign({ id_usuario: ids.super }, process.env.JWT_SECRET, { expiresIn: "5m" });
+  assert.equal((await api("GET", "/usuarios", null, reset)).s, 401);
+});
+
+test("seguridad: las respuestas nunca incluyen la contraseña", async () => {
+  const r = await api("GET", "/usuarios?limit=5", null, ids.tSuper);
+  assert.equal(r.s, 200);
+  assert.ok(r.b.data.length >= 4);
+  assert.ok(!JSON.stringify(r.b).includes('"password"'));
+});
+
+test("seguridad: el socio solo ve lo suyo", async () => {
+  assert.equal((await api("GET", "/usuarios", null, ids.tSocio)).s, 403);
+  assert.equal((await api("GET", `/usuarios/${ids.socio}`, null, ids.tSocio)).s, 200);
+  assert.equal((await api("GET", `/usuarios/${ids.socio2}`, null, ids.tSocio)).s, 403);
+  assert.equal((await api("GET", "/dashboard/kpis", null, ids.tSocio)).s, 403);
+  // aunque pida los préstamos de otro, el servidor fuerza los suyos
+  const r = await api("GET", `/prestamos?id_usuario=${ids.socio2}`, null, ids.tSocio);
+  assert.equal(r.s, 200);
+  assert.ok(r.b.data.every((p) => p.id_usuario === ids.socio));
+});
+
+test("seguridad: solo el Super Administrador crea Super Administradores", async () => {
+  const datos = {
+    nombre_completo: "Intruso Prueba", dni: "0801000000099", password: "Clave1234", rol_id: 5,
+    telefono: "98765432", fecha_nacimiento: "1990-01-01",
+  };
+  const r = await api("POST", "/usuarios", datos, ids.tAdmin);
+  assert.equal(r.s, 403);
+});
+
+// ─────────────────────────────────────────────────────────────
+test("registro por enlace: el socio queda pendiente y limitado", async () => {
+  const enlace = await api("GET", "/solicitudes/enlace", null, ids.tSuper);
+  assert.equal(enlace.s, 200);
+  const codigo = enlace.b.codigo;
+  const datos = {
+    nombre_completo: "Nuevo Socio Prueba", dni: "0801000000010", telefono: "98761234",
+    correo: "nuevo.prueba@prueba.hn", fecha_nacimiento: "1992-03-04", password: "Clave1234",
+  };
+
+  assert.equal((await api("POST", "/registro", datos)).s, 403); // sin código
+  assert.equal((await api("POST", "/registro", { ...datos, codigo, password: "abc" })).s, 400);
+  assert.equal((await api("POST", "/registro", { ...datos, codigo, fecha_nacimiento: "2015-01-01" })).s, 400);
+
+  const ok = await api("POST", "/registro", { ...datos, codigo });
+  assert.equal(ok.s, 201);
+  ids.nuevo = ok.b.id_usuario;
+  assert.equal((await api("POST", "/registro", { ...datos, codigo })).s, 409); // duplicado
+
+  const login = await api("POST", "/usuarios/login", { dni: datos.dni, password: datos.password });
+  assert.equal(login.s, 200);
+  assert.equal(login.b.usuario.estado, "pendiente");
+  ids.tNuevo = login.b.token;
+
+  assert.equal((await api("GET", "/cuentas", null, ids.tNuevo)).s, 403);
+  assert.equal((await api("GET", "/solicitudes/parametros", null, ids.tNuevo)).s, 200);
+});
+
+test("solicitud de préstamo: validaciones y una sola en trámite", async () => {
+  const sol = {
+    monto: 5000, plazo_meses: 6, cuota_posible: 1100, proposito: "negocio", ocupacion: "negocio_propio",
+    ingreso_mensual: 9000, acepta: true,
+  };
+  assert.equal((await api("POST", "/solicitudes/prestamo", { ...sol, monto: 99999999 }, ids.tNuevo)).s, 400);
+  assert.equal((await api("POST", "/solicitudes/prestamo", { ...sol, acepta: false }, ids.tNuevo)).s, 400);
+
+  const ok = await api("POST", "/solicitudes/prestamo", sol, ids.tNuevo);
+  assert.equal(ok.s, 201);
+  cerca(ok.b.cuota_estimada, 1148.04);
+  ids.prestamoNuevo = ok.b.id_prestamo;
+
+  assert.equal((await api("POST", "/solicitudes/prestamo", sol, ids.tNuevo)).s, 409);
+});
+
+test("aprobación: el socio y el préstamo se aprueban juntos", async () => {
+  const resumen = await api("GET", "/solicitudes/resumen", null, ids.tSuper);
+  assert.equal(resumen.b.socios_pendientes, 1);
+  assert.equal(resumen.b.prestamos_pendientes, 1);
+
+  // no se puede aprobar el préstamo si el socio sigue pendiente y no se aprueba también
+  const sin = await api("POST", `/solicitudes/prestamos/${ids.prestamoNuevo}/aprobar`, {}, ids.tSuper);
+  assert.equal(sin.s, 400);
+
+  const ok = await api(
+    "POST", `/solicitudes/prestamos/${ids.prestamoNuevo}/aprobar`,
+    { aprobar_socio: true, tasa_mensual: 10 }, ids.tSuper
+  );
+  assert.equal(ok.s, 200);
+
+  const [[u]] = await pool.query("SELECT estado FROM usuarios WHERE id_usuario = ?", [ids.nuevo]);
+  assert.equal(u.estado, "activo");
+  const [cuentas] = await pool.query("SELECT tipo_cuenta FROM cuentas WHERE id_usuario = ?", [ids.nuevo]);
+  assert.equal(cuentas.length, 3);
+});
+
+test("desembolso → pago total → finiquito", async () => {
+  const id = ids.prestamoNuevo;
+
+  // no se desembolsa sin aprobar ni se emite finiquito antes de pagar
+  const ds = await api("POST", `/prestamos/${id}/desembolsar`, { metodo: "efectivo" }, ids.tSuper);
+  assert.equal(ds.s, 200);
+  assert.ok(ds.b.id_recibo);
+
+  const nuevoToken = (await api("POST", "/usuarios/login", { dni: "0801000000010", password: "Clave1234" })).b.token;
+  assert.equal((await api("GET", `/recibos/finiquito/${id}`, null, nuevoToken)).s, 400);
+
+  const cot = await api("GET", `/prestamos/${id}/cotizar-liquidacion`, null, ids.tSuper);
+  const total = cot.b.data.total_a_pagar;
+  cerca(total, 5500); // 5,000 al 10% mensual, mes completo
+
+  // sobrepago rechazado
+  const sobre = await api("POST", "/pagos", { id_prestamo: id, monto_pagado: total + 50, tipo_pago: "desglose" }, ids.tSuper);
+  assert.equal(sobre.s, 400);
+
+  const pago = await api("POST", "/pagos", { id_prestamo: id, monto_pagado: total, metodo_pago: "Efectivo", tipo_pago: "desglose" }, ids.tSuper);
+  assert.equal(pago.s, 201);
+  assert.equal(pago.b.detalles.prestamo_liquidado, true);
+  assert.ok(pago.b.id_finiquito);
+  ids.pagoFinal = pago.b.id_pago;
+
+  // el pago repetido no se acepta
+  assert.equal((await api("POST", "/pagos", { id_prestamo: id, monto_pagado: total }, ids.tSuper)).s, 400);
+
+  // el socio ve su propia constancia, pero no la de otros
+  const fin = await api("GET", `/recibos/finiquito/${id}`, null, nuevoToken);
+  assert.equal(fin.s, 200);
+  assert.equal(fin.b.data.tipo, "finiquito");
+  assert.match(fin.b.data.numero, /^F-\d{6}$/);
+  const [[otro]] = await pool.query("SELECT id_prestamo FROM prestamos WHERE id_usuario <> ? LIMIT 1", [ids.nuevo]);
+  if (otro) assert.equal((await api("GET", `/recibos/finiquito/${otro.id_prestamo}`, null, nuevoToken)).s, 403);
+});
+
+test("integridad: anular exige motivo, archiva y revierte el finiquito", async () => {
+  const id = ids.prestamoNuevo;
+  assert.equal((await api("DELETE", `/pagos/${ids.pagoFinal}`, null, ids.tSuper)).s, 400); // sin motivo
+
+  // un préstamo con pagos no se puede eliminar
+  assert.equal((await api("DELETE", `/prestamos/${id}`, null, ids.tSuper)).s, 409);
+
+  const an = await api("DELETE", `/pagos/${ids.pagoFinal}?motivo=prueba%20automatica`, null, ids.tSuper);
+  assert.equal(an.s, 200);
+
+  const [[pr]] = await pool.query("SELECT estado, saldo_restante FROM prestamos WHERE id_prestamo = ?", [id]);
+  assert.equal(pr.estado, "activo");
+  cerca(parseFloat(pr.saldo_restante), 5000);
+
+  const [arch] = await pool.query("SELECT motivo FROM pagos_anulados WHERE id_prestamo = ?", [id]);
+  assert.equal(arch.length, 1);
+  const [[fq]] = await pool.query(
+    "SELECT anulado FROM recibos WHERE tipo = 'finiquito' AND referencia_id = ? ORDER BY id_recibo DESC LIMIT 1", [id]
+  );
+  assert.equal(fq.anulado, 1);
+
+  // no se marca como pagado un préstamo con saldo
+  assert.equal((await api("PUT", `/prestamos/${id}`, { estado: "pagado" }, ids.tSuper)).s, 409);
+});
+
+// ─────────────────────────────────────────────────────────────
+test("mora: se cobra, y solo el Super Administrador puede omitirla", async () => {
+  const [r] = await pool.query(
+    `INSERT INTO prestamos (id_usuario, monto, tasa_interes, tipo_tasa, tasa_original, plazo_meses, saldo_restante, estado, fecha_otorgado)
+     VALUES (?, 1000, 120, 'nominal_mensual', 10, 6, 1000, 'activo', DATE_SUB(NOW(), INTERVAL 70 DAY))`,
+    [ids.socio]
+  );
+  const id = r.insertId;
+
+  const prox = await api("GET", `/pagos/prestamo/${id}/proximo-pago`, null, ids.tSuper);
+  assert.equal(prox.s, 200);
+  assert.ok(prox.b.proximo_pago.dias_mora >= 39 && prox.b.proximo_pago.dias_mora <= 41);
+  assert.ok(prox.b.proximo_pago.interes_moratorio > 25);
+
+  // el socio ve su mora (pero no los intereses ordinarios)
+  const vista = await api("GET", `/pagos/prestamo/${id}/proximo-pago`, null, ids.tSocio);
+  assert.equal(vista.s, 200);
+  assert.ok(vista.b.proximo_pago.interes_moratorio > 25);
+  assert.equal(vista.b.proximo_pago.interes_para_saldar, undefined);
+
+  // un administrador común no puede omitir la mora
+  const noPuede = await api("POST", "/pagos", { id_prestamo: id, monto_pagado: 300, condonar_mora: true }, ids.tAdmin);
+  assert.equal(noPuede.s, 403);
+
+  // un pago menor a la mora no se acepta
+  const corto = await api("POST", "/pagos", { id_prestamo: id, monto_pagado: 10 }, ids.tSuper);
+  assert.equal(corto.s, 400);
+
+  const conMora = await api("POST", "/pagos", { id_prestamo: id, monto_pagado: 300 }, ids.tSuper);
+  assert.equal(conMora.s, 201);
+  assert.ok(conMora.b.detalles.interes_moratorio > 25);
+});
+
+test("mora omitida por el Super Administrador queda registrada", async () => {
+  const [r] = await pool.query(
+    `INSERT INTO prestamos (id_usuario, monto, tasa_interes, tipo_tasa, tasa_original, plazo_meses, saldo_restante, estado, fecha_otorgado)
+     VALUES (?, 2000, 120, 'nominal_mensual', 10, 6, 2000, 'mora', DATE_SUB(NOW(), INTERVAL 90 DAY))`,
+    [ids.socio2]
+  );
+  const ok = await api("POST", "/pagos", { id_prestamo: r.insertId, monto_pagado: 400, condonar_mora: true }, ids.tSuper);
+  assert.equal(ok.s, 201);
+  assert.equal(ok.b.detalles.interes_moratorio, 0);
+  assert.ok(ok.b.detalles.mora_condonada > 0);
+  const [[b]] = await pool.query("SELECT COUNT(*) AS n FROM bitacora WHERE detalle LIKE '%MORA OMITIDA%'");
+  assert.ok(b.n >= 1);
+});
+
+// ─────────────────────────────────────────────────────────────
+test("caja: movimientos, gasto y cierre con diferencia", async () => {
+  const hoy = require("../../utils/fechas").hoyISO();
+
+  const ing = await api("POST", "/caja/ingreso", { categoria: "saldo_inicial", monto: 10000, metodo: "efectivo" }, ids.tSuper);
+  assert.equal(ing.s, 201);
+  const gas = await api("POST", "/caja/gasto", { categoria: "servicios", monto: 250.5, concepto: "Energía eléctrica" }, ids.tSuper);
+  assert.equal(gas.s, 201);
+  assert.equal((await api("POST", "/caja/gasto", { categoria: "servicios", monto: 0, concepto: "x" }, ids.tSuper)).s, 400);
+
+  const res = await api("GET", `/caja/resumen?fecha=${hoy}`, null, ids.tSuper);
+  assert.equal(res.s, 200);
+  assert.ok(res.b.totales.ingresos >= 10000);
+  const esperado = res.b.efectivo.efectivo_esperado;
+
+  // con diferencia exige explicación
+  const sin = await api("POST", "/caja/cierre", { fecha: hoy, efectivo_contado: esperado - 100 }, ids.tSuper);
+  assert.equal(sin.s, 400);
+
+  const ok = await api(
+    "POST", "/caja/cierre",
+    { fecha: hoy, efectivo_contado: esperado - 100, observacion: "Faltante por cambio" }, ids.tSuper
+  );
+  assert.equal(ok.s, 201);
+  cerca(ok.b.diferencia, -100);
+
+  assert.equal((await api("POST", "/caja/cierre", { fecha: hoy, efectivo_contado: esperado }, ids.tSuper)).s, 409);
+});
+
+test("contabilidad: cierre mensual congelado y reapertura", async () => {
+  // no se cierra un mes futuro
+  assert.equal((await api("POST", "/contabilidad/cierre-mensual", { anio: 2099, mes: 1 }, ids.tSuper)).s, 400);
+
+  const vivo = await api("GET", "/contabilidad/cierre-mensual?anio=2026&mes=1", null, ids.tSuper);
+  assert.equal(vivo.b.cerrado, false);
+
+  assert.equal((await api("POST", "/contabilidad/cierre-mensual", { anio: 2026, mes: 1 }, ids.tSuper)).s, 201);
+  assert.equal((await api("POST", "/contabilidad/cierre-mensual", { anio: 2026, mes: 1 }, ids.tSuper)).s, 409);
+
+  const guardado = await api("GET", "/contabilidad/cierre-mensual?anio=2026&mes=1", null, ids.tSuper);
+  assert.equal(guardado.b.cerrado, true);
+
+  // solo el Super Administrador reabre, con motivo
+  assert.equal((await api("DELETE", "/contabilidad/cierre-mensual/2026/1?motivo=motivo%20valido", null, ids.tAdmin)).s, 403);
+  assert.equal((await api("DELETE", "/contabilidad/cierre-mensual/2026/1?motivo=no", null, ids.tSuper)).s, 400);
+  assert.equal((await api("DELETE", "/contabilidad/cierre-mensual/2026/1?motivo=correccion%20autorizada", null, ids.tSuper)).s, 200);
+});
+
+test("monitoreo: el estado del servicio responde", async () => {
+  const r = await api("GET", "/salud");
+  assert.equal(r.s, 200);
+  assert.equal(r.b.estado, "ok");
+  assert.ok(r.b.migraciones.aplicadas >= 7);
+});

@@ -1,3 +1,4 @@
+import { hoyLocal } from "../utils/fechas";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
@@ -41,7 +42,7 @@ export default function Liquidaciones() {
   const [liquidaciones, setLiquidaciones] = useState([]);
   const [editLiquidacion, setEditLiquidacion] = useState(null);
   const [form, setForm] = useState({
-    fecha: new Date().toISOString().split("T")[0],
+    fecha: hoyLocal(),
     monto: "",
     descripcion: "",
   });
@@ -100,7 +101,7 @@ export default function Liquidaciones() {
         mostrarAlerta("Liquidación registrada correctamente.", "success");
       }
       setForm({
-        fecha: new Date().toISOString().split("T")[0],
+        fecha: hoyLocal(),
         monto: "",
         descripcion: "",
       });
@@ -118,7 +119,7 @@ export default function Liquidaciones() {
   const handleEdit = (liq) => {
     setEditLiquidacion(liq);
     setForm({
-      fecha: liq.fecha ? liq.fecha.substring(0, 10) : new Date().toISOString().split("T")[0],
+      fecha: liq.fecha ? liq.fecha.substring(0, 10) : hoyLocal(),
       monto: liq.monto,
       descripcion: liq.descripcion || "",
     });
@@ -128,7 +129,7 @@ export default function Liquidaciones() {
   const openCrearModal = () => {
     setEditLiquidacion(null);
     setForm({
-      fecha: new Date().toISOString().split("T")[0],
+      fecha: hoyLocal(),
       monto: "",
       descripcion: "",
     });

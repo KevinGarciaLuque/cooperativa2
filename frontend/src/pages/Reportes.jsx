@@ -1,3 +1,4 @@
+import { hoyLocal } from "../utils/fechas";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
@@ -159,7 +160,7 @@ export default function Reportes() {
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `${nombreArchivo}_${new Date().toISOString().split("T")[0]}.xlsx`);
+      link.setAttribute("download", `${nombreArchivo}_${hoyLocal()}.xlsx`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

@@ -1,3 +1,4 @@
+import { hoyLocal } from "../utils/fechas";
 import { Paginacion } from "../ui/Componentes";
 import { paginar } from "../ui/paginar";
 import { useEffect, useState } from "react";
@@ -50,7 +51,7 @@ export default function Movimientos() {
     id_cuenta: "",
     tipo: "",
     monto: "",
-    fecha: new Date().toISOString().split("T")[0],
+    fecha: hoyLocal(),
     descripcion: "",
   });
 
@@ -129,7 +130,7 @@ export default function Movimientos() {
       id_cuenta: "",
       tipo: "",
       monto: "",
-      fecha: new Date().toISOString().split("T")[0],
+      fecha: hoyLocal(),
       descripcion: "",
     });
     setShowModal(true);
@@ -143,7 +144,7 @@ export default function Movimientos() {
       monto: movimiento.monto,
       fecha: movimiento.fecha
         ? movimiento.fecha.substring(0, 10)
-        : new Date().toISOString().split("T")[0],
+        : hoyLocal(),
       descripcion: movimiento.descripcion || "",
     });
     setShowModal(true);
@@ -182,7 +183,7 @@ export default function Movimientos() {
         id_cuenta: "",
         tipo: "",
         monto: "",
-        fecha: new Date().toISOString().split("T")[0],
+        fecha: hoyLocal(),
         descripcion: "",
       });
       setEditMovimiento(null);

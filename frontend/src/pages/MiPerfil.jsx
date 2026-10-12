@@ -6,9 +6,10 @@ import {
   FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt,
   FaBirthdayCake, FaIdCard, FaCamera, FaEdit,
   FaSave, FaTimes, FaLock, FaEye, FaEyeSlash,
-  FaCheckCircle, FaExclamationTriangle, FaIdBadge,
+  FaCheckCircle, FaExclamationTriangle, FaIdBadge, FaSignature,
 } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
+import FirmaDigital from "../components/FirmaDigital";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -195,6 +196,8 @@ export default function MiPerfil() {
   const tabs = [
     { key: "info",       label: "Información personal", icon: <FaUser /> },
     { key: "seguridad",  label: "Seguridad",             icon: <FaShieldAlt /> },
+    // La firma es para el personal: aparece en los documentos que emite o aprueba
+    ...(user?.rol && user.rol !== "Socio" ? [{ key: "firma", label: "Firma digital", icon: <FaSignature /> }] : []),
     { key: "actividad",  label: "Actividad reciente",    icon: <FaHistory /> },
   ];
 
@@ -591,6 +594,13 @@ export default function MiPerfil() {
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* ───────────────────────── TAB: FIRMA DIGITAL ── */}
+              {tab === "firma" && (
+                <div className="mp-card" style={{ maxWidth: 720 }}>
+                  <FirmaDigital token={token} />
                 </div>
               )}
 

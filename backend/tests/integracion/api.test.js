@@ -641,6 +641,40 @@ test("registro por enlace con préstamo: cuenta y solicitud llegan juntas", asyn
   assert.equal(pr.estado, "rechazado");
 });
 
+test("firma digital: el personal guarda la suya y sale en sus documentos", async () => {
+  const subir = async (token, tipo = "image/png") => {
+    const f = new FormData();
+    f.append("firma", new Blob([PNG], { type: tipo }), "firma.png");
+    const r = await fetch(`${base}/api/firma/mia`, { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: f });
+    return { s: r.status, b: await r.json().catch(() => null) };
+  };
+
+  // un socio no tiene firma de la cooperativa
+  assert.equal((await api("GET", "/firma/mia", null, ids.tSocio)).s, 403);
+  assert.equal((await subir(ids.tSocio)).s, 403);
+  assert.equal((await subir(ids.tSuper, "image/jpeg")).s, 400);
+
+  assert.equal((await api("GET", "/firma/mia", null, ids.tSuper)).b.imagen, null);
+  const ok = await subir(ids.tSuper);
+  assert.equal(ok.s, 200);
+  assert.match(ok.b.imagen, /^data:image\/png;base64,/);
+
+  // los recibos que emitió el Super Administrador traen su firma
+  const [[rec]] = await pool.query("SELECT id_recibo FROM recibos WHERE emitido_por = ? LIMIT 1", [ids.super]);
+  const recibo = await api("GET", `/recibos/${rec.id_recibo}`, null, ids.tSuper);
+  assert.match(recibo.b.data.firma_emisor, /^data:image\/png;base64,/);
+
+  // la carta de aprobación se sigue generando con la firma
+  const carta = await fetch(`${base}/api/solicitudes/prestamos/${ids.prestamoNuevo}/carta`, {
+    headers: { Authorization: `Bearer ${ids.tSuper}` },
+  });
+  assert.equal(carta.status, 200);
+
+  assert.equal((await api("DELETE", "/firma/mia", null, ids.tSuper)).s, 200);
+  const sin = await api("GET", `/recibos/${rec.id_recibo}`, null, ids.tSuper);
+  assert.equal(sin.b.data.firma_emisor, null);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

@@ -61,6 +61,17 @@ const ponerLogo = async (doc, ancho, y) => {
   }
 };
 
+// Firma de quien emitió el documento, sobre su línea (proporción 3:1)
+const ponerFirma = (doc, firma, x, yLinea, ancho) => {
+  if (!firma) return;
+  const alto = Math.min(ancho / 3, 16);
+  try {
+    doc.addImage(firma, "PNG", x + (ancho - alto * 3) / 2, yLinea - alto - 0.5, alto * 3, alto);
+  } catch {
+    // firma dañada: queda solo la línea
+  }
+};
+
 const soloFecha = (f) => {
   const d = new Date(f);
   return isNaN(d) ? "" : d.toLocaleDateString("es-HN", { day: "numeric", month: "long", year: "numeric" });
@@ -138,6 +149,7 @@ async function generarFiniquitoPdf(recibo) {
   // Firmas
   doc.setDrawColor(148, 163, 184);
   const mitad = (ancho - margen * 2) / 2;
+  ponerFirma(doc, recibo.firma_emisor, margen, y, mitad - 8);
   doc.line(margen, y, margen + mitad - 8, y);
   doc.line(margen + mitad + 8, y, ancho - margen, y);
   doc.setFont("helvetica", "normal");
@@ -239,6 +251,7 @@ export async function generarReciboPdf(recibo) {
   // Firmas
   doc.setDrawColor(148, 163, 184);
   const mitad = (ancho - margen * 2) / 2;
+  ponerFirma(doc, recibo.firma_emisor, margen, y, mitad - 8);
   doc.line(margen, y, margen + mitad - 8, y);
   doc.line(margen + mitad + 8, y, ancho - margen, y);
   doc.setFont("helvetica", "normal");

@@ -316,6 +316,20 @@ const MIGRACIONES = [
       }
     },
   },
+  {
+    id: "2026_10_013_firmas_usuario",
+    descripcion: "Firma digital del personal para los documentos que emite o aprueba",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS firmas_usuario (
+          id_usuario INT PRIMARY KEY,
+          mime VARCHAR(40) NOT NULL,
+          contenido MEDIUMBLOB NOT NULL,
+          actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

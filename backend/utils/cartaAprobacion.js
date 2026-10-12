@@ -7,6 +7,7 @@ const PDFDocument = require("pdfkit");
 const pool = require("../db");
 const { calcularCuotaMensual } = require("./calculosPrestamo");
 const { notificarSocio, escaparHtml, correoConfigurado } = require("./notificaciones");
+const { leerFirma } = require("./firmas");
 
 // Estados en los que el préstamo ya fue aprobado alguna vez. Un préstamo registrado
 // directamente (sin pasar por "aprobado") no tiene fecha de aprobación: se usa la de otorgado.
@@ -39,7 +40,7 @@ const leerLogo = () => {
 const datosCarta = async (idPrestamo) => {
   const [rows] = await pool.query(
     `SELECT p.id_prestamo, p.id_usuario, p.monto, p.plazo_meses, p.tasa_interes, p.estado, p.fecha_aprobacion, p.fecha_otorgado,
-            u.nombre_completo, u.dni, a.nombre_completo AS aprobado_por
+            u.nombre_completo, u.dni, a.nombre_completo AS aprobado_por, p.aprobado_por AS id_aprobador
      FROM prestamos p
      INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
      LEFT JOIN usuarios a ON p.aprobado_por = a.id_usuario
@@ -63,6 +64,7 @@ const datosCarta = async (idPrestamo) => {
     cuota: parseFloat(calcularCuotaMensual(num(p.monto), num(p.tasa_interes), plazo).toFixed(2)),
     fecha_aprobacion: fechaAprobacion,
     aprobado_por: p.aprobado_por,
+    firma: (await leerFirma(p.id_aprobador))?.contenido || null,
   };
 };
 
@@ -151,6 +153,13 @@ const generarCartaPdf = (d) =>
 
     // Firma
     const yFirma = Math.max(doc.y + 70, doc.page.height - 170);
+    if (d.firma) {
+      try {
+        doc.image(d.firma, 60 + ancho / 4, yFirma - 62, { fit: [ancho / 2, 58], align: "center", valign: "bottom" });
+      } catch {
+        // firma dañada: queda solo la línea
+      }
+    }
     doc.strokeColor("#94a3b8").moveTo(60 + ancho / 4, yFirma).lineTo(60 + (ancho * 3) / 4, yFirma).stroke();
     doc.fillColor("#000").font("Helvetica-Bold").fontSize(10)
       .text(d.aprobado_por || "Administración", 60, yFirma + 6, { width: ancho, align: "center" });

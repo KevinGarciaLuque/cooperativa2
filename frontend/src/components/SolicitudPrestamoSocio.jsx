@@ -1,30 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import InputMonto from "../ui/InputMonto";
+import { FaFilePdf } from "react-icons/fa";
+import { CamposMonto, CamposIngresos } from "./CamposSolicitud";
+import { SOLICITUD_VACIA, fmt, solicitudDesde } from "../utils/solicitud";
+import { descargarCarta } from "../utils/cartaAprobacion";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-
-const fmt = (n) =>
-  `L. ${parseFloat(n || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-const PROPOSITOS = {
-  negocio: "Negocio o capital de trabajo",
-  vivienda: "Vivienda o mejoras del hogar",
-  educacion: "Educación",
-  salud: "Salud o emergencia",
-  agricultura: "Agricultura o ganadería",
-  consumo: "Consumo personal",
-  otro: "Otro",
-};
-
-const OCUPACIONES = {
-  empleado: "Empleado",
-  negocio_propio: "Negocio propio",
-  agricultor: "Agricultor / ganadero",
-  independiente: "Trabajador independiente",
-  jubilado: "Jubilado o pensionado",
-  otro: "Otro",
-};
 
 const ESTADOS = {
   pendiente: { label: "En revisión", bg: "#fef3c7", color: "#92400e" },
@@ -35,6 +16,9 @@ const ESTADOS = {
   mora: { label: "En mora", bg: "#fee2e2", color: "#991b1b" },
 };
 
+// Estados en los que ya existe la carta de aprobación
+const CON_CARTA = ["aprobado", "activo", "mora", "pagado"];
+
 // Formulario con el que el socio pide un préstamo: la cooperativa lo recibe para su revisión
 export default function SolicitudPrestamoSocio({ token, onEnviada }) {
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
@@ -43,23 +27,8 @@ export default function SolicitudPrestamoSocio({ token, onEnviada }) {
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
-  const [form, setForm] = useState({
-    monto: "",
-    plazo_meses: "",
-    cuota_posible: "",
-    proposito: "",
-    descripcion: "",
-    ocupacion: "",
-    lugar_trabajo: "",
-    ingreso_mensual: "",
-    ref1_nombre: "",
-    ref1_telefono: "",
-    ref1_parentesco: "",
-    ref2_nombre: "",
-    ref2_telefono: "",
-    ref2_parentesco: "",
-    acepta: false,
-  });
+  const [form, setForm] = useState(SOLICITUD_VACIA);
+  const [acepta, setAcepta] = useState(false);
 
   const cargarMias = () =>
     axios
@@ -76,75 +45,30 @@ export default function SolicitudPrestamoSocio({ token, onEnviada }) {
     // eslint-disable-next-line
   }, [headers]);
 
-  const cambiar = (e) => {
-    const { name, value, type, checked } = e.target;
-    setForm((f) => ({ ...f, [name]: type === "checkbox" ? checked : value }));
-  };
-
-  const monto = parseFloat(form.monto) || 0;
-  const plazo = parseInt(form.plazo_meses) || 0;
-  const cuotaPosible = parseFloat(form.cuota_posible) || 0;
-  const ingreso = parseFloat(form.ingreso_mensual) || 0;
-
-  // Cuota estimada con la tasa referencial (sistema francés)
-  const cuotaEstimada = useMemo(() => {
-    if (!param || monto <= 0 || plazo <= 0) return 0;
-    const i = param.tasa_mensual / 100;
-    if (i === 0) return monto / plazo;
-    return (monto * i * Math.pow(1 + i, plazo)) / (Math.pow(1 + i, plazo) - 1);
-  }, [param, monto, plazo]);
-
-  const relacion = ingreso > 0 && cuotaEstimada > 0 ? (cuotaEstimada / ingreso) * 100 : null;
-  const superaCapacidad = cuotaEstimada > 0 && cuotaPosible > 0 && cuotaEstimada > cuotaPosible * 1.001;
-
-  // Plazo mínimo para que la cuota entre en lo que el socio dice poder pagar
-  const plazoSugerido = useMemo(() => {
-    if (!param || monto <= 0 || cuotaPosible <= 0 || !superaCapacidad) return null;
-    for (let n = 1; n <= param.plazo_max; n++) {
-      const i = param.tasa_mensual / 100;
-      const c = i === 0 ? monto / n : (monto * i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1);
-      if (c <= cuotaPosible) return n;
-    }
-    return null;
-  }, [param, monto, cuotaPosible, superaCapacidad]);
-
   const enviar = async (e) => {
     e.preventDefault();
     setError("");
     setExito("");
     setEnviando(true);
     try {
-      const referencias = [1, 2]
-        .map((n) => ({
-          nombre: form[`ref${n}_nombre`],
-          telefono: form[`ref${n}_telefono`],
-          parentesco: form[`ref${n}_parentesco`],
-        }))
-        .filter((r) => r.nombre && r.telefono);
-      const r = await axios.post(
-        `${API_URL}/solicitudes/prestamo`,
-        {
-          monto,
-          plazo_meses: plazo,
-          cuota_posible: cuotaPosible,
-          proposito: form.proposito,
-          descripcion: form.descripcion,
-          ocupacion: form.ocupacion,
-          lugar_trabajo: form.lugar_trabajo,
-          ingreso_mensual: ingreso,
-          referencias,
-          acepta: form.acepta,
-        },
-        { headers }
-      );
+      const r = await axios.post(`${API_URL}/solicitudes/prestamo`, solicitudDesde(form, acepta), { headers });
       setExito(r.data.message);
-      setForm((f) => ({ ...f, monto: "", plazo_meses: "", cuota_posible: "", descripcion: "", acepta: false }));
+      setForm((f) => ({ ...f, monto: "", plazo_meses: "", cuota_posible: "", descripcion: "" }));
+      setAcepta(false);
       cargarMias();
       if (onEnviada) onEnviada();
     } catch (err) {
       setError(err.response?.data?.message || "No se pudo enviar la solicitud.");
     } finally {
       setEnviando(false);
+    }
+  };
+
+  const bajarCarta = async (id) => {
+    try {
+      await descargarCarta(id, token);
+    } catch {
+      setError("No se pudo descargar la carta de aprobación.");
     }
   };
 
@@ -160,7 +84,7 @@ export default function SolicitudPrestamoSocio({ token, onEnviada }) {
             {mias.map((m) => {
               const e = ESTADOS[m.estado] || { label: m.estado, bg: "#e5e7eb", color: "#374151" };
               return (
-                <div key={m.id_prestamo} className="d-flex flex-wrap justify-content-between align-items-center py-2 border-bottom">
+                <div key={m.id_prestamo} className="d-flex flex-wrap justify-content-between align-items-center gap-2 py-2 border-bottom">
                   <div>
                     <div className="fw-semibold">{fmt(m.monto)} a {m.plazo_meses} meses</div>
                     <div className="small text-muted">
@@ -170,9 +94,16 @@ export default function SolicitudPrestamoSocio({ token, onEnviada }) {
                       <div className="small text-danger">Motivo: {m.motivo_rechazo}</div>
                     )}
                   </div>
-                  <span className="badge rounded-pill px-3 py-2" style={{ background: e.bg, color: e.color }}>
-                    {e.label}
-                  </span>
+                  <div className="d-flex align-items-center gap-2">
+                    {CON_CARTA.includes(m.estado) && (
+                      <button className="btn btn-sm btn-outline-success" onClick={() => bajarCarta(m.id_prestamo)}>
+                        <FaFilePdf className="me-1" /> Carta de aprobación
+                      </button>
+                    )}
+                    <span className="badge rounded-pill px-3 py-2" style={{ background: e.bg, color: e.color }}>
+                      {e.label}
+                    </span>
+                  </div>
                 </div>
               );
             })}
@@ -194,134 +125,18 @@ export default function SolicitudPrestamoSocio({ token, onEnviada }) {
             </div>
           ) : (
             <form onSubmit={enviar}>
-              <div className="row g-3">
-                <div className="col-12 col-md-4">
-                  <label className="form-label fw-semibold small">¿Cuánto necesitas? (L.) *</label>
-                  <InputMonto
-                    required className="form-control form-control-lg" placeholder="0.00"
-                    value={form.monto} onChange={(v) => setForm((f) => ({ ...f, monto: v }))}
-                  />
-                  {param && <div className="form-text">Máximo {fmt(param.monto_max)}</div>}
-                </div>
-                <div className="col-12 col-md-4">
-                  <label className="form-label fw-semibold small">¿En cuántos meses lo pagarás? *</label>
-                  <input
-                    type="number" min="1" max={param?.plazo_max || 60} step="1" required className="form-control form-control-lg"
-                    name="plazo_meses" value={form.plazo_meses} onChange={cambiar} placeholder="Ej: 6"
-                  />
-                </div>
-                <div className="col-12 col-md-4">
-                  <label className="form-label fw-semibold small">¿Cuánto puedes pagar al mes? (L.) *</label>
-                  <InputMonto
-                    required className="form-control form-control-lg" placeholder="0.00"
-                    value={form.cuota_posible} onChange={(v) => setForm((f) => ({ ...f, cuota_posible: v }))}
-                  />
-                </div>
+              <CamposMonto param={param} form={form} setForm={setForm} />
+              <div className="mt-3">
+                <CamposIngresos form={form} setForm={setForm} />
+              </div>
 
-                {/* Simulación */}
-                {cuotaEstimada > 0 && (
-                  <div className="col-12">
-                    <div className="p-3" style={{ background: "#f0f7e6", borderRadius: 12, border: "1px solid #cfe5a0" }}>
-                      <div className="row g-2 text-center justify-content-center">
-                        <div className="col-6 col-md-4">
-                          <div className="small text-muted">Cuota estimada al mes</div>
-                          <div className="fw-bold fs-4">{fmt(cuotaEstimada)}</div>
-                        </div>
-                        <div className="col-6 col-md-4">
-                          <div className="small text-muted">Plazo</div>
-                          <div className="fw-bold fs-4">{plazo} {plazo === 1 ? "mes" : "meses"}</div>
-                        </div>
-                      </div>
-                      <div className="small text-muted text-center mt-2">
-                        Es un cálculo aproximado. La cuota final depende de las condiciones que apruebe la cooperativa.
-                      </div>
-                      {superaCapacidad && (
-                        <div className="alert alert-warning py-2 mt-3 mb-0 small">
-                          La cuota estimada ({fmt(cuotaEstimada)}) es mayor a lo que dices poder pagar ({fmt(cuotaPosible)}).
-                          {plazoSugerido && <> Con <strong>{plazoSugerido} meses</strong> la cuota se ajusta a tu capacidad.</>}
-                        </div>
-                      )}
-                      {relacion !== null && relacion > (param?.pct_ingreso_max || 40) && (
-                        <div className="alert alert-warning py-2 mt-2 mb-0 small">
-                          La cuota sería el {relacion.toFixed(0)}% de tu ingreso mensual. La cooperativa puede pedirte un plazo
-                          mayor o un monto menor.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div className="col-12 col-md-6">
-                  <label className="form-label fw-semibold small">¿Para qué usarás el préstamo? *</label>
-                  <select required className="form-select" name="proposito" value={form.proposito} onChange={cambiar}>
-                    <option value="">Selecciona...</option>
-                    {Object.entries(PROPOSITOS).map(([v, t]) => (
-                      <option key={v} value={v}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-12 col-md-6">
-                  <label className="form-label fw-semibold small">Cuéntanos un poco más</label>
-                  <input
-                    className="form-control" name="descripcion" maxLength={300} value={form.descripcion}
-                    onChange={cambiar} placeholder="Ej: comprar mercadería para mi pulpería"
-                  />
-                </div>
-
-                <div className="col-12 col-md-4">
-                  <label className="form-label fw-semibold small">¿De qué vives? *</label>
-                  <select required className="form-select" name="ocupacion" value={form.ocupacion} onChange={cambiar}>
-                    <option value="">Selecciona...</option>
-                    {Object.entries(OCUPACIONES).map(([v, t]) => (
-                      <option key={v} value={v}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-12 col-md-4">
-                  <label className="form-label fw-semibold small">Lugar de trabajo o nombre del negocio</label>
-                  <input className="form-control" name="lugar_trabajo" maxLength={120} value={form.lugar_trabajo} onChange={cambiar} />
-                </div>
-                <div className="col-12 col-md-4">
-                  <label className="form-label fw-semibold small">Ingreso mensual aproximado (L.) *</label>
-                  <InputMonto
-                    required className="form-control" placeholder="0.00"
-                    value={form.ingreso_mensual} onChange={(v) => setForm((f) => ({ ...f, ingreso_mensual: v }))}
-                  />
-                </div>
-
-                <div className="col-12">
-                  <div className="fw-semibold small mb-2">Referencias personales (recomendado)</div>
-                  <div className="row g-2">
-                    {[1, 2].map((n) => (
-                      <div className="col-12" key={n}>
-                        <div className="row g-2">
-                          <div className="col-12 col-md-5">
-                            <input
-                              className="form-control" placeholder={`Referencia ${n}: nombre`} maxLength={100}
-                              name={`ref${n}_nombre`} value={form[`ref${n}_nombre`]} onChange={cambiar}
-                            />
-                          </div>
-                          <div className="col-6 col-md-3">
-                            <input
-                              className="form-control" placeholder="Teléfono" maxLength={20}
-                              name={`ref${n}_telefono`} value={form[`ref${n}_telefono`]} onChange={cambiar}
-                            />
-                          </div>
-                          <div className="col-6 col-md-4">
-                            <input
-                              className="form-control" placeholder="Parentesco o relación" maxLength={50}
-                              name={`ref${n}_parentesco`} value={form[`ref${n}_parentesco`]} onChange={cambiar}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
+              <div className="row g-3 mt-0">
                 <div className="col-12">
                   <div className="form-check">
-                    <input id="acepta-sol" name="acepta" type="checkbox" className="form-check-input" checked={form.acepta} onChange={cambiar} />
+                    <input
+                      id="acepta-sol" type="checkbox" className="form-check-input"
+                      checked={acepta} onChange={(e) => setAcepta(e.target.checked)}
+                    />
                     <label htmlFor="acepta-sol" className="form-check-label small">
                       Declaro que la información es verdadera y autorizo a la cooperativa a verificarla.
                     </label>
@@ -343,7 +158,7 @@ export default function SolicitudPrestamoSocio({ token, onEnviada }) {
                   <button
                     type="submit" className="btn btn-lg fw-bold"
                     style={{ background: "#a8cd3a", color: "#1a2a00", borderRadius: 12 }}
-                    disabled={enviando || !form.acepta}
+                    disabled={enviando || !acepta}
                   >
                     {enviando ? "Enviando..." : "Enviar solicitud"}
                   </button>

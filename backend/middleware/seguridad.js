@@ -58,6 +58,7 @@ const REGLAS_SOCIO = [
   { metodo: "GET", re: /^\/aportaciones\/(\d+)$/, sql: "SELECT id_usuario FROM aportaciones WHERE id_aportacion = ?", id: 1 },
   { metodo: "GET", re: /^\/prestamos\/(\d+)$/, sql: SQL_PRESTAMO, id: 1 },
   { metodo: "GET", re: /^\/recibos\/finiquito\/(\d+)$/, sql: SQL_PRESTAMO, id: 1 },
+  { metodo: "GET", re: /^\/solicitudes\/prestamos\/(\d+)\/carta$/, sql: SQL_PRESTAMO, id: 1 },
   { metodo: "GET", re: /^\/recibos\/socio\/(\d+)$/, propio: 1 },
   { metodo: "GET", re: /^\/recibos\/(\d+)$/, sql: SQL_RECIBO, id: 1 },
   { metodo: "GET", re: /^\/recibos\/(\d+)\/comprobante-firmado$/, sql: SQL_RECIBO, id: 1 },

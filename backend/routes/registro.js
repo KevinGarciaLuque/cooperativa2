@@ -1,12 +1,14 @@
 // Registro público de nuevos socios mediante un enlace que comparte la cooperativa.
-// La cuenta queda en estado "pendiente" hasta que el personal la apruebe.
+// Quien llega por el enlace puede pedir su préstamo en el mismo formulario: la cuenta y la
+// solicitud se crean juntas y quedan "pendientes" hasta que el personal las apruebe.
 const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const pool = require("../db");
 const { validarPassword } = require("../utils/passwordPolicy");
 const { leerRegistro } = require("../utils/registroConfig");
-const { notificarAdministradores } = require("../utils/notificaciones");
+const { notificarAdministradores, escaparHtml } = require("../utils/notificaciones");
+const { parametrosSolicitud, validarSolicitud, insertarSolicitud } = require("../utils/solicitudPrestamo");
 
 const validarDNI = (v) => /^\d{13}$/.test(v);
 const validarTelefono = (v) => /^\d{8}$/.test(v);
@@ -40,6 +42,8 @@ router.get("/estado", async (req, res) => {
       cooperativa: await nombreCooperativa(),
       habilitado: cfg.habilitado,
       valido,
+      // Para calcular la cuota estimada en el formulario (solo con un enlace válido)
+      parametros: valido ? parametrosSolicitud() : null,
     });
   } catch (error) {
     res.status(500).json({ message: "No se pudo verificar el enlace de registro" });
@@ -48,6 +52,7 @@ router.get("/estado", async (req, res) => {
 
 // POST /api/registro
 router.post("/", async (req, res) => {
+  let connection;
   try {
     const {
       nombre_completo,
@@ -58,6 +63,7 @@ router.post("/", async (req, res) => {
       fecha_nacimiento,
       password,
       codigo,
+      prestamo, // opcional: la solicitud de préstamo que llena en el mismo formulario
       website, // campo trampa: un humano no lo llena
     } = req.body;
 
@@ -90,6 +96,13 @@ router.post("/", async (req, res) => {
     const errorPassword = validarPassword(password);
     if (errorPassword) return res.status(400).json({ message: errorPassword });
 
+    let solicitud = null;
+    if (prestamo) {
+      const { error, datos } = validarSolicitud(prestamo);
+      if (error) return res.status(400).json({ message: error });
+      solicitud = datos;
+    }
+
     const [existe] = await pool.query("SELECT id_usuario, estado FROM usuarios WHERE dni = ?", [dni]);
     if (existe.length) {
       const msg =
@@ -103,7 +116,11 @@ router.post("/", async (req, res) => {
     if (!rol.length) return res.status(500).json({ message: "No se pudo completar el registro." });
 
     const hash = await bcrypt.hash(password, 10);
-    const [r] = await pool.query(
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const [r] = await connection.query(
       `INSERT INTO usuarios
          (nombre_completo, dni, telefono, correo, direccion, fecha_nacimiento, password, rol_id, estado, fecha_registro)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', NOW())`,
@@ -119,22 +136,42 @@ router.post("/", async (req, res) => {
       ]
     );
 
-    await pool.query(
+    let creada = null;
+    if (solicitud) creada = await insertarSolicitud(connection, r.insertId, solicitud);
+
+    await connection.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
-      [r.insertId, "Registro por enlace", `Nueva solicitud de socio: ${nombre} (DNI ${dni}). Pendiente de aprobación.`]
+      [
+        r.insertId,
+        "Registro por enlace",
+        `Nueva solicitud de socio: ${nombre} (DNI ${dni}). Pendiente de aprobación.` +
+          (creada
+            ? ` Solicita L. ${solicitud.monto.toFixed(2)} a ${solicitud.plazo} meses (cuota estimada L. ${creada.cuota_estimada.toFixed(2)}). Préstamo #${creada.id_prestamo}`
+            : " Sin solicitud de préstamo."),
+      ]
     );
 
+    await connection.commit();
+
     notificarAdministradores(
-      "Nueva solicitud de socio",
-      `<p><strong>${nombre}</strong> (identidad ${dni}) se registró por el enlace de la cooperativa y espera aprobación.</p>`
+      creada ? "Nueva solicitud de socio y préstamo" : "Nueva solicitud de socio",
+      `<p><strong>${escaparHtml(nombre)}</strong> (identidad ${dni}) se registró por el enlace de la cooperativa y espera aprobación.</p>` +
+        (creada
+          ? `<p>Solicita un préstamo de <strong>L. ${solicitud.monto.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</strong> a ${solicitud.plazo} meses.</p>`
+          : "")
     );
 
     res.status(201).json({
       success: true,
-      message: "Registro recibido. Ya puedes iniciar sesión y enviar tu solicitud de préstamo.",
+      message: creada
+        ? "Registro y solicitud de préstamo recibidos. La cooperativa los revisará y te responderá pronto."
+        : "Registro recibido. La cooperativa revisará tus datos y activará tu cuenta.",
       id_usuario: r.insertId,
+      id_prestamo: creada ? creada.id_prestamo : null,
+      cuota_estimada: creada ? creada.cuota_estimada : null,
     });
   } catch (error) {
+    if (connection) await connection.rollback().catch(() => {});
     if (error.code === "ER_DUP_ENTRY") {
       const campo = String(error.sqlMessage || "").includes("correo") ? "este correo electrónico" : "estos datos";
       return res.status(409).json({
@@ -143,6 +180,8 @@ router.post("/", async (req, res) => {
     }
     console.error("ERROR EN REGISTRO PÚBLICO:", error);
     res.status(500).json({ message: "No se pudo completar el registro. Intenta de nuevo." });
+  } finally {
+    if (connection) connection.release();
   }
 });
 

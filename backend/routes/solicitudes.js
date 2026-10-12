@@ -4,13 +4,11 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const config = require("../utils/configFinanciera");
-const { calcularCuotaMensual } = require("../utils/calculosPrestamo");
+const { parametrosSolicitud, validarSolicitud, insertarSolicitud } = require("../utils/solicitudPrestamo");
 const { leerRegistro, guardarRegistro } = require("../utils/registroConfig");
-const { notificarAdministradores } = require("../utils/notificaciones");
+const { notificarAdministradores, notificarSocio, correoConfigurado, escaparHtml } = require("../utils/notificaciones");
+const { datosCarta, generarCartaPdf, enviarCartaAprobacion, nombreArchivoCarta } = require("../utils/cartaAprobacion");
 const { invalidarEstado } = require("../middleware/seguridad");
-
-const PROPOSITOS = ["negocio", "vivienda", "educacion", "salud", "agricultura", "consumo", "otro"];
-const OCUPACIONES = ["empleado", "negocio_propio", "agricultor", "independiente", "jubilado", "otro"];
 
 const num = (v) => parseFloat(v || 0);
 const esSocio = (req) => req.usuario?.rol === "Socio";
@@ -25,18 +23,7 @@ const aTexto = (v, max) => String(v || "").trim().substring(0, max);
 // PARÁMETROS PARA EL FORMULARIO (socio)
 // ============================================
 router.get("/parametros", (req, res) => {
-  const c = config.obtener();
-  res.json({
-    success: true,
-    data: {
-      tasa_mensual: c.sol_tasa_mensual,
-      monto_max: c.sol_monto_max,
-      plazo_max: c.sol_plazo_max,
-      pct_ingreso_max: c.sol_pct_ingreso_max,
-      propositos: PROPOSITOS,
-      ocupaciones: OCUPACIONES,
-    },
-  });
+  res.json({ success: true, data: parametrosSolicitud() });
 });
 
 // ============================================
@@ -66,44 +53,9 @@ router.post("/prestamo", async (req, res) => {
     if (!esSocio(req)) {
       return res.status(403).json({ message: "Solo un socio puede enviar su propia solicitud." });
     }
-    const c = config.obtener();
-    const b = req.body;
-
-    const monto = num(b.monto);
-    const plazo = parseInt(b.plazo_meses);
-    const cuotaPosible = num(b.cuota_posible);
-    const ingreso = num(b.ingreso_mensual);
-
-    if (!(monto > 0) || monto > c.sol_monto_max) {
-      return res.status(400).json({ message: `El monto debe ser mayor a 0 y no superar L. ${c.sol_monto_max.toLocaleString("es-HN")}.` });
-    }
-    if (!Number.isInteger(plazo) || plazo < 1 || plazo > c.sol_plazo_max) {
-      return res.status(400).json({ message: `El plazo debe estar entre 1 y ${c.sol_plazo_max} meses.` });
-    }
-    if (!(cuotaPosible > 0)) {
-      return res.status(400).json({ message: "Indica cuánto puedes pagar al mes." });
-    }
-    if (!PROPOSITOS.includes(b.proposito)) {
-      return res.status(400).json({ message: "Selecciona el destino del préstamo." });
-    }
-    if (!OCUPACIONES.includes(b.ocupacion)) {
-      return res.status(400).json({ message: "Selecciona tu fuente de ingresos." });
-    }
-    if (!(ingreso > 0)) {
-      return res.status(400).json({ message: "Indica tu ingreso mensual aproximado." });
-    }
-    if (b.acepta !== true) {
-      return res.status(400).json({ message: "Debes confirmar que la información es verdadera." });
-    }
-
-    const referencias = (Array.isArray(b.referencias) ? b.referencias : [])
-      .slice(0, 2)
-      .map((r) => ({
-        nombre: aTexto(r.nombre, 100),
-        telefono: aTexto(r.telefono, 20),
-        parentesco: aTexto(r.parentesco, 50),
-      }))
-      .filter((r) => r.nombre && r.telefono);
+    const { error, datos } = validarSolicitud(req.body);
+    if (error) return res.status(400).json({ message: error });
+    const { monto, plazo } = datos;
 
     await connection.beginTransaction();
 
@@ -118,34 +70,10 @@ router.post("/prestamo", async (req, res) => {
       });
     }
 
-    const tasaMensual = c.sol_tasa_mensual;
-    const tasaAnual = parseFloat((tasaMensual * 12).toFixed(4));
-    const cuotaEstimada = parseFloat(calcularCuotaMensual(monto, tasaAnual, plazo).toFixed(2));
-
-    const [pr] = await connection.query(
-      `INSERT INTO prestamos (id_usuario, monto, tasa_interes, tipo_tasa, tasa_original, plazo_meses, saldo_restante, estado)
-       VALUES (?, ?, ?, 'nominal_mensual', ?, ?, ?, 'pendiente')`,
-      [req.usuario.id_usuario, monto, tasaAnual, tasaMensual, plazo, monto]
-    );
-
-    await connection.query(
-      `INSERT INTO solicitudes_prestamo
-         (id_prestamo, id_usuario, proposito, descripcion, ocupacion, lugar_trabajo, ingreso_mensual,
-          cuota_posible, cuota_estimada, tasa_referencial, referencias)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        pr.insertId,
-        req.usuario.id_usuario,
-        b.proposito,
-        aTexto(b.descripcion, 300) || null,
-        b.ocupacion,
-        aTexto(b.lugar_trabajo, 120) || null,
-        ingreso,
-        cuotaPosible,
-        cuotaEstimada,
-        tasaMensual,
-        JSON.stringify(referencias),
-      ]
+    const { id_prestamo: idPrestamo, cuota_estimada: cuotaEstimada } = await insertarSolicitud(
+      connection,
+      req.usuario.id_usuario,
+      datos
     );
 
     await connection.query(
@@ -153,7 +81,7 @@ router.post("/prestamo", async (req, res) => {
       [
         req.usuario.id_usuario,
         "Solicitud de préstamo",
-        `${req.usuario.nombre_completo || "Socio"} solicitó L. ${monto.toFixed(2)} a ${plazo} meses (cuota estimada L. ${cuotaEstimada.toFixed(2)}). Préstamo #${pr.insertId}`,
+        `${req.usuario.nombre_completo || "Socio"} solicitó L. ${monto.toFixed(2)} a ${plazo} meses (cuota estimada L. ${cuotaEstimada.toFixed(2)}). Préstamo #${idPrestamo}`,
       ]
     );
 
@@ -167,7 +95,7 @@ router.post("/prestamo", async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Solicitud enviada. La cooperativa la revisará y te responderá pronto.",
-      id_prestamo: pr.insertId,
+      id_prestamo: idPrestamo,
       cuota_estimada: cuotaEstimada,
     });
   } catch (error) {
@@ -328,6 +256,16 @@ router.post("/socios/:id/rechazar", soloPersonal, async (req, res) => {
     );
     await connection.commit();
     invalidarEstado(u.id_usuario);
+    notificarSocio(
+      u.id_usuario,
+      "Respuesta a tu solicitud",
+      `<p>Hola <strong>${escaparHtml(u.nombre_completo)}</strong>:</p>
+       <p>Lamentamos informarte que tu solicitud para ser socio no fue aprobada.</p>
+       <p><strong>Motivo:</strong> ${escaparHtml(motivo)}</p>
+       <p>Si tienes dudas, comunícate con la cooperativa.</p>`,
+      undefined,
+      { conEnlace: false }
+    );
     res.json({ success: true, message: "Solicitud de socio rechazada." });
   } catch (error) {
     await connection.rollback().catch(() => {});
@@ -396,7 +334,22 @@ router.post("/prestamos/:id/aprobar", soloPersonal, async (req, res) => {
       [p.id_usuario, "Préstamo aprobado", `Solicitud #${req.params.id} aprobada: L. ${monto.toFixed(2)} a ${plazo} meses, ${tasaMensual}% mensual. Pendiente de desembolso.`]
     );
     await connection.commit();
-    res.json({ success: true, message: "Solicitud aprobada. Falta registrar el desembolso en Préstamos." });
+
+    // La carta de aprobación sale sola al correo del socio (sin hacer esperar al personal)
+    const [[dest]] = await pool.query("SELECT correo FROM usuarios WHERE id_usuario = ?", [p.id_usuario]);
+    const correo = String(dest?.correo || "").trim();
+    const seEnvia = correoConfigurado() && !!correo;
+    if (seEnvia) enviarCartaAprobacion(p.id_prestamo).catch(() => {});
+
+    res.json({
+      success: true,
+      message:
+        "Solicitud aprobada. Falta registrar el desembolso en Préstamos." +
+        (seEnvia
+          ? ` La carta de aprobación se está enviando a ${correo}.`
+          : " La carta de aprobación no se envió por correo: descárgala y compártela con el socio."),
+      carta_por_correo: seEnvia,
+    });
   } catch (error) {
     await connection.rollback().catch(() => {});
     if (error.codigo) return res.status(error.codigo).json({ message: error.message });
@@ -404,6 +357,40 @@ router.post("/prestamos/:id/aprobar", soloPersonal, async (req, res) => {
     res.status(500).json({ message: "No se pudo aprobar la solicitud" });
   } finally {
     connection.release();
+  }
+});
+
+// Carta de aprobación en PDF (el personal, o el socio dueño del préstamo)
+router.get("/prestamos/:id/carta", async (req, res) => {
+  try {
+    const d = await datosCarta(parseInt(req.params.id));
+    if (!d) return res.status(404).json({ message: "Este préstamo no tiene carta de aprobación." });
+    if (esSocio(req) && d.id_usuario !== req.usuario.id_usuario) {
+      return res.status(403).json({ message: "No tienes permiso para realizar esta acción." });
+    }
+    const pdf = await generarCartaPdf(d);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${nombreArchivoCarta(d)}"`);
+    res.send(pdf);
+  } catch (error) {
+    console.error("ERROR AL GENERAR CARTA DE APROBACIÓN:", error);
+    res.status(500).json({ message: "No se pudo generar la carta" });
+  }
+});
+
+// Reenviar la carta al correo del socio
+router.post("/prestamos/:id/carta/enviar", soloPersonal, async (req, res) => {
+  try {
+    const r = await enviarCartaAprobacion(parseInt(req.params.id));
+    if (!r.enviado) return res.status(400).json({ message: r.motivo });
+    await pool.query(
+      `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
+      [req.usuario.id_usuario, "Carta de aprobación", `Se reenvió la carta del préstamo #${req.params.id} a ${r.correo}`]
+    );
+    res.json({ success: true, message: `Carta enviada a ${r.correo}.` });
+  } catch (error) {
+    console.error("ERROR AL ENVIAR CARTA DE APROBACIÓN:", error);
+    res.status(500).json({ message: "No se pudo enviar la carta" });
   }
 });
 

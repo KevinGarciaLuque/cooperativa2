@@ -2,6 +2,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useConfigSitio } from "../../hooks/useConfigSitio";
 import SolicitudPrestamoSocio from "../../components/SolicitudPrestamoSocio";
 import ReciboModal from "../../components/ReciboModal";
+import { descargarCarta } from "../../utils/cartaAprobacion";
 import { comprimirImagen } from "../../utils/imagen";
 import { useEffect, useState } from "react";
 import axios from "axios";
@@ -469,7 +470,7 @@ export default function SocioPerfil() {
               <div>
                 <strong>Tu cuenta está pendiente de aprobación.</strong>
                 <div className="small">
-                  Ya puedes enviar tu solicitud de préstamo. La cooperativa revisará tus datos y activará tu cuenta.
+                  La cooperativa revisará tus datos y tu solicitud de préstamo, y te avisará por correo.
                 </div>
               </div>
             </div>
@@ -483,7 +484,7 @@ export default function SocioPerfil() {
               style={{ background: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)", border: "1px solid #a7f3d0" }}
             >
               <div style={{ fontSize: 36, lineHeight: 1 }}>🎉</div>
-              <div>
+              <div className="flex-grow-1">
                 <div className="fw-bold" style={{ color: "#065f46", fontSize: "1.1rem" }}>
                   ¡Felicidades! Tu préstamo ha sido aprobado
                 </div>
@@ -491,6 +492,17 @@ export default function SocioPerfil() {
                   Tu solicitud de <strong>L. {fmt(p.monto)}</strong> a {p.plazo_meses} meses fue aprobada. La
                   cooperativa se comunicará contigo para entregarte el desembolso.
                 </div>
+                <button
+                  className="btn btn-sm btn-success mt-2"
+                  onClick={() =>
+                    descargarCarta(p.id_prestamo, token).catch(() => {
+                      setMsg("No se pudo descargar la carta de aprobación.");
+                      setMsgTipo("error");
+                    })
+                  }
+                >
+                  Descargar carta de aprobación (PDF)
+                </button>
               </div>
             </div>
           ))}

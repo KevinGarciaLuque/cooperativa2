@@ -242,6 +242,7 @@ export default function DetallePrestamoVentanilla({
         {/* Encabezado */}
         <div className="dp-card p-4 mb-3">
           <div className="d-flex flex-wrap justify-content-between align-items-start gap-2">
+            <img src="/smartcoop.png" alt="SmartCoop" className="d-none d-print-block" style={{ height: 56 }} />
             <div>
               <h4 className="fw-bold mb-1" style={{ color: AZUL }}>
                 Préstamo #{p.id_prestamo} · L. {fmt(calc.monto)}

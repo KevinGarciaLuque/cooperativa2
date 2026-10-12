@@ -136,7 +136,8 @@ router.get("/resumen", soloPersonal, async (req, res) => {
 router.get("/", soloPersonal, async (req, res) => {
   try {
     const [socios] = await pool.query(
-      `SELECT id_usuario, nombre_completo, dni, telefono, correo, direccion, fecha_nacimiento, fecha_registro
+      `SELECT id_usuario, nombre_completo, dni, telefono, correo, direccion, fecha_nacimiento, fecha_registro,
+              (SELECT COUNT(*) FROM documentos_identidad d WHERE d.id_usuario = usuarios.id_usuario) AS fotos_identidad
        FROM usuarios WHERE estado = 'pendiente' ORDER BY fecha_registro ASC`
     );
 
@@ -148,7 +149,8 @@ router.get("/", soloPersonal, async (req, res) => {
               (SELECT IFNULL(SUM(monto), 0) FROM aportaciones a WHERE a.id_usuario = pr.id_usuario) AS total_aportado,
               (SELECT IFNULL(SUM(saldo_restante), 0) FROM prestamos x
                  WHERE x.id_usuario = pr.id_usuario AND x.estado IN ('activo','mora')) AS saldo_vigente,
-              (SELECT COUNT(*) FROM prestamos x WHERE x.id_usuario = pr.id_usuario AND x.estado = 'pagado') AS prestamos_pagados
+              (SELECT COUNT(*) FROM prestamos x WHERE x.id_usuario = pr.id_usuario AND x.estado = 'pagado') AS prestamos_pagados,
+              (SELECT COUNT(*) FROM documentos_identidad d WHERE d.id_usuario = pr.id_usuario) AS fotos_identidad
        FROM solicitudes_prestamo s
        INNER JOIN prestamos pr ON s.id_prestamo = pr.id_prestamo
        INNER JOIN usuarios u ON pr.id_usuario = u.id_usuario

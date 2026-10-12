@@ -46,6 +46,8 @@ const REGLAS_SOCIO = [
   { metodo: "GET", re: /^\/prestamos$/, forzarUsuario: true, pendiente: true },
   { metodo: "GET", re: /^\/solicitudes\/(parametros|mias)$/, libre: true, pendiente: true },
   { metodo: "POST", re: /^\/solicitudes\/prestamo$/, libre: true, pendiente: true },
+  { metodo: "GET", re: /^\/socios\/(\d+)\/identidad(\/(frente|reverso))?$/, propio: 1, pendiente: true },
+  { metodo: "POST", re: /^\/socios\/(\d+)\/identidad\/(frente|reverso)$/, propio: 1, pendiente: true },
   { metodo: "GET", re: /^\/socios\/(\d+)\/estado-cuenta$/, propio: 1 },
   { metodo: "PUT", re: /^\/usuarios\/(\d+)\/foto$/, propio: 1 },
   { metodo: "POST", re: /^\/usuarios\/(\d+)\/cambiar-password$/, propio: 1 },

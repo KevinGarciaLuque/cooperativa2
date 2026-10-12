@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { FaHandHoldingUsd, FaCheckCircle, FaExclamationTriangle, FaArrowLeft } from "react-icons/fa";
 import { CamposMonto, CamposIngresos, AvisoRelacion } from "../components/CamposSolicitud";
 import { SOLICITUD_VACIA, fmt, solicitudDesde, simular } from "../utils/solicitud";
+import { CampoFotoIdentidad } from "../components/FotosIdentidad";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const AZUL = "#1a2035";
@@ -23,6 +24,7 @@ export default function Registro() {
   const [paso, setPaso] = useState(1);
   const [quierePrestamo, setQuierePrestamo] = useState(true);
   const [solicitud, setSolicitud] = useState(SOLICITUD_VACIA);
+  const [dni, setDni] = useState({ frente: null, reverso: null }); // fotos de la identidad
   const [form, setForm] = useState({
     nombre_completo: "",
     dni: "",
@@ -90,6 +92,10 @@ export default function Registro() {
       setError("Las contraseñas no coinciden.");
       return;
     }
+    if (!dni.frente || !dni.reverso) {
+      setError("Adjunta las fotos del frente y del reverso de tu identidad.");
+      return;
+    }
     if (quierePrestamo) irA(3);
     else enviar();
   };
@@ -103,18 +109,26 @@ export default function Registro() {
     }
     setEnviando(true);
     try {
-      await axios.post(`${API_URL}/registro`, {
-        nombre_completo: form.nombre_completo,
-        dni: form.dni,
-        telefono: form.telefono,
-        correo: form.correo,
-        direccion: form.direccion || undefined,
-        fecha_nacimiento: form.fecha_nacimiento,
-        password: form.password,
-        codigo,
-        prestamo: quierePrestamo ? solicitudDesde(solicitud, true) : undefined,
-        website: form.website,
-      });
+      // Datos y fotos de la identidad van juntos en un solo envío
+      const envio = new FormData();
+      envio.append(
+        "datos",
+        JSON.stringify({
+          nombre_completo: form.nombre_completo,
+          dni: form.dni,
+          telefono: form.telefono,
+          correo: form.correo,
+          direccion: form.direccion || undefined,
+          fecha_nacimiento: form.fecha_nacimiento,
+          password: form.password,
+          codigo,
+          prestamo: quierePrestamo ? solicitudDesde(solicitud, true) : undefined,
+          website: form.website,
+        })
+      );
+      envio.append("dni_frente", dni.frente);
+      envio.append("dni_reverso", dni.reverso);
+      await axios.post(`${API_URL}/registro`, envio);
       // Inicia sesión automáticamente: en su panel verá el estado de su solicitud
       const ok = await login(form.dni, form.password);
       navigate(ok === true ? "/perfil" : "/login");
@@ -296,6 +310,29 @@ export default function Registro() {
                       col: "col-12 col-md-6",
                       input: { type: "password", required: true, autoComplete: "new-password" },
                     })}
+
+                    <div className="col-12">
+                      <div className="fw-semibold small mb-1">Fotos de tu identidad</div>
+                      <div className="form-text mt-0 mb-2">
+                        Toma una foto clara de cada lado de tu tarjeta de identidad, donde se lean los datos.
+                      </div>
+                      <div className="row g-2">
+                        <div className="col-6">
+                          <CampoFotoIdentidad
+                            etiqueta="Frente"
+                            archivo={dni.frente}
+                            onChange={(f) => { setError(""); setDni((d) => ({ ...d, frente: f })); }}
+                          />
+                        </div>
+                        <div className="col-6">
+                          <CampoFotoIdentidad
+                            etiqueta="Reverso"
+                            archivo={dni.reverso}
+                            onChange={(f) => { setError(""); setDni((d) => ({ ...d, reverso: f })); }}
+                          />
+                        </div>
+                      </div>
+                    </div>
 
                     {/* Campo trampa para robots: oculto para las personas */}
                     <div style={{ position: "absolute", left: "-9999px" }} aria-hidden="true">

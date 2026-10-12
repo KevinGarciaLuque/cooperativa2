@@ -79,6 +79,7 @@ export default function EstadoCuentaSocio({ idSocio, headers, onBack, textoVolve
         {data && (
           <div style={{ opacity: cargando ? 0.5 : 1 }}>
             <div className="ec-card p-4 mb-3">
+              <img src="/smartcoop.png" alt="SmartCoop" style={{ height: 56, float: "right" }} />
               <h4 className="fw-bold mb-1">Estado de cuenta</h4>
               <div className="fw-semibold">{data.socio.nombre_completo}</div>
               <div className="text-muted small">

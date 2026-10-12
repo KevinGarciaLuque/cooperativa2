@@ -291,6 +291,11 @@ export default function Contabilidad() {
       </ul>
 
       <div className="ct-print" style={{ opacity: cargando ? 0.5 : 1, transition: "opacity .15s" }}>
+        {/* Encabezado solo al imprimir */}
+        <div className="d-none d-print-flex align-items-center gap-3 mb-3">
+          <img src="/smartcoop.png" alt="SmartCoop" style={{ height: 56 }} />
+          <div className="fw-bold fs-5">SmartCoop · Contabilidad</div>
+        </div>
         {/* ── CIERRE MENSUAL ── */}
         {tab === "cierre" && (
           <>

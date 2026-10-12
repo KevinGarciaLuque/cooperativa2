@@ -30,6 +30,48 @@ const fechaLarga = (f) => {
 export const nombreArchivoRecibo = (recibo) =>
   recibo.tipo === "finiquito" ? `Finiquito-${recibo.numero}.pdf` : `Recibo-${recibo.numero}.pdf`;
 
+// Todos los documentos llevan el logo de SmartCoop (carpeta public)
+let logoCache = null;
+const cargarLogo = async () => {
+  if (logoCache) return logoCache;
+  try {
+    const blob = await (await fetch("/smartcoop.png")).blob();
+    logoCache = await new Promise((ok, mal) => {
+      const lector = new FileReader();
+      lector.onload = () => ok(lector.result);
+      lector.onerror = mal;
+      lector.readAsDataURL(blob);
+    });
+  } catch {
+    logoCache = null;
+  }
+  return logoCache;
+};
+
+// Dibuja el logo centrado arriba y devuelve dónde sigue el contenido
+const ponerLogo = async (doc, ancho, y) => {
+  const logo = await cargarLogo();
+  if (!logo) return y;
+  const lado = 20;
+  try {
+    doc.addImage(logo, "PNG", ancho / 2 - lado / 2, y - 8, lado, lado);
+    return y + lado - 2;
+  } catch {
+    return y;
+  }
+};
+
+// Firma de quien emitió el documento, sobre su línea (proporción 3:1)
+const ponerFirma = (doc, firma, x, yLinea, ancho) => {
+  if (!firma) return;
+  const alto = Math.min(ancho / 3, 16);
+  try {
+    doc.addImage(firma, "PNG", x + (ancho - alto * 3) / 2, yLinea - alto - 0.5, alto * 3, alto);
+  } catch {
+    // firma dañada: queda solo la línea
+  }
+};
+
 const soloFecha = (f) => {
   const d = new Date(f);
   return isNaN(d) ? "" : d.toLocaleDateString("es-HN", { day: "numeric", month: "long", year: "numeric" });
@@ -42,7 +84,7 @@ async function generarFiniquitoPdf(recibo) {
   const ancho = doc.internal.pageSize.getWidth();
   const margen = 16;
   const d = recibo.detalle || {};
-  let y = 20;
+  let y = await ponerLogo(doc, ancho, 14);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
@@ -107,6 +149,7 @@ async function generarFiniquitoPdf(recibo) {
   // Firmas
   doc.setDrawColor(148, 163, 184);
   const mitad = (ancho - margen * 2) / 2;
+  ponerFirma(doc, recibo.firma_emisor, margen, y, mitad - 8);
   doc.line(margen, y, margen + mitad - 8, y);
   doc.line(margen + mitad + 8, y, ancho - margen, y);
   doc.setFont("helvetica", "normal");
@@ -129,7 +172,7 @@ export async function generarReciboPdf(recibo) {
   const ancho = doc.internal.pageSize.getWidth();
   const margen = 14;
   const d = recibo.detalle || {};
-  let y = 18;
+  let y = await ponerLogo(doc, ancho, 14);
 
   // Encabezado
   doc.setFont("helvetica", "bold");
@@ -208,6 +251,7 @@ export async function generarReciboPdf(recibo) {
   // Firmas
   doc.setDrawColor(148, 163, 184);
   const mitad = (ancho - margen * 2) / 2;
+  ponerFirma(doc, recibo.firma_emisor, margen, y, mitad - 8);
   doc.line(margen, y, margen + mitad - 8, y);
   doc.line(margen + mitad + 8, y, ancho - margen, y);
   doc.setFont("helvetica", "normal");

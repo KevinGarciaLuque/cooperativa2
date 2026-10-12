@@ -4,6 +4,7 @@ const pool = require("../db");
 const multer = require("multer");
 const { notificarAdministradores } = require("../utils/notificaciones");
 const { numeroRecibo, emitirFiniquito } = require("../utils/recibos");
+const { firmaDataUrl } = require("../utils/firmas");
 
 const formatear = (r, cooperativa) => {
   let detalle = null;
@@ -30,6 +31,12 @@ const formatear = (r, cooperativa) => {
     cooperativa,
   };
 };
+
+// Recibo completo (para verlo o generar su PDF): incluye la firma de quien lo emitió
+const reciboCompleto = async (r) => ({
+  ...formatear(r, await nombreCooperativa()),
+  firma_emisor: await firmaDataUrl(r.emitido_por),
+});
 
 const nombreCooperativa = async () => {
   try {
@@ -61,7 +68,7 @@ router.get("/finiquito/:id_prestamo", async (req, res) => {
     const id = await emitirFiniquito(pool, idPrestamo, req.usuario?.id_usuario || null);
     if (!id) return res.status(500).json({ message: "No se pudo emitir la constancia" });
     const [rows] = await pool.query(`${SELECT_RECIBO} WHERE r.id_recibo = ?`, [id]);
-    res.json({ success: true, data: formatear(rows[0], await nombreCooperativa()) });
+    res.json({ success: true, data: await reciboCompleto(rows[0]) });
   } catch (error) {
     console.error("ERROR AL OBTENER FINIQUITO:", error);
     res.status(500).json({ message: "Error al obtener la constancia" });
@@ -80,7 +87,7 @@ router.get("/buscar", async (req, res) => {
       [referencia_tipo, referencia_id]
     );
     if (!rows.length) return res.status(404).json({ message: "No hay recibo para esta operación." });
-    res.json({ success: true, data: formatear(rows[0], await nombreCooperativa()) });
+    res.json({ success: true, data: await reciboCompleto(rows[0]) });
   } catch (error) {
     console.error("ERROR AL BUSCAR RECIBO:", error);
     res.status(500).json({ message: "Error al buscar el recibo" });
@@ -232,7 +239,7 @@ router.get("/:id", async (req, res) => {
   try {
     const [rows] = await pool.query(`${SELECT_RECIBO} WHERE r.id_recibo = ?`, [req.params.id]);
     if (!rows.length) return res.status(404).json({ message: "Recibo no encontrado" });
-    res.json({ success: true, data: formatear(rows[0], await nombreCooperativa()) });
+    res.json({ success: true, data: await reciboCompleto(rows[0]) });
   } catch (error) {
     console.error("ERROR AL OBTENER RECIBO:", error);
     res.status(500).json({ message: "Error al obtener el recibo" });

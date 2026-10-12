@@ -8,6 +8,7 @@ import { EmptyState, PageHeader } from "../ui/Componentes";
 import InputMonto from "../ui/InputMonto";
 import DesembolsoModal from "../components/DesembolsoModal";
 import ReciboModal from "../components/ReciboModal";
+import FotosIdentidad from "../components/FotosIdentidad";
 import { useConfigSitio } from "../hooks/useConfigSitio";
 import { OCUPACIONES, PROPOSITOS, fmt } from "../utils/solicitud";
 import { compartirCarta, descargarCarta } from "../utils/cartaAprobacion";
@@ -35,6 +36,7 @@ export default function Solicitudes() {
   const [sinFirma, setSinFirma] = useState([]);
   const [recibidos, setRecibidos] = useState([]);
   const [enviandoCarta, setEnviandoCarta] = useState(null);
+  const [verIdentidad, setVerIdentidad] = useState(null); // { id_usuario, nombre_completo }
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -378,6 +380,18 @@ export default function Solicitudes() {
                         </div>
                       )}
 
+                      <div className="small mb-3">
+                        <strong>Identidad:</strong>{" "}
+                        {p.fotos_identidad >= 2 ? (
+                          <span className="text-success">fotos recibidas</span>
+                        ) : (
+                          <span className="text-danger">{p.fotos_identidad ? "falta una foto" : "sin fotos"}</span>
+                        )}{" "}
+                        · <button className="btn btn-link btn-sm p-0 align-baseline" onClick={() => setVerIdentidad(p)}>
+                          Ver identidad
+                        </button>
+                      </div>
+
                       <div className="d-flex gap-2">
                         <button
                           className="btn fw-semibold flex-fill"
@@ -413,6 +427,7 @@ export default function Solicitudes() {
                     <th>Teléfono</th>
                     <th>Correo</th>
                     <th>Registro</th>
+                    <th>Identidad</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -424,6 +439,14 @@ export default function Solicitudes() {
                       <td>{s.telefono || "—"}</td>
                       <td className="small">{s.correo || "—"}</td>
                       <td className="small">{String(s.fecha_registro).substring(0, 10)}</td>
+                      <td>
+                        <button
+                          className={`btn btn-sm ${s.fotos_identidad >= 2 ? "btn-outline-success" : "btn-outline-danger"}`}
+                          onClick={() => setVerIdentidad(s)}
+                        >
+                          {s.fotos_identidad >= 2 ? "Ver fotos" : s.fotos_identidad ? "Falta 1 foto" : "Sin fotos"}
+                        </button>
+                      </td>
                       <td className="text-nowrap">
                         <button
                           className="btn btn-sm fw-semibold me-1"
@@ -572,6 +595,28 @@ export default function Solicitudes() {
           onConfirmar={confirmarDesembolso}
           onCancelar={() => setADesembolsar(null)}
         />
+      )}
+
+      {verIdentidad && (
+        <div
+          className="modal show d-block"
+          style={{ background: "rgba(0,0,0,.6)", zIndex: 6000, position: "fixed", inset: 0, overflowY: "auto" }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content border-0 shadow-lg" style={{ borderRadius: 16 }}>
+              <div className="modal-header border-0 pb-0">
+                <div>
+                  <h5 className="modal-title fw-bold">Identidad</h5>
+                  <div className="small text-muted">{verIdentidad.nombre_completo}</div>
+                </div>
+                <button type="button" className="btn-close" onClick={() => { setVerIdentidad(null); cargar(); }} />
+              </div>
+              <div className="modal-body">
+                <FotosIdentidad idSocio={verIdentidad.id_usuario} headers={headers} />
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {reciboAbierto && (

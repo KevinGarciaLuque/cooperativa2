@@ -28,6 +28,31 @@ const api = async (metodo, ruta, cuerpo, token) => {
   return { s: r.status, b };
 };
 
+// Registro por enlace: los datos van en "datos" y las fotos de la identidad como archivos
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==",
+  "base64"
+);
+const registrar = async (datos, { frente = true, reverso = true } = {}) => {
+  const f = new FormData();
+  f.append("datos", JSON.stringify(datos));
+  if (frente) f.append("dni_frente", new Blob([PNG], { type: "image/png" }), "frente.png");
+  if (reverso) f.append("dni_reverso", new Blob([PNG], { type: "image/png" }), "reverso.png");
+  const r = await fetch(`${base}/api/registro`, { method: "POST", body: f });
+  return { s: r.status, b: await r.json().catch(() => null) };
+};
+
+const subirFoto = async (id, lado, token, tipo = "image/png") => {
+  const f = new FormData();
+  f.append("foto", new Blob([PNG], { type: tipo }), `${lado}.png`);
+  const r = await fetch(`${base}/api/socios/${id}/identidad/${lado}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: f,
+  });
+  return { s: r.status, b: await r.json().catch(() => null) };
+};
+
 const tokenDe = (u, rol, rolId) =>
   jwt.sign({ id_usuario: u, rol, rol_id: rolId, nombre_completo: `Usuario ${u}` }, process.env.JWT_SECRET, {
     expiresIn: "10m",
@@ -129,16 +154,19 @@ test("registro por enlace: el socio queda pendiente y limitado", async () => {
     correo: "nuevo.prueba@prueba.hn", fecha_nacimiento: "1992-03-04", password: "Clave1234",
   };
 
-  assert.equal((await api("POST", "/registro", datos)).s, 403); // sin código
-  assert.equal((await api("POST", "/registro", { ...datos, codigo, password: "abc" })).s, 400);
+  assert.equal((await registrar(datos)).s, 403); // sin código
+  assert.equal((await registrar({ ...datos, codigo, password: "abc" })).s, 400);
   // el correo es obligatorio: ahí recibirá sus recibos
-  assert.equal((await api("POST", "/registro", { ...datos, codigo, correo: "" })).s, 400);
-  assert.equal((await api("POST", "/registro", { ...datos, codigo, fecha_nacimiento: "2015-01-01" })).s, 400);
+  assert.equal((await registrar({ ...datos, codigo, correo: "" })).s, 400);
+  assert.equal((await registrar({ ...datos, codigo, fecha_nacimiento: "2015-01-01" })).s, 400);
+  // las dos fotos de la identidad son obligatorias
+  assert.equal((await registrar({ ...datos, codigo }, { reverso: false })).s, 400);
+  assert.equal((await api("POST", "/registro", { ...datos, codigo })).s, 400);
 
-  const ok = await api("POST", "/registro", { ...datos, codigo });
+  const ok = await registrar({ ...datos, codigo });
   assert.equal(ok.s, 201);
   ids.nuevo = ok.b.id_usuario;
-  assert.equal((await api("POST", "/registro", { ...datos, codigo })).s, 409); // duplicado
+  assert.equal((await registrar({ ...datos, codigo })).s, 409); // duplicado
 
   const login = await api("POST", "/usuarios/login", { dni: datos.dni, password: datos.password });
   assert.equal(login.s, 200);
@@ -147,6 +175,38 @@ test("registro por enlace: el socio queda pendiente y limitado", async () => {
 
   assert.equal((await api("GET", "/cuentas", null, ids.tNuevo)).s, 403);
   assert.equal((await api("GET", "/solicitudes/parametros", null, ids.tNuevo)).s, 200);
+});
+
+test("identidad: fotos privadas, el socio sube las suyas y el personal las ve", async () => {
+  const foto = async (id, lado, token) => {
+    const r = await fetch(`${base}/api/socios/${id}/identidad/${lado}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    return { s: r.status, tipo: r.headers.get("content-type") || "" };
+  };
+
+  // las del registro llegaron y el personal las ve
+  const estado = await api("GET", `/socios/${ids.nuevo}/identidad`, null, ids.tSuper);
+  assert.equal(estado.s, 200);
+  assert.ok(estado.b.data.frente && estado.b.data.reverso);
+  const vista = await foto(ids.nuevo, "frente", ids.tSuper);
+  assert.equal(vista.s, 200);
+  assert.match(vista.tipo, /image\/png/);
+
+  // nunca son públicas, ni las de otro socio
+  assert.equal((await foto(ids.nuevo, "frente")).s, 401);
+  assert.equal((await foto(ids.nuevo, "frente", ids.tSocio)).s, 403);
+  assert.equal((await subirFoto(ids.nuevo, "frente", ids.tSocio)).s, 403);
+
+  // el socio pendiente puede cambiarlas; solo se aceptan imágenes
+  assert.equal((await subirFoto(ids.nuevo, "reverso", ids.tNuevo)).s, 201);
+  assert.equal((await subirFoto(ids.nuevo, "reverso", ids.tNuevo, "application/pdf")).s, 400);
+
+  // un socio activo sin fotos las sube desde su perfil, pero no puede reemplazarlas después
+  assert.equal((await subirFoto(ids.socio, "frente", ids.tSocio)).s, 201);
+  assert.equal((await subirFoto(ids.socio, "frente", ids.tSocio)).s, 403);
+  assert.equal((await subirFoto(ids.socio, "frente", ids.tSuper)).s, 201); // el personal sí
+  await pool.query("DELETE FROM documentos_identidad WHERE id_usuario = ?", [ids.socio]);
 });
 
 test("solicitud de préstamo: validaciones y una sola en trámite", async () => {
@@ -553,12 +613,12 @@ test("registro por enlace con préstamo: cuenta y solicitud llegan juntas", asyn
   };
 
   // si la solicitud viene mal, no se crea nada
-  const mal = await api("POST", "/registro", { ...datos, prestamo: { ...prestamo, proposito: "" } });
+  const mal = await registrar({ ...datos, prestamo: { ...prestamo, proposito: "" } });
   assert.equal(mal.s, 400);
   const [[nadie]] = await pool.query("SELECT COUNT(*) AS n FROM usuarios WHERE dni = ?", [datos.dni]);
   assert.equal(nadie.n, 0);
 
-  const ok = await api("POST", "/registro", { ...datos, prestamo });
+  const ok = await registrar({ ...datos, prestamo });
   assert.equal(ok.s, 201);
   assert.ok(ok.b.id_prestamo);
   cerca(ok.b.cuota_estimada, 1148.04);
@@ -579,6 +639,40 @@ test("registro por enlace con préstamo: cuenta y solicitud llegan juntas", asyn
   assert.equal((await api("POST", `/solicitudes/socios/${ok.b.id_usuario}/rechazar`, { motivo: "Prueba" }, ids.tSuper)).s, 200);
   const [[pr]] = await pool.query("SELECT estado FROM prestamos WHERE id_prestamo = ?", [ok.b.id_prestamo]);
   assert.equal(pr.estado, "rechazado");
+});
+
+test("firma digital: el personal guarda la suya y sale en sus documentos", async () => {
+  const subir = async (token, tipo = "image/png") => {
+    const f = new FormData();
+    f.append("firma", new Blob([PNG], { type: tipo }), "firma.png");
+    const r = await fetch(`${base}/api/firma/mia`, { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: f });
+    return { s: r.status, b: await r.json().catch(() => null) };
+  };
+
+  // un socio no tiene firma de la cooperativa
+  assert.equal((await api("GET", "/firma/mia", null, ids.tSocio)).s, 403);
+  assert.equal((await subir(ids.tSocio)).s, 403);
+  assert.equal((await subir(ids.tSuper, "image/jpeg")).s, 400);
+
+  assert.equal((await api("GET", "/firma/mia", null, ids.tSuper)).b.imagen, null);
+  const ok = await subir(ids.tSuper);
+  assert.equal(ok.s, 200);
+  assert.match(ok.b.imagen, /^data:image\/png;base64,/);
+
+  // los recibos que emitió el Super Administrador traen su firma
+  const [[rec]] = await pool.query("SELECT id_recibo FROM recibos WHERE emitido_por = ? LIMIT 1", [ids.super]);
+  const recibo = await api("GET", `/recibos/${rec.id_recibo}`, null, ids.tSuper);
+  assert.match(recibo.b.data.firma_emisor, /^data:image\/png;base64,/);
+
+  // la carta de aprobación se sigue generando con la firma
+  const carta = await fetch(`${base}/api/solicitudes/prestamos/${ids.prestamoNuevo}/carta`, {
+    headers: { Authorization: `Bearer ${ids.tSuper}` },
+  });
+  assert.equal(carta.status, 200);
+
+  assert.equal((await api("DELETE", "/firma/mia", null, ids.tSuper)).s, 200);
+  const sin = await api("GET", `/recibos/${rec.id_recibo}`, null, ids.tSuper);
+  assert.equal(sin.b.data.firma_emisor, null);
 });
 
 test("monitoreo: el estado del servicio responde", async () => {

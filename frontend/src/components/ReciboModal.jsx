@@ -282,6 +282,7 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
             {recibo && (
               <>
                 <div className="text-center mb-3">
+                  <img src="/smartcoop.png" alt="SmartCoop" style={{ height: 64, marginBottom: 6 }} />
                   <div className="fw-bold fs-5">{recibo.cooperativa}</div>
                   <div className="text-muted small">{TIPOS[recibo.tipo] || "Recibo"}</div>
                   <div className="fw-bold mt-1" style={{ letterSpacing: 1 }}>N.º {recibo.numero}</div>
@@ -392,8 +393,11 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
                   <span className="fw-bold fs-4">{fmt(recibo.monto)}</span>
                 </div>
 
-                <div className="row text-center small text-muted" style={{ marginTop: 36 }}>
+                <div className="row text-center small text-muted align-items-end" style={{ marginTop: 36 }}>
                   <div className="col-6">
+                    {recibo.firma_emisor && (
+                      <img src={recibo.firma_emisor} alt="Firma" style={{ height: 52, maxWidth: "100%", objectFit: "contain", marginBottom: -6 }} />
+                    )}
                     <div style={{ borderTop: "1px solid #94a3b8", paddingTop: 4 }}>
                       {recibo.emitido_por || "Cajero"}
                       <div>Recibido por</div>

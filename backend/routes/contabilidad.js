@@ -38,9 +38,9 @@ const ETIQUETAS_ACTIVIDAD = {
 const nombreCooperativa = async () => {
   try {
     const [rows] = await pool.query("SELECT valor FROM configuracion_sitio WHERE clave = 'site_name'");
-    return rows.length ? rows[0].valor : "Cooperativa";
+    return rows.length ? rows[0].valor : "SmartCoop";
   } catch {
-    return "Cooperativa";
+    return "SmartCoop";
   }
 };
 

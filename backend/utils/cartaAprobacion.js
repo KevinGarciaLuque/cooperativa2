@@ -1,6 +1,8 @@
 // Carta de aprobación de préstamo en PDF: se envía al socio por correo al aprobar su
 // solicitud y queda disponible para descargarla. No muestra la tasa de interés: el
 // socio solo ve el monto, el plazo y la cuota.
+const fs = require("fs");
+const path = require("path");
 const PDFDocument = require("pdfkit");
 const pool = require("../db");
 const { calcularCuotaMensual } = require("./calculosPrestamo");
@@ -22,14 +24,21 @@ const leerConfig = async (clave) => {
   return rows.length ? rows[0].valor : null;
 };
 
-// Logo de la cooperativa (solo PNG o JPG, que es lo que admite el PDF)
+// Logo subido en Configuración (solo PNG o JPG, que es lo que admite el PDF);
+// si no hay, el de SmartCoop
+const LOGO_PREDETERMINADO = path.join(__dirname, "..", "assets", "smartcoop.png");
 const leerLogo = async () => {
   try {
     const ruta = await leerConfig("logo_url");
-    if (!ruta) return null;
-    const [rows] = await pool.query("SELECT mime, contenido FROM archivos WHERE ruta = ? LIMIT 1", [ruta]);
-    if (!rows.length || !["image/png", "image/jpeg"].includes(rows[0].mime)) return null;
-    return rows[0].contenido;
+    if (ruta) {
+      const [rows] = await pool.query("SELECT mime, contenido FROM archivos WHERE ruta = ? LIMIT 1", [ruta]);
+      if (rows.length && ["image/png", "image/jpeg"].includes(rows[0].mime)) return rows[0].contenido;
+    }
+  } catch {
+    // sin logo subido: se usa el predeterminado
+  }
+  try {
+    return fs.readFileSync(LOGO_PREDETERMINADO);
   } catch {
     return null;
   }
@@ -50,7 +59,7 @@ const datosCarta = async (idPrestamo) => {
   if (!p || !p.fecha_aprobacion || !ESTADOS_APROBADOS.includes(p.estado)) return null;
   const plazo = parseInt(p.plazo_meses) || 0;
   return {
-    cooperativa: (await leerConfig("site_name")) || "Cooperativa",
+    cooperativa: (await leerConfig("site_name")) || "SmartCoop",
     logo: await leerLogo(),
     id_prestamo: p.id_prestamo,
     id_usuario: p.id_usuario,

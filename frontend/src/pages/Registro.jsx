@@ -42,7 +42,7 @@ export default function Registro() {
     axios
       .get(`${API_URL}/registro/estado`, { params: { c: codigo } })
       .then((r) => setEstado(r.data))
-      .catch(() => setEstado({ cooperativa: "Cooperativa", habilitado: false, valido: false, parametros: null }));
+      .catch(() => setEstado({ cooperativa: "SmartCoop", habilitado: false, valido: false, parametros: null }));
   }, [codigo]);
 
   const cambiar = (e) => {

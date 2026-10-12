@@ -1,7 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { registrarCaja } = require("../utils/caja");
+const { actualizarEstadosMora } = require("../utils/moraScheduler");
 const {
+  calcularCuotaMensual,
+  generarTablaAmortizacion,
   calcularDiasMora,
   calcularInteresMoratorio,
   DIAS_MES,
@@ -14,49 +18,6 @@ const {
 // ============================================
 // FUNCIONES AUXILIARES Y CÁLCULOS
 // ============================================
-
-// Calcular cuota mensual (sistema francés de amortización)
-// plazoMeses === 0 → préstamo indefinido: solo pago de interés mensual
-const calcularCuotaMensual = (monto, tasaAnual, plazoMeses) => {
-  if (plazoMeses === 0) {
-    // Solo interés mensual, el capital no se amortiza
-    return monto * (tasaAnual / 100) / 12;
-  }
-  const tasaMensual = (tasaAnual / 100) / 12;
-  const cuota = monto * (tasaMensual * Math.pow(1 + tasaMensual, plazoMeses)) / 
-                (Math.pow(1 + tasaMensual, plazoMeses) - 1);
-  return cuota;
-};
-
-// Generar tabla de amortización
-const generarTablaAmortizacion = (monto, tasaAnual, plazoMeses, fechaOtorgado) => {
-  if (plazoMeses === 0) return []; // Préstamo indefinido: sin tabla de amortización fija
-  const tasaMensual = (tasaAnual / 100) / 12;
-  const cuotaMensual = calcularCuotaMensual(monto, tasaAnual, plazoMeses);
-  let saldoRestante = monto;
-  const tabla = [];
-
-  for (let i = 1; i <= plazoMeses; i++) {
-    const interesCuota = saldoRestante * tasaMensual;
-    const capitalCuota = cuotaMensual - interesCuota;
-    saldoRestante = Math.max(0, saldoRestante - capitalCuota);
-
-    // Calcular fecha de vencimiento (mes a mes)
-    const fechaVencimiento = new Date(fechaOtorgado);
-    fechaVencimiento.setMonth(fechaVencimiento.getMonth() + i);
-
-    tabla.push({
-      numero_cuota: i,
-      cuota_total: parseFloat(cuotaMensual.toFixed(2)),
-      capital: parseFloat(capitalCuota.toFixed(2)),
-      interes: parseFloat(interesCuota.toFixed(2)),
-      saldo_restante: parseFloat(saldoRestante.toFixed(2)),
-      fecha_vencimiento: fechaVencimiento.toISOString().split('T')[0],
-    });
-  }
-
-  return tabla;
-};
 
 // Registrar en bitácora
 const registrarBitacora = async (id_usuario, accion, detalle) => {
@@ -412,6 +373,21 @@ router.patch("/:id/aprobar", async (req, res) => {
       }
     }
 
+    // Desembolso en efectivo: sale de caja (si va a la cuenta del socio no sale efectivo)
+    if (!desembolsar_a_cuenta) {
+      await registrarCaja(connection, {
+        tipo: "egreso",
+        categoria: "desembolso_prestamo",
+        monto: prestamo[0].monto,
+        metodo: "efectivo",
+        descripcion: `Desembolso de préstamo #${req.params.id}`,
+        referencia_tipo: "prestamo",
+        referencia_id: parseInt(req.params.id),
+        id_socio: prestamo[0].id_usuario,
+        id_registrado_por: req.usuario?.id_usuario,
+      });
+    }
+
     // Registrar en bitácora
     await connection.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) 
@@ -499,10 +475,10 @@ router.patch("/:id/estado", async (req, res) => {
   try {
     const { estado } = req.body;
 
-    const estadosValidos = ['pendiente', 'aprobado', 'activo', 'pagado', 'mora', 'cancelado'];
+    const estadosValidos = ['pendiente', 'activo', 'pagado', 'mora'];
     if (!estado || !estadosValidos.includes(estado)) {
       return res.status(400).json({
-        message: "Estado inválido. Debe ser: pendiente, aprobado, activo, pagado, mora o cancelado"
+        message: "Estado inválido. Debe ser: pendiente, activo, pagado o mora"
       });
     }
 
@@ -515,7 +491,13 @@ router.patch("/:id/estado", async (req, res) => {
       return res.status(404).json({ message: "Préstamo no encontrado" });
     }
 
-    // Si se marca como pagado, también poner saldo_restante en 0
+    // Solo se marca como pagado un préstamo sin saldo (el saldo se salda registrando el pago)
+    if (estado === 'pagado' && parseFloat(prestamo[0].saldo_restante) > 0.01) {
+      return res.status(409).json({
+        message: `El préstamo aún tiene saldo (L. ${parseFloat(prestamo[0].saldo_restante).toFixed(2)}). Regístralo como pago de liquidación.`,
+      });
+    }
+
     if (estado === 'pagado') {
       await pool.query(
         `UPDATE prestamos SET estado = 'pagado', saldo_restante = 0.00 WHERE id_prestamo = ?`,
@@ -669,64 +651,17 @@ router.post("/:id/liquidar", async (req, res) => {
 // ============================================
 router.post("/verificar-mora", async (req, res) => {
   try {
-    const hoy = new Date();
-    
-    // Obtener préstamos activos
-    const [prestamosActivos] = await pool.query(
-      `SELECT p.*, 
-       (SELECT MAX(fecha_pago) FROM pagos_prestamo WHERE id_prestamo = p.id_prestamo) as ultimo_pago
-       FROM prestamos p
-       WHERE p.estado = 'activo'`
-    );
-
-    let prestamosEnMora = [];
-
-    for (const prestamo of prestamosActivos) {
-      const cuotaMensual = calcularCuotaMensual(
-        parseFloat(prestamo.monto),
-        parseFloat(prestamo.tasa_interes),
-        parseInt(prestamo.plazo_meses)
-      );
-
-      // Calcular días desde el último pago o desde el otorgamiento
-      const fechaReferencia = prestamo.ultimo_pago ? new Date(prestamo.ultimo_pago) : new Date(prestamo.fecha_otorgado);
-      const diasTranscurridos = Math.floor((hoy - fechaReferencia) / (1000 * 60 * 60 * 24));
-
-      // Si han pasado más de 35 días (un mes + 5 días de gracia), está en mora
-      if (diasTranscurridos > 35) {
-        await pool.query(
-          `UPDATE prestamos SET estado = 'mora' WHERE id_prestamo = ?`,
-          [prestamo.id_prestamo]
-        );
-
-        prestamosEnMora.push({
-          id_prestamo: prestamo.id_prestamo,
-          id_usuario: prestamo.id_usuario,
-          dias_mora: diasTranscurridos - 30,
-        });
-
-        // Registrar en bitácora
-        await registrarBitacora(
-          prestamo.id_usuario,
-          "Préstamo en mora",
-          `Préstamo #${prestamo.id_prestamo} marcado en mora. Días de atraso: ${diasTranscurridos - 30}`
-        );
-      }
-    }
-
+    const r = await actualizarEstadosMora();
     res.json({
       success: true,
       message: "Verificación de mora completada",
-      prestamos_en_mora: prestamosEnMora.length,
-      detalle: prestamosEnMora,
+      prestamos_en_mora: r.entraron.length,
+      regularizados: r.salieron.length,
+      detalle: r.entraron,
     });
-
   } catch (error) {
     console.error("ERROR AL VERIFICAR MORA:", error);
-    res.status(500).json({ 
-      message: "Error al verificar mora", 
-      error: error.message 
-    });
+    res.status(500).json({ message: "Error al verificar mora" });
   }
 });
 
@@ -833,8 +768,9 @@ router.post("/", async (req, res) => {
       return res.status(404).json({ message: "Usuario no encontrado o inactivo" });
 
     const cuotaMensual = calcularCuotaMensual(montoNum, tasaNum, plazoNum);
-    const estadosPermitidos = ['pendiente', 'aprobado', 'activo', 'mora', 'pagado', 'cancelado'];
-    const estadoPrestamo = (estado && estadosPermitidos.includes(estado)) ? estado : 'pendiente';
+    const estadosPermitidos = ['pendiente', 'activo', 'mora', 'pagado'];
+    const estadoSolicitado = estado === 'aprobado' ? 'activo' : estado;
+    const estadoPrestamo = (estadoSolicitado && estadosPermitidos.includes(estadoSolicitado)) ? estadoSolicitado : 'pendiente';
     const fechaOtorgado = fecha_otorgado || null;
     const tipoTasaGuardar = tipo_tasa || "nominal_anual";
     const tasaOriginalGuardar = tasa_original != null ? parseFloat(tasa_original) : tasaNum;
@@ -846,6 +782,21 @@ router.post("/", async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id_usuario, montoNum, tasaNum, tipoTasaGuardar, tasaOriginalGuardar, plazoNum, montoNum, estadoPrestamo, fechaOtorgado]
     );
+
+    if (["activo", "mora", "pagado"].includes(estadoPrestamo)) {
+      await registrarCaja(connection, {
+        tipo: "egreso",
+        categoria: "desembolso_prestamo",
+        monto: montoNum,
+        metodo: "efectivo",
+        descripcion: `Desembolso de préstamo #${result.insertId}`,
+        referencia_tipo: "prestamo",
+        referencia_id: result.insertId,
+        id_socio: id_usuario,
+        id_registrado_por: req.usuario?.id_usuario,
+        fecha: fechaOtorgado ? (String(fechaOtorgado).length === 10 ? `${fechaOtorgado} 12:00:00` : fechaOtorgado) : null,
+      });
+    }
 
     await connection.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
@@ -873,35 +824,113 @@ router.post("/", async (req, res) => {
 // PUT /:id → actualizar datos de un préstamo
 // ============================================
 router.put("/:id", async (req, res) => {
+  const connection = await pool.getConnection();
   try {
     const { id } = req.params;
     const { monto, tasa_interes, plazo_meses, fecha_otorgado, estado, tipo_tasa, tasa_original } = req.body;
 
-    const [existing] = await pool.query(`SELECT * FROM prestamos WHERE id_prestamo = ?`, [id]);
-    if (existing.length === 0)
-      return res.status(404).json({ message: "Préstamo no encontrado" });
+    await connection.beginTransaction();
 
-    const montoNum = parseFloat(monto) || existing[0].monto;
-    const tasaNum = parseFloat(tasa_interes) || existing[0].tasa_interes;
+    const [existing] = await connection.query(
+      `SELECT * FROM prestamos WHERE id_prestamo = ? FOR UPDATE`,
+      [id]
+    );
+    if (existing.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ message: "Préstamo no encontrado" });
+    }
+    const actual = existing[0];
+
+    const [[{ cantidad_pagos }]] = await connection.query(
+      `SELECT COUNT(*) AS cantidad_pagos FROM pagos_prestamo WHERE id_prestamo = ?`,
+      [id]
+    );
+    const tienePagos = cantidad_pagos > 0;
+
+    const montoNum = parseFloat(monto) || parseFloat(actual.monto);
+    const tasaNum = parseFloat(tasa_interes) || parseFloat(actual.tasa_interes);
     // Usar !== undefined/null/'' para no pisar el valor 0 (indefinido)
     const plazoNum = (plazo_meses !== undefined && plazo_meses !== null && plazo_meses !== '')
       ? parseInt(plazo_meses)
-      : existing[0].plazo_meses;
-    const estadosPermitidosPut = ['pendiente', 'aprobado', 'activo', 'mora', 'pagado', 'cancelado'];
-    const nuevoEstado = (estado && estadosPermitidosPut.includes(estado)) ? estado : existing[0].estado;
-    const nuevaFecha = fecha_otorgado || existing[0].fecha_otorgado;
-    const tipoTasaGuardar = tipo_tasa || existing[0].tipo_tasa || "nominal_anual";
-    const tasaOriginalGuardar = tasa_original != null ? parseFloat(tasa_original) : (existing[0].tasa_original || tasaNum);
+      : actual.plazo_meses;
 
-    await pool.query(
-      `UPDATE prestamos SET monto = ?, tasa_interes = ?, tipo_tasa = ?, tasa_original = ?, plazo_meses = ?, estado = ?, fecha_otorgado = ? WHERE id_prestamo = ?`,
-      [montoNum, tasaNum, tipoTasaGuardar, tasaOriginalGuardar, plazoNum, nuevoEstado, nuevaFecha, id]
+    if (isNaN(plazoNum) || plazoNum < 0 || plazoNum > 360) {
+      await connection.rollback();
+      return res.status(400).json({ message: "El plazo debe ser entre 1 y 360 meses (0 = indefinido)" });
+    }
+
+    // Con pagos registrados el capital otorgado no se puede cambiar: descuadraría el saldo
+    if (tienePagos && Math.abs(montoNum - parseFloat(actual.monto)) >= 0.01) {
+      await connection.rollback();
+      return res.status(409).json({
+        message: "Este préstamo ya tiene pagos registrados: no se puede cambiar el monto otorgado.",
+      });
+    }
+
+    const estadosPermitidosPut = ['pendiente', 'activo', 'mora', 'pagado'];
+    const estadoSolicitado = estado === 'aprobado' ? 'activo' : estado;
+    const nuevoEstado = (estadoSolicitado && estadosPermitidosPut.includes(estadoSolicitado))
+      ? estadoSolicitado
+      : actual.estado;
+
+    // Un préstamo solo pasa a "pagado" cuando su saldo ya es cero (se salda registrando el pago)
+    const saldoActual = parseFloat(actual.saldo_restante);
+    if (nuevoEstado === 'pagado' && actual.estado !== 'pagado' && saldoActual > 0.01) {
+      await connection.rollback();
+      return res.status(409).json({
+        message: `El préstamo aún tiene saldo (L. ${saldoActual.toFixed(2)}). Regístralo como pago de liquidación en Pagos.`,
+      });
+    }
+
+    const nuevaFecha = fecha_otorgado || actual.fecha_otorgado;
+    const tipoTasaGuardar = tipo_tasa || actual.tipo_tasa || "nominal_anual";
+    const tasaOriginalGuardar = tasa_original != null ? parseFloat(tasa_original) : (actual.tasa_original || tasaNum);
+
+    // Sin pagos, el saldo acompaña al monto; con pagos, el saldo se conserva
+    const nuevoSaldo = tienePagos ? saldoActual : montoNum;
+
+    await connection.query(
+      `UPDATE prestamos SET monto = ?, tasa_interes = ?, tipo_tasa = ?, tasa_original = ?, plazo_meses = ?, saldo_restante = ?, estado = ?, fecha_otorgado = ? WHERE id_prestamo = ?`,
+      [montoNum, tasaNum, tipoTasaGuardar, tasaOriginalGuardar, plazoNum, nuevoSaldo, nuevoEstado, nuevaFecha, id]
     );
 
+    // Pasar de pendiente a vigente es el desembolso: sale dinero de caja
+    if (actual.estado === 'pendiente' && ['activo', 'mora', 'pagado'].includes(nuevoEstado)) {
+      await registrarCaja(connection, {
+        tipo: "egreso",
+        categoria: "desembolso_prestamo",
+        monto: montoNum,
+        metodo: "efectivo",
+        descripcion: `Desembolso de préstamo #${id}`,
+        referencia_tipo: "prestamo",
+        referencia_id: parseInt(id),
+        id_socio: actual.id_usuario,
+        id_registrado_por: req.usuario?.id_usuario,
+        fecha: fecha_otorgado ? (String(fecha_otorgado).length === 10 ? `${fecha_otorgado} 12:00:00` : fecha_otorgado) : null,
+      });
+    }
+
+    // Bitácora de los cambios relevantes
+    const cambios = [];
+    if (Math.abs(montoNum - parseFloat(actual.monto)) >= 0.01) cambios.push(`monto L. ${parseFloat(actual.monto).toFixed(2)} → L. ${montoNum.toFixed(2)}`);
+    if (Math.abs(tasaNum - parseFloat(actual.tasa_interes)) >= 0.0001) cambios.push(`tasa anual ${parseFloat(actual.tasa_interes)}% → ${tasaNum}%`);
+    if (plazoNum !== actual.plazo_meses) cambios.push(`plazo ${actual.plazo_meses} → ${plazoNum} meses`);
+    if (nuevoEstado !== actual.estado) cambios.push(`estado ${actual.estado} → ${nuevoEstado}`);
+    if (cambios.length > 0) {
+      await connection.query(
+        `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
+        [actual.id_usuario, "Modificación de préstamo", `Préstamo #${id}: ${cambios.join("; ")}`]
+      );
+    }
+
+    await connection.commit();
     res.json({ success: true, message: "Préstamo actualizado correctamente." });
   } catch (error) {
+    await connection.rollback().catch(() => {});
     console.error("ERROR AL ACTUALIZAR PRÉSTAMO:", error);
     res.status(500).json({ message: "Error al actualizar el préstamo", error: error.message });
+  } finally {
+    connection.release();
   }
 });
 
@@ -913,21 +942,61 @@ router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [existing] = await connection.query(`SELECT * FROM prestamos WHERE id_prestamo = ?`, [id]);
-    if (existing.length === 0)
-      return res.status(404).json({ message: "Préstamo no encontrado" });
-
     await connection.beginTransaction();
 
-    // Eliminar pagos relacionados primero (FK) y luego el préstamo
-    await connection.query(`DELETE FROM pagos_prestamo WHERE id_prestamo = ?`, [id]);
+    const [existing] = await connection.query(
+      `SELECT * FROM prestamos WHERE id_prestamo = ? FOR UPDATE`,
+      [id]
+    );
+    if (existing.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ message: "Préstamo no encontrado" });
+    }
+    const p = existing[0];
+
+    // Nunca se borra el historial de pagos: primero hay que anularlos uno a uno (con motivo)
+    const [[{ cantidad_pagos }]] = await connection.query(
+      `SELECT COUNT(*) AS cantidad_pagos FROM pagos_prestamo WHERE id_prestamo = ?`,
+      [id]
+    );
+    if (cantidad_pagos > 0) {
+      await connection.rollback();
+      return res.status(409).json({
+        message: `Este préstamo tiene ${cantidad_pagos} pago(s) registrado(s). Anula los pagos antes de eliminarlo.`,
+      });
+    }
+
     await connection.query(`DELETE FROM prestamos WHERE id_prestamo = ?`, [id]);
+
+    // Si ya se había desembolsado, el dinero vuelve a caja
+    if (p.estado !== "pendiente") {
+      await registrarCaja(connection, {
+        tipo: "ingreso",
+        categoria: "anulacion_desembolso",
+        monto: p.monto,
+        metodo: "efectivo",
+        descripcion: `Eliminación del préstamo #${id} (reversión del desembolso)`,
+        referencia_tipo: "prestamo",
+        referencia_id: parseInt(id),
+        id_socio: p.id_usuario,
+        id_registrado_por: req.usuario?.id_usuario,
+      });
+    }
+
+    await connection.query(
+      `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
+      [
+        p.id_usuario,
+        "Eliminación de préstamo",
+        `Préstamo #${id} por L. ${parseFloat(p.monto).toFixed(2)} eliminado (estado: ${p.estado})`,
+      ]
+    );
 
     await connection.commit();
 
     res.json({ success: true, message: "Préstamo eliminado correctamente." });
   } catch (error) {
-    await connection.rollback();
+    await connection.rollback().catch(() => {});
     console.error("ERROR AL ELIMINAR PRÉSTAMO:", error);
     res.status(500).json({ message: "Error al eliminar el préstamo", error: error.message });
   } finally {

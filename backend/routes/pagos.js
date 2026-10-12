@@ -2,8 +2,12 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const jwt = require("jsonwebtoken");
+const { registrarCaja } = require("../utils/caja");
 const {
   DIAS_MES,
+  calcularCuotaMensual,
+  calcularDiasMora,
+  calcularInteresMoratorio,
   soloFecha,
   esFechaISO,
   hoyISO,
@@ -16,26 +20,6 @@ const {
 // FUNCIONES AUXILIARES Y CÁLCULOS
 // ============================================
 
-// Calcular cuota mensual (sistema francés)
-// plazoMeses === 0 → préstamo indefinido: solo interés mensual
-const calcularCuotaMensual = (monto, tasaAnual, plazoMeses) => {
-  if (plazoMeses === 0) {
-    return monto * (tasaAnual / 100) / 12;
-  }
-  const tasaMensual = (tasaAnual / 100) / 12;
-  const cuota = monto * (tasaMensual * Math.pow(1 + tasaMensual, plazoMeses)) / 
-                (Math.pow(1 + tasaMensual, plazoMeses) - 1);
-  return cuota;
-};
-
-// Calcular interés moratorio (tasa adicional del 2% mensual sobre saldo vencido)
-const calcularInteresMoratorio = (saldoVencido, diasMora) => {
-  const tasaMoratoriaAnual = 24; // 2% mensual = 24% anual
-  const tasaMoratoriaDiaria = tasaMoratoriaAnual / 365 / 100;
-  const interesMoratorio = saldoVencido * tasaMoratoriaDiaria * diasMora;
-  return interesMoratorio;
-};
-
 // Registrar en bitácora
 const registrarBitacora = async (id_usuario, accion, detalle) => {
   try {
@@ -46,23 +30,6 @@ const registrarBitacora = async (id_usuario, accion, detalle) => {
   } catch (error) {
     console.error("Error al registrar en bitácora:", error);
   }
-};
-
-// Calcular días de mora
-const calcularDiasMora = (fechaOtorgado, fechaUltimoPago = null) => {
-  const hoy = new Date();
-  const fechaReferencia = fechaUltimoPago ? new Date(fechaUltimoPago) : new Date(fechaOtorgado);
-  
-  // Agregar 30 días (un mes) a la fecha de referencia
-  const fechaVencimiento = new Date(fechaReferencia);
-  fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
-  
-  if (hoy > fechaVencimiento) {
-    const diasMora = Math.floor((hoy - fechaVencimiento) / (1000 * 60 * 60 * 24));
-    return diasMora;
-  }
-  
-  return 0;
 };
 
 // ============================================
@@ -200,20 +167,27 @@ router.get("/:id", async (req, res) => {
 // ============================================
 router.post("/", async (req, res) => {
   const connection = await pool.getConnection();
-  
+
+  // Toda la operación va en una transacción; los retornos anticipados la revierten
+  const fail = async (codigo, cuerpo) => {
+    await connection.rollback().catch(() => {});
+    return res.status(codigo).json(cuerpo);
+  };
+
   try {
+    await connection.beginTransaction();
     const { id_prestamo, monto_pagado, metodo_pago, condonar_mora, tipo_pago, fecha_pago, fecha_referencia } = req.body;
 
     // Validaciones
     if (!id_prestamo || !monto_pagado) {
-      return res.status(400).json({ 
+      return fail(400, { 
         message: "Préstamo y monto pagado son requeridos." 
       });
     }
 
     const montoPagadoNum = parseFloat(monto_pagado);
     if (isNaN(montoPagadoNum) || montoPagadoNum <= 0) {
-      return res.status(400).json({ 
+      return fail(400, { 
         message: "El monto debe ser un número positivo" 
       });
     }
@@ -223,29 +197,42 @@ router.post("/", async (req, res) => {
       `SELECT p.*, u.nombre_completo 
        FROM prestamos p
        INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
-       WHERE p.id_prestamo = ?`,
+       WHERE p.id_prestamo = ?
+       FOR UPDATE OF p`,
       [id_prestamo]
     );
 
     if (prestamo.length === 0) {
-      return res.status(404).json({ message: "Préstamo no encontrado" });
+      return fail(404, { message: "Préstamo no encontrado" });
     }
 
     const prestamoData = prestamo[0];
 
     if (prestamoData.estado === 'pagado') {
-      return res.status(400).json({ 
+      return fail(400, { 
         message: "El préstamo ya está completamente pagado" 
       });
     }
 
     if (prestamoData.estado === 'pendiente') {
-      return res.status(400).json({ 
+      return fail(400, { 
         message: "El préstamo aún no ha sido aprobado" 
       });
     }
 
     const saldoActual = parseFloat(prestamoData.saldo_restante);
+
+    const [duplicado] = await connection.query(
+      `SELECT id_pago FROM pagos_prestamo
+       WHERE id_prestamo = ? AND monto_pagado = ? AND fecha_pago >= DATE_SUB(NOW(), INTERVAL 30 SECOND)
+       LIMIT 1`,
+      [id_prestamo, montoPagadoNum]
+    );
+    if (duplicado.length > 0) {
+      return fail(409, {
+        message: "Este pago ya fue registrado hace unos segundos. Revisa el historial antes de repetirlo.",
+      });
+    }
 
     // Calcular cuota mensual esperada
     const cuotaMensual = calcularCuotaMensual(
@@ -279,13 +266,13 @@ router.post("/", async (req, res) => {
       try {
         const token = req.header("Authorization")?.replace("Bearer ", "");
         rolSolicitante = token
-          ? jwt.verify(token, process.env.JWT_SECRET || "clave_secreta").rol
+          ? jwt.verify(token, process.env.JWT_SECRET).rol
           : null;
       } catch {
         rolSolicitante = null;
       }
       if (rolSolicitante !== "Super Administrador") {
-        return res.status(403).json({ message: "Solo el Super Administrador puede omitir la mora." });
+        return fail(403, { message: "Solo el Super Administrador puede omitir la mora." });
       }
       moraCondonada = true;
     }
@@ -297,11 +284,11 @@ router.post("/", async (req, res) => {
     const hoy = hoyISO();
     const fechaPagoStr = esFechaISO(fecha_pago) ? fecha_pago : hoy;
     if (fechaPagoStr > hoy) {
-      return res.status(400).json({ message: "La fecha del pago no puede ser futura." });
+      return fail(400, { message: "La fecha del pago no puede ser futura." });
     }
     const fechaUltimoPago = ultimoPago.length > 0 ? soloFecha(ultimoPago[0].fecha_pago) : null;
     if (fechaUltimoPago && fechaPagoStr < fechaUltimoPago) {
-      return res.status(400).json({
+      return fail(400, {
         message: `La fecha del pago no puede ser anterior al último pago registrado (${fechaUltimoPago}).`,
       });
     }
@@ -323,7 +310,7 @@ router.post("/", async (req, res) => {
     }
 
     if (montoPagadoNum < interesMoratorio - 0.005) {
-      return res.status(400).json({
+      return fail(400, {
         message: `El pago no alcanza a cubrir la mora generada (L. ${interesMoratorio.toFixed(2)}).`,
         interes_moratorio: parseFloat(interesMoratorio.toFixed(2)),
       });
@@ -332,7 +319,7 @@ router.post("/", async (req, res) => {
     // No se acepta más de lo adeudado: saldo + interés del período + mora
     const totalAdeudado = parseFloat((saldoActual + interesDelPeriodo + interesMoratorio).toFixed(2));
     if (montoPagadoNum > totalAdeudado + 0.01) {
-      return res.status(400).json({
+      return fail(400, {
         message: `El monto (L. ${montoPagadoNum.toFixed(2)}) excede el total adeudado (L. ${totalAdeudado.toFixed(2)}).`,
         total_adeudado: totalAdeudado,
       });
@@ -347,8 +334,6 @@ router.post("/", async (req, res) => {
     const nuevoSaldo = parseFloat(Math.max(0, saldoActual - capitalDelPeriodo).toFixed(2));
     const prestamoLiquidado = nuevoSaldo <= 0.01; // Considerar liquidado si queda menos de 1 centavo
 
-    await connection.beginTransaction();
-
     // Registrar el pago
     const [result] = await connection.query(
       `INSERT INTO pagos_prestamo (id_prestamo, monto_pagado, monto_capital, monto_interes, metodo_pago, saldo_restante, fecha_pago) 
@@ -361,6 +346,19 @@ router.post("/", async (req, res) => {
     );
 
     const nuevoPagoId = result.insertId;
+
+    await registrarCaja(connection, {
+      tipo: "ingreso",
+      categoria: "pago_prestamo",
+      monto: montoPagadoNum,
+      metodo: metodo_pago,
+      descripcion: `Pago préstamo #${id_prestamo} (capital L. ${capitalDelPeriodo.toFixed(2)}, interés L. ${interesEfectivo.toFixed(2)}${interesMoratorio > 0 ? `, mora L. ${interesMoratorio.toFixed(2)}` : ""})`,
+      referencia_tipo: "pago",
+      referencia_id: nuevoPagoId,
+      id_socio: prestamoData.id_usuario,
+      id_registrado_por: req.usuario?.id_usuario,
+      fecha: fechaPagoStr === hoy ? null : `${fechaPagoStr} 12:00:00`,
+    });
 
     // Actualizar saldo del préstamo
     await connection.query(
@@ -658,7 +656,7 @@ router.put("/:id", async (req, res) => {
     // Obtener el pago actual junto con datos del préstamo
     const [pagoRows] = await connection.query(
       `SELECT p.id_pago, p.id_prestamo, p.monto_pagado, p.fecha_pago,
-              pre.monto AS monto_original, pre.tasa_interes
+              pre.monto AS monto_original, pre.tasa_interes, pre.id_usuario
        FROM pagos_prestamo p
        INNER JOIN prestamos pre ON p.id_prestamo = pre.id_prestamo
        WHERE p.id_pago = ?`,
@@ -727,6 +725,22 @@ router.put("/:id", async (req, res) => {
         `UPDATE prestamos SET saldo_restante = ?, estado = IF(? <= 0.01, 'pagado', estado) WHERE id_prestamo = ?`,
         [saldo, saldo, idPrestamo]
       );
+
+      // Caja: la diferencia del monto editado entra o sale como ajuste
+      const diferenciaCaja = parseFloat((montoPagadoNum - montoAnterior).toFixed(2));
+      if (Math.abs(diferenciaCaja) >= 0.01) {
+        await registrarCaja(connection, {
+          tipo: diferenciaCaja > 0 ? "ingreso" : "egreso",
+          categoria: "ajuste_pago",
+          monto: Math.abs(diferenciaCaja),
+          metodo: metodoNorm,
+          descripcion: `Ajuste por edición del pago #${req.params.id}: de L. ${montoAnterior.toFixed(2)} a L. ${montoPagadoNum.toFixed(2)}`,
+          referencia_tipo: "pago",
+          referencia_id: parseInt(req.params.id),
+          id_socio: pagoData.id_usuario,
+          id_registrado_por: req.usuario?.id_usuario,
+        });
+      }
     }
 
     await connection.commit();
@@ -746,18 +760,31 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   const connection = await pool.getConnection();
   
+  const fail = async (codigo, cuerpo) => {
+    await connection.rollback().catch(() => {});
+    return res.status(codigo).json(cuerpo);
+  };
+
   try {
-    // Obtener el pago
+    const motivo = String(req.body?.motivo || req.query.motivo || "").trim();
+    if (motivo.length < 3) {
+      return fail(400, { message: "Indica el motivo de la anulación (mínimo 3 caracteres)." });
+    }
+
+    await connection.beginTransaction();
+
+    // Obtener el pago (bloqueando el préstamo para evitar cambios simultáneos)
     const [pago] = await connection.query(
       `SELECT p.*, pre.id_usuario, pre.saldo_restante as saldo_prestamo_actual
        FROM pagos_prestamo p
        INNER JOIN prestamos pre ON p.id_prestamo = pre.id_prestamo
-       WHERE p.id_pago = ?`,
+       WHERE p.id_pago = ?
+       FOR UPDATE`,
       [req.params.id]
     );
 
     if (pago.length === 0) {
-      return res.status(404).json({ message: "Pago no encontrado" });
+      return fail(404, { message: "Pago no encontrado" });
     }
 
     const pagoData = pago[0];
@@ -772,12 +799,10 @@ router.delete("/:id", async (req, res) => {
     );
 
     if (ultimoPago.length > 0 && ultimoPago[0].id_pago !== parseInt(req.params.id)) {
-      return res.status(400).json({ 
+      return fail(400, { 
         message: "Solo se puede anular el último pago registrado" 
       });
     }
-
-    await connection.beginTransaction();
 
     // Calcular nuevo saldo del préstamo (reversión)
     // Se restaura solo el capital amortizado, no el monto total del pago
@@ -790,11 +815,36 @@ router.delete("/:id", async (req, res) => {
       [nuevoSaldo, pagoData.id_prestamo]
     );
 
-    // Eliminar el pago
+    // Archivar el pago anulado (auditoría) y retirarlo del historial activo
+    await connection.query(
+      `INSERT INTO pagos_anulados
+         (id_pago, id_prestamo, monto_pagado, monto_capital, monto_interes, metodo_pago,
+          saldo_restante, fecha_pago, motivo, anulado_por)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        pagoData.id_pago, pagoData.id_prestamo, pagoData.monto_pagado, pagoData.monto_capital,
+        pagoData.monto_interes, pagoData.metodo_pago, pagoData.saldo_restante, pagoData.fecha_pago,
+        motivo.substring(0, 255), req.usuario?.id_usuario || null,
+      ]
+    );
+
     await connection.query(
       `DELETE FROM pagos_prestamo WHERE id_pago = ?`,
       [req.params.id]
     );
+
+    // Contrapartida en caja: sale el dinero que había entrado por este pago
+    await registrarCaja(connection, {
+      tipo: "egreso",
+      categoria: "anulacion_pago",
+      monto: pagoData.monto_pagado,
+      metodo: pagoData.metodo_pago,
+      descripcion: `Anulación del pago #${pagoData.id_pago} (préstamo #${pagoData.id_prestamo}). Motivo: ${motivo}`,
+      referencia_tipo: "pago",
+      referencia_id: pagoData.id_pago,
+      id_socio: pagoData.id_usuario,
+      id_registrado_por: req.usuario?.id_usuario,
+    });
 
     // Registrar en bitácora
     await connection.query(
@@ -803,7 +853,7 @@ router.delete("/:id", async (req, res) => {
       [
         pagoData.id_usuario,
         "Anulación de pago",
-        `Pago #${req.params.id} anulado. Monto: L. ${parseFloat(pagoData.monto_pagado).toFixed(2)}. Saldo restaurado a: L. ${nuevoSaldo.toFixed(2)}`
+        `Pago #${req.params.id} anulado. Monto: L. ${parseFloat(pagoData.monto_pagado).toFixed(2)}. Saldo restaurado a: L. ${nuevoSaldo.toFixed(2)}. Motivo: ${motivo}`
       ]
     );
 

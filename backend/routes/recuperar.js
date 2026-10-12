@@ -1,5 +1,6 @@
 // routes/recuperar.js
 const express = require("express");
+const { validarPassword } = require("../utils/passwordPolicy");
 const router = express.Router();
 const pool = require("../db");
 const jwt = require("jsonwebtoken");
@@ -49,7 +50,7 @@ router.post("/", async (req, res) => {
     res.json({ message: "Correo de recuperación enviado correctamente" });
   } catch (error) {
     console.error("Error en recuperación:", error);
-    res.status(500).json({ message: "Error enviando correo", error });
+    res.status(500).json({ message: "Error enviando correo" });
   }
 });
 
@@ -59,6 +60,11 @@ router.post("/:token", async (req, res) => {
   const { password } = req.body;
 
   try {
+    const errorPassword = validarPassword(password);
+    if (errorPassword) {
+      return res.status(400).json({ message: errorPassword });
+    }
+
     // Verifica el token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 

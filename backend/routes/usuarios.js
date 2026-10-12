@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const bcrypt = require("bcryptjs");
+const { validarPassword } = require("../utils/passwordPolicy");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const path = require("path");
@@ -154,7 +155,7 @@ router.post("/login", async (req, res) => {
         rol: user.rol,
         dni: user.dni,
       },
-      process.env.JWT_SECRET || "clave_secreta",
+      process.env.JWT_SECRET,
       { expiresIn: "8h" }
     );
 
@@ -315,6 +316,11 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ 
         message: "Nombre completo, DNI y contraseña son obligatorios." 
       });
+    }
+
+    const errorPassword = validarPassword(password);
+    if (errorPassword) {
+      return res.status(400).json({ message: errorPassword });
     }
 
     // Validar DNI hondureño (13 dígitos)
@@ -502,8 +508,12 @@ router.put("/:id", async (req, res) => {
       values.push(estado);
     }
 
-    // Si hay nueva contraseña, hashearla
+    // Si hay nueva contraseña, validarla y hashearla
     if (password) {
+      const errorPassword = validarPassword(password);
+      if (errorPassword) {
+        return res.status(400).json({ message: errorPassword });
+      }
       const salt = await bcrypt.genSalt(10);
       const passwordHash = await bcrypt.hash(password, salt);
       updateFields.push("password = ?");
@@ -665,6 +675,11 @@ router.post("/:id/cambiar-password", async (req, res) => {
       return res.status(400).json({ 
         message: "La contraseña actual y la nueva son requeridas" 
       });
+    }
+
+    const errorPassword = validarPassword(password_nuevo);
+    if (errorPassword) {
+      return res.status(400).json({ message: errorPassword });
     }
 
     // Obtener usuario

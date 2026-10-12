@@ -4,6 +4,8 @@
 //   - Pasados los 30 días, el interés sigue por días reales (tasa mensual / 30).
 //   - Cuota fija: siempre un mes (30 días).
 
+const config = require("./configFinanciera");
+
 const DIAS_MES = 30;
 
 const pad = (n) => String(n).padStart(2, "0");
@@ -39,18 +41,61 @@ const calcularInteresPeriodo = (saldo, tasaAnual, dias) => {
 const diasDeInteres = (modo, fechaBase, fechaPago) =>
   modo === "cuota_fija" ? DIAS_MES : Math.max(DIAS_MES, diasEntre(fechaBase, fechaPago));
 
-// Días de atraso: pasados 30 días desde el último pago (o desde el otorgamiento)
+// Días de atraso: pasados los días de gracia (por defecto 30) desde el último
+// pago o desde el otorgamiento.
 const calcularDiasMora = (fechaOtorgado, fechaUltimoPago = null) => {
   const base = soloFecha(fechaUltimoPago) || soloFecha(fechaOtorgado);
   if (!base) return 0;
-  return Math.max(0, diasEntre(base, hoyISO()) - DIAS_MES);
+  return Math.max(0, diasEntre(base, hoyISO()) - config.obtener().mora_dias_gracia);
 };
 
-// Mora: 24% anual (2% mensual) sobre el saldo, por día de atraso
+// Mora: tasa anual configurable (24% por defecto) sobre el saldo, por día de atraso
 const calcularInteresMoratorio = (saldo, diasMora) =>
-  parseFloat(saldo) * (24 / 365 / 100) * diasMora;
+  parseFloat(saldo) * (config.obtener().mora_tasa_anual / 365 / 100) * diasMora;
+
+// Cuota mensual (sistema francés). plazoMeses === 0 → préstamo indefinido: solo interés
+const calcularCuotaMensual = (monto, tasaAnual, plazoMeses) => {
+  if (plazoMeses === 0) {
+    return monto * (tasaAnual / 100) / 12;
+  }
+  const tasaMensual = tasaAnual / 100 / 12;
+  if (tasaMensual === 0) return monto / plazoMeses;
+  return (monto * (tasaMensual * Math.pow(1 + tasaMensual, plazoMeses))) /
+    (Math.pow(1 + tasaMensual, plazoMeses) - 1);
+};
+
+// Tabla de amortización teórica del plan pactado
+const generarTablaAmortizacion = (monto, tasaAnual, plazoMeses, fechaOtorgado) => {
+  if (plazoMeses === 0) return [];
+  const tasaMensual = tasaAnual / 100 / 12;
+  const cuotaMensual = calcularCuotaMensual(monto, tasaAnual, plazoMeses);
+  let saldoRestante = monto;
+  const tabla = [];
+
+  for (let i = 1; i <= plazoMeses; i++) {
+    const interesCuota = saldoRestante * tasaMensual;
+    const capitalCuota = cuotaMensual - interesCuota;
+    saldoRestante = Math.max(0, saldoRestante - capitalCuota);
+
+    const fechaVencimiento = new Date(fechaOtorgado);
+    fechaVencimiento.setMonth(fechaVencimiento.getMonth() + i);
+
+    tabla.push({
+      numero_cuota: i,
+      cuota_total: parseFloat(cuotaMensual.toFixed(2)),
+      capital: parseFloat(capitalCuota.toFixed(2)),
+      interes: parseFloat(interesCuota.toFixed(2)),
+      saldo_restante: parseFloat(saldoRestante.toFixed(2)),
+      fecha_vencimiento: fechaVencimiento.toISOString().split("T")[0],
+    });
+  }
+
+  return tabla;
+};
 
 module.exports = {
+  calcularCuotaMensual,
+  generarTablaAmortizacion,
   calcularDiasMora,
   calcularInteresMoratorio,
   DIAS_MES,

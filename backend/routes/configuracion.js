@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const configFin = require("../utils/configFinanciera");
 const { verificarToken } = require("../middleware/auth");
 const multer = require("multer");
 const path = require("path");
@@ -90,7 +91,9 @@ router.get("/", async (req, res) => {
   try {
     const [rows] = await pool.query("SELECT clave, valor FROM configuracion_sitio");
     const db = {};
-    rows.forEach(({ clave, valor }) => { db[clave] = valor; });
+    rows.forEach(({ clave, valor }) => {
+      if (!clave.startsWith("fin_")) db[clave] = valor; // los parámetros financieros no son públicos
+    });
 
     // Fusionar con defaults
     const resultado = { ...DEFAULTS, ...db };
@@ -105,6 +108,46 @@ router.get("/", async (req, res) => {
     res.json({ success: true, data: resultado });
   } catch (error) {
     res.status(500).json({ message: "Error al obtener configuración", error: error.message });
+  }
+});
+
+// ============================================================
+// GET/PUT /api/configuracion/financiera  (requiere sesión; PUT solo Super Admin)
+// Parámetros de mora que usa todo el sistema
+// ============================================================
+router.get("/financiera", verificarToken, (req, res) => {
+  res.json({ success: true, data: configFin.obtener() });
+});
+
+router.put("/financiera", verificarToken, soloSuperAdmin, async (req, res) => {
+  try {
+    const tasa = parseFloat(req.body.mora_tasa_anual);
+    const gracia = parseInt(req.body.mora_dias_gracia);
+    if (isNaN(tasa) || tasa < 0 || tasa > 120) {
+      return res.status(400).json({ message: "La tasa de mora anual debe estar entre 0 y 120." });
+    }
+    if (isNaN(gracia) || gracia < 0 || gracia > 90) {
+      return res.status(400).json({ message: "Los días de gracia deben estar entre 0 y 90." });
+    }
+    const guardar = [
+      ["fin_mora_tasa_anual", String(tasa)],
+      ["fin_mora_dias_gracia", String(gracia)],
+    ];
+    for (const [clave, valor] of guardar) {
+      await pool.query(
+        "INSERT INTO configuracion_sitio (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)",
+        [clave, valor]
+      );
+    }
+    await pool.query(
+      "INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())",
+      [req.usuario.id_usuario, "Cambio de parámetros financieros", `Mora: ${tasa}% anual, ${gracia} días de gracia`]
+    );
+    await configFin.refrescar();
+    res.json({ success: true, message: "Parámetros financieros guardados.", data: configFin.obtener() });
+  } catch (error) {
+    console.error("ERROR AL GUARDAR PARÁMETROS FINANCIEROS:", error);
+    res.status(500).json({ message: "Error al guardar los parámetros financieros" });
   }
 });
 

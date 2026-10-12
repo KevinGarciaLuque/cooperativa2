@@ -162,15 +162,23 @@ export default function Pagos() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("¿Seguro que deseas eliminar este pago?")) return;
+    const motivo = window.prompt(
+      "Anular este pago devuelve el saldo al préstamo y queda registrado.\n\nIndica el motivo de la anulación:"
+    );
+    if (motivo === null) return;
+    if (motivo.trim().length < 3) {
+      mostrarAlerta("El motivo de la anulación es obligatorio.", "error");
+      return;
+    }
     try {
       await axios.delete(`${API_URL}/pagos/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
+        params: { motivo: motivo.trim() },
       });
-      mostrarAlerta("Pago eliminado correctamente.", "success");
+      mostrarAlerta("Pago anulado correctamente.", "success");
       fetchData();
     } catch (err) {
-      mostrarAlerta("Error al eliminar el pago.", "error");
+      mostrarAlerta(err.response?.data?.message || "Error al anular el pago.", "error");
     }
   };
 

@@ -20,6 +20,8 @@ import Reportes from "../pages/Reportes";
 import Roles from "../pages/Roles";
 import Usuarios from "../pages/Usuarios/Usuarios";
 import Ventanilla from "../pages/Ventanilla";
+import Caja from "../pages/Caja";
+import ParametrosFinancieros from "../pages/SuperAdmin/ParametrosFinancieros";
 // Vistas de usuario socio
 import SocioPerfil from "../pages/Socio/SocioPerfil";
 // Vista para restablecimiento por token
@@ -78,6 +80,22 @@ export default function Rutas() {
             element={
               <PrivateRoute>
                 <Ventanilla />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/caja"
+            element={
+              <PrivateRoute>
+                <Caja />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/parametros-financieros"
+            element={
+              <PrivateRoute>
+                <ParametrosFinancieros />
               </PrivateRoute>
             }
           />

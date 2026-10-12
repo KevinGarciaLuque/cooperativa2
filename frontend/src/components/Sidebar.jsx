@@ -23,6 +23,8 @@ import {
   FaDatabase,
   FaShieldAlt,
   FaConciergeBell,
+  FaCashRegister,
+  FaSlidersH,
 } from "react-icons/fa";
 import LogoCoop from "./LogoCoop";
 
@@ -44,6 +46,7 @@ const TODOS_MODULOS = [
   { key: "cuentas",       to: "/cuentas",       icon: <FaUniversity />,     label: "Cuentas" },
   { key: "prestamos",     to: "/prestamos",     icon: <FaHandHoldingUsd />, label: "Préstamos" },
   { key: "aportaciones",  to: "/aportaciones",  icon: <FaPiggyBank />,      label: "Aportaciones" },
+  { key: "caja",          to: "/caja",          icon: <FaCashRegister />,   label: "Caja" },
   { key: "pagos",         to: "/pagos",         icon: <FaMoneyCheckAlt />,  label: "Pagos" },
   { key: "movimientos",   to: "/movimientos",   icon: <FaExchangeAlt />,    label: "Movimientos" },
   { key: "reportes",      to: "/reportes",      icon: <FaFileAlt />,        label: "Reportes" },
@@ -56,6 +59,7 @@ const TODOS_MODULOS = [
 // Menú completo para Super Administrador (todos los módulos + control de accesos)
 const menuSuperAdmin = [
   ...TODOS_MODULOS,
+  { to: "/parametros-financieros", icon: <FaSlidersH />, label: "Parámetros" },
   { to: "/superadmin", icon: <FaShieldAlt />, label: "Control de Accesos" },
 ];
 

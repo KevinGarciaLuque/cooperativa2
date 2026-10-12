@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { registrarCaja } = require("../utils/caja");
 
 // ============================================
 // FUNCIONES AUXILIARES
@@ -247,6 +248,18 @@ router.post("/", async (req, res) => {
       [cuentaDestino.id_cuenta, montoNum, descripcion || 'Aportación mensual']
     );
 
+    await registrarCaja(connection, {
+      tipo: "ingreso",
+      categoria: "aportacion",
+      monto: montoNum,
+      metodo: req.body.metodo_pago,
+      descripcion: descripcion || "Aportación mensual",
+      referencia_tipo: "aportacion",
+      referencia_id: nuevaAportacionId,
+      id_socio: id_usuario,
+      id_registrado_por: req.usuario?.id_usuario,
+    });
+
     // Registrar en bitácora
     await connection.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) 
@@ -356,14 +369,30 @@ router.put("/:id", async (req, res) => {
         // Registrar movimiento de ajuste
         await connection.query(
           `INSERT INTO movimientos_cuenta (id_cuenta, tipo_movimiento, monto, descripcion, fecha) 
-           VALUES (?, 'aporte', ?, ?, NOW())`,
+           VALUES (?, ?, ?, ?, NOW())`,
           [
             cuenta[0].id_cuenta, 
+            diferencia > 0 ? 'aporte' : 'retiro',
             Math.abs(diferencia),
             `Ajuste por modificación de aportación (ID: ${req.params.id})`
           ]
         );
       }
+    }
+
+    if (monto && Math.abs(montoNuevo - montoAnterior) >= 0.01) {
+      const dif = montoNuevo - montoAnterior;
+      await registrarCaja(connection, {
+        tipo: dif > 0 ? "ingreso" : "egreso",
+        categoria: "ajuste_aportacion",
+        monto: Math.abs(dif),
+        metodo: "efectivo",
+        descripcion: `Ajuste de aportación #${req.params.id}: de L. ${montoAnterior.toFixed(2)} a L. ${montoNuevo.toFixed(2)}`,
+        referencia_tipo: "aportacion",
+        referencia_id: parseInt(req.params.id),
+        id_socio: aportacionActual[0].id_usuario,
+        id_registrado_por: req.usuario?.id_usuario,
+      });
     }
 
     // Registrar en bitácora
@@ -449,6 +478,18 @@ router.delete("/:id", async (req, res) => {
         ]
       );
     }
+
+    await registrarCaja(connection, {
+      tipo: "egreso",
+      categoria: "anulacion_aportacion",
+      monto: montoAportacion,
+      metodo: "efectivo",
+      descripcion: `Eliminación de la aportación #${req.params.id}`,
+      referencia_tipo: "aportacion",
+      referencia_id: parseInt(req.params.id),
+      id_socio: id_usuario,
+      id_registrado_por: req.usuario?.id_usuario,
+    });
 
     // Registrar en bitácora
     await connection.query(

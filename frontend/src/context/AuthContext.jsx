@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import axios from "axios";
 
 const AuthContext = createContext();
@@ -23,7 +23,9 @@ export function AuthProvider({ children }) {
       localStorage.setItem("token", res.data.token);
       return true;
     } catch (error) {
-      return false;
+      // Mensaje del servidor (por ejemplo, bloqueo temporal por demasiados intentos)
+      const status = error.response?.status;
+      return status === 429 ? error.response.data?.message || false : false;
     }
   };
 
@@ -33,6 +35,25 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
   };
+
+  // Si el servidor indica que la sesión ya no es válida (expiró o la cuenta se
+  // desactivó), se cierra la sesión y se vuelve al inicio de sesión.
+  useEffect(() => {
+    const id = axios.interceptors.response.use(
+      (r) => r,
+      (error) => {
+        const url = error.config?.url || "";
+        const esAuth = url.includes("/usuarios/login") || url.includes("/recuperar");
+        if (error.response?.status === 401 && !esAuth && localStorage.getItem("token")) {
+          localStorage.removeItem("user");
+          localStorage.removeItem("token");
+          window.location.href = "/login";
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => axios.interceptors.response.eject(id);
+  }, []);
 
   const updateUser = (updatedFields) => {
     const updated = { ...user, ...updatedFields };

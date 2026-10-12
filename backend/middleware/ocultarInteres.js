@@ -39,7 +39,7 @@ const ocultarInteresSocio = (req, res, next) => {
   try {
     const token = req.header("Authorization")?.replace("Bearer ", "");
     if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || "clave_secreta");
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
       if (decoded.rol === "Socio") {
         const jsonOriginal = res.json.bind(res);
         res.json = (body) => jsonOriginal(limpiar(body));

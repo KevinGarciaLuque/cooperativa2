@@ -1,6 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const {
+  DIAS_MES,
+  soloFecha,
+  esFechaISO,
+  hoyISO,
+  diasEntre,
+  calcularInteresPeriodo,
+  diasDeInteres,
+} = require("../utils/calculosPrestamo");
 
 // ============================================
 // FUNCIONES AUXILIARES Y CÁLCULOS
@@ -192,7 +201,7 @@ router.post("/", async (req, res) => {
   const connection = await pool.getConnection();
   
   try {
-    const { id_prestamo, monto_pagado, metodo_pago, incluir_mora } = req.body;
+    const { id_prestamo, monto_pagado, metodo_pago, incluir_mora, tipo_pago, fecha_pago, fecha_referencia } = req.body;
 
     // Validaciones
     if (!id_prestamo || !monto_pagado) {
@@ -265,17 +274,44 @@ router.post("/", async (req, res) => {
       interesMoratorio = calcularInteresMoratorio(saldoActual, diasMora);
     }
 
-    // ── Amortización francesa ──────────────────────────────────────────────
-    // La tasa_interes se almacena como valor anual → convertir a mensual
-    const tasaMensual = parseFloat(prestamoData.tasa_interes) / 100 / 12;
+    // ── Interés del período ────────────────────────────────────────────────
+    // Mes completo siempre: mínimo 30 días de interés; pasado el mes, por días reales.
+    const modo = ["desglose", "indefinido"].includes(tipo_pago) ? tipo_pago : "cuota_fija";
+    const hoy = hoyISO();
+    const fechaPagoStr = esFechaISO(fecha_pago) ? fecha_pago : hoy;
+    if (fechaPagoStr > hoy) {
+      return res.status(400).json({ message: "La fecha del pago no puede ser futura." });
+    }
+    const fechaUltimoPago = ultimoPago.length > 0 ? soloFecha(ultimoPago[0].fecha_pago) : null;
+    if (fechaUltimoPago && fechaPagoStr < fechaUltimoPago) {
+      return res.status(400).json({
+        message: `La fecha del pago no puede ser anterior al último pago registrado (${fechaUltimoPago}).`,
+      });
+    }
+    const fechaBase = esFechaISO(fecha_referencia)
+      ? fecha_referencia
+      : fechaUltimoPago || soloFecha(prestamoData.fecha_otorgado) || fechaPagoStr;
+    const diasInteres = diasDeInteres(modo, fechaBase, fechaPagoStr);
 
-    // Interés que corresponde a este período sobre el saldo actual
-    const interesDelPeriodo = parseFloat((saldoActual * tasaMensual).toFixed(2));
+    const interesDelPeriodo = calcularInteresPeriodo(
+      saldoActual,
+      prestamoData.tasa_interes,
+      diasInteres
+    );
 
     // El monto neto que se aplica al préstamo (descontando mora si aplica)
     let montoAplicado = montoPagadoNum;
     if (interesMoratorio > 0) {
       montoAplicado -= interesMoratorio;
+    }
+
+    // No se acepta más de lo adeudado: saldo + interés del período + mora
+    const totalAdeudado = parseFloat((saldoActual + interesDelPeriodo + interesMoratorio).toFixed(2));
+    if (montoPagadoNum > totalAdeudado + 0.01) {
+      return res.status(400).json({
+        message: `El monto (L. ${montoPagadoNum.toFixed(2)}) excede el total adeudado (L. ${totalAdeudado.toFixed(2)}).`,
+        total_adeudado: totalAdeudado,
+      });
     }
 
     // Capital = lo que queda después de cubrir el interés del período
@@ -292,8 +328,12 @@ router.post("/", async (req, res) => {
     // Registrar el pago
     const [result] = await connection.query(
       `INSERT INTO pagos_prestamo (id_prestamo, monto_pagado, monto_capital, monto_interes, metodo_pago, saldo_restante, fecha_pago) 
-       VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-      [id_prestamo, montoPagadoNum, capitalDelPeriodo, interesEfectivo, metodo_pago || 'Efectivo', nuevoSaldo]
+       VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, NOW()))`,
+      [
+        id_prestamo, montoPagadoNum, capitalDelPeriodo, interesEfectivo,
+        metodo_pago || 'Efectivo', nuevoSaldo,
+        fechaPagoStr === hoy ? null : `${fechaPagoStr} 12:00:00`,
+      ]
     );
 
     const nuevoPagoId = result.insertId;
@@ -349,6 +389,8 @@ router.post("/", async (req, res) => {
         saldo_nuevo: nuevoSaldo,
         cuota_mensual_esperada: parseFloat(cuotaMensual.toFixed(2)),
         dias_mora: diasMora,
+        dias_interes: diasInteres,
+        modo_interes: modo,
         interes_moratorio: parseFloat(interesMoratorio.toFixed(2)),
         prestamo_liquidado: prestamoLiquidado,
       },
@@ -441,6 +483,11 @@ router.get("/prestamo/:id_prestamo/proximo-pago", async (req, res) => {
       [req.params.id_prestamo]
     );
 
+    // Monto para saldar hoy: saldo + interés proporcional por días desde el último pago
+    const fechaBaseLiq = soloFecha(ultimoPago.length > 0 ? ultimoPago[0].fecha_pago : prestamoData.fecha_otorgado);
+    const diasLiq = Math.max(DIAS_MES, diasEntre(fechaBaseLiq, hoyISO()));
+    const interesLiq = calcularInteresPeriodo(prestamoData.saldo_restante, prestamoData.tasa_interes, diasLiq);
+
     const cuotasPagadas = totalPagos[0].total;
     const cuotasFaltantes = parseInt(prestamoData.plazo_meses) - cuotasPagadas;
 
@@ -456,6 +503,9 @@ router.get("/prestamo/:id_prestamo/proximo-pago", async (req, res) => {
         cuotas_pagadas: cuotasPagadas,
         cuotas_faltantes: cuotasFaltantes,
         en_mora: diasMora > 0,
+        dias_desde_ultimo_pago: diasLiq,
+        interes_para_saldar: interesLiq,
+        total_para_saldar: parseFloat((parseFloat(prestamoData.saldo_restante) + interesLiq).toFixed(2)),
       },
     });
 

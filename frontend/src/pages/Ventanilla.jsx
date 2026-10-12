@@ -386,14 +386,29 @@ export default function Ventanilla() {
                             <div className="fw-bold">{prox?.fecha_vencimiento || "—"}</div>
                           </div>
                         </div>
-                        <button
-                          className="btn fw-semibold w-100"
-                          style={{ background: ACCENT, color: "#1a2a00" }}
-                          onClick={() => irNuevo("/pagos", { prestamo: p.id_prestamo })}
-                        >
-                          <FaMoneyCheckAlt className="me-2" />
-                          Cobrar cuota
-                        </button>
+                        {prox?.total_para_saldar != null && (
+                          <div className="small text-muted mb-3">
+                            Para saldar hoy ({prox.dias_desde_ultimo_pago} día(s) desde el último pago):{" "}
+                            <strong>L. {fmt(prox.total_para_saldar)}</strong>
+                          </div>
+                        )}
+                        <div className="d-flex gap-2">
+                          <button
+                            className="btn fw-semibold flex-fill"
+                            style={{ background: ACCENT, color: "#1a2a00" }}
+                            onClick={() => irNuevo("/pagos", { prestamo: p.id_prestamo })}
+                          >
+                            <FaMoneyCheckAlt className="me-2" />
+                            Cobrar cuota
+                          </button>
+                          <button
+                            className="btn btn-outline-dark fw-semibold flex-fill"
+                            title="Pagar el préstamo completo: saldo + interés"
+                            onClick={() => irNuevo("/pagos", { prestamo: p.id_prestamo, tipo: "desglose" })}
+                          >
+                            Liquidar total
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );

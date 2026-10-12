@@ -3,16 +3,13 @@ const jwt = require("jsonwebtoken");
 // Campos que un socio no debe ver: intereses, tasas y el desglose de capital.
 const CAMPO_OCULTO = /interes|tasa|capital/i;
 
-// Cuota mínima calculada con la tasa efectiva mensual (misma fórmula que usaba
-// el panel del socio en el cliente), para que siga viendo su cuota sin ver la tasa.
+// Cuota mínima calculada igual que el backend (tasa_interes anual / 12), para que
+// el socio siga viendo su cuota sin ver la tasa.
 const cuotaMinima = (p) => {
   const monto = parseFloat(p.monto);
   const plazo = parseInt(p.plazo_meses);
   if (!(monto > 0) || isNaN(plazo)) return null;
-  const tasaMensual =
-    p.tasa_original != null
-      ? parseFloat(p.tasa_original) / 100
-      : parseFloat(p.tasa_interes) / 100 / 12;
+  const tasaMensual = parseFloat(p.tasa_interes) / 100 / 12;
   if (isNaN(tasaMensual)) return null;
   if (plazo === 0) return parseFloat((monto * tasaMensual).toFixed(2));
   if (tasaMensual === 0) return parseFloat((monto / plazo).toFixed(2));

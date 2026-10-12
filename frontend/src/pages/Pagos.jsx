@@ -47,6 +47,7 @@ export default function Pagos() {
   const [prestamoFiltro, setPrestamoFiltro] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editPago, setEditPago] = useState(null);
+  const [tipoInicial, setTipoInicial] = useState(""); // tipo de pago sugerido desde la Ventanilla
   const [form, setForm] = useState({
     id_prestamo: "",
     monto: "",
@@ -121,17 +122,19 @@ export default function Pagos() {
   });
 
   // Acciones rápidas que llegan desde la Ventanilla
-  useAccionRapida(!loading, ({ accion, prestamo, q }) => {
+  useAccionRapida(!loading, ({ accion, prestamo, tipo, q }) => {
     if (accion === "ver") {
       setFiltro(q);
     } else if (accion === "nuevo") {
       openCrearModal();
       if (prestamo) setForm((f) => ({ ...f, id_prestamo: prestamo }));
+      setTipoInicial(tipo || "");
     }
   });
 
   const openCrearModal = () => {
     setEditPago(null);
+    setTipoInicial("");
     setForm({
       id_prestamo: "",
       monto: "",
@@ -178,6 +181,9 @@ export default function Pagos() {
         monto_pagado: parseFloat(form.monto),
         metodo_pago: form.metodo_pago || "Efectivo",
         descripcion: form.descripcion || "",
+        tipo_pago: form.tipo_pago || "cuota_fija",
+        fecha_pago: form.fecha || undefined,
+        fecha_referencia: form.fecha_referencia || undefined,
       };
       if (editPago) {
         await axios.put(`${API_URL}/pagos/${editPago.id_pago}`, payload, {
@@ -209,7 +215,8 @@ export default function Pagos() {
   };
 
   const handleInput = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm((f) => ({ ...f, [name]: value }));
   };
 
   // Estadísticas
@@ -628,6 +635,7 @@ export default function Pagos() {
           onClose={() => setShowModal(false)}
           onSubmit={handleSubmit}
           handleInput={handleInput}
+          tipoInicial={tipoInicial}
         />
       )}
     </div>
@@ -1113,6 +1121,7 @@ function ModalPago({
   onClose,
   onSubmit,
   handleInput,
+  tipoInicial = "",
 }) {
   // ── Hooks SIEMPRE antes del early return (regla de React) ────────────
   const [fechaReferencia, setFechaReferencia] = useState("");
@@ -1158,7 +1167,11 @@ function ModalPago({
       setFechaReferencia("");
     }
     if (prestamoSeleccionado && !editPago) {
-      setTipoPago(parseInt(prestamoSeleccionado.plazo_meses) === 0 ? "indefinido" : "cuota_fija");
+      setTipoPago(
+        tipoInicial === "desglose"
+          ? "desglose"
+          : parseInt(prestamoSeleccionado.plazo_meses) === 0 ? "indefinido" : "cuota_fija"
+      );
     }
   // eslint-disable-next-line
   }, [prestamoSeleccionado?.id_prestamo]);
@@ -1181,7 +1194,7 @@ function ModalPago({
     const ref = fechaReferencia ? new Date(fechaReferencia + "T00:00:00") : null;
     const fechaPagoDate = form.fecha ? new Date(form.fecha + "T00:00:00") : null;
     const dias = (ref && fechaPagoDate)
-      ? Math.max(1, Math.round((fechaPagoDate - ref) / (1000 * 60 * 60 * 24)))
+      ? Math.max(30, Math.round((fechaPagoDate - ref) / (1000 * 60 * 60 * 24)))
       : 30;
     const tasaMens = parseFloat(prestamoSeleccionado.tasa_interes) / 100 / 12;
     const tasaDia = tasaMens / 30;
@@ -1195,6 +1208,14 @@ function ModalPago({
     handleInput({ target: { name: "monto", value: raw } });
   // eslint-disable-next-line
   }, [tipoPago, prestamoSeleccionado?.id_prestamo, fechaReferencia, form.fecha]);
+
+  // El backend calcula el interés con la misma regla: enviarle el tipo y el período elegidos
+  useEffect(() => {
+    if (editPago) return;
+    handleInput({ target: { name: "tipo_pago", value: tipoPago } });
+    handleInput({ target: { name: "fecha_referencia", value: fechaReferencia } });
+  // eslint-disable-next-line
+  }, [tipoPago, fechaReferencia]);
 
   // Cuando cambia la fecha del pago: recalcular días (sin tocar fechaReferencia)
   // Se fuerza re-render natural — diasTranscurridos se recalcula automáticamente
@@ -1220,7 +1241,7 @@ function ModalPago({
     const ref  = new Date(fechaReferencia + "T00:00:00");
     const pago = new Date(form.fecha      + "T00:00:00");
     const diff = Math.round((pago - ref) / (1000 * 60 * 60 * 24));
-    return diff >= 1 ? diff : 1; // mínimo 1 día
+    return diff >= 30 ? diff : 30; // mes completo siempre: mínimo 30 días
   };
   const diasTranscurridos = prestamoSeleccionado ? calcularDias() : 30;
   const tasaDiaria = tasaMensual / 30;                       // tasa diaria = mensual / 30

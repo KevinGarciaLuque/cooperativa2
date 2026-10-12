@@ -1,6 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const {
+  DIAS_MES,
+  soloFecha,
+  hoyISO,
+  diasEntre,
+  calcularInteresPeriodo,
+} = require("../utils/calculosPrestamo");
 
 // ============================================
 // FUNCIONES AUXILIARES Y CÁLCULOS
@@ -545,49 +552,85 @@ router.patch("/:id/estado", async (req, res) => {
 // ============================================
 // CANCELAR/LIQUIDAR PRÉSTAMO COMPLETAMENTE
 // ============================================
+// COTIZAR LIQUIDACIÓN TOTAL (saldo + interés, mínimo un mes completo)
+// ============================================
+const cotizarLiquidacion = async (conn, idPrestamo) => {
+  const [prestamo] = await conn.query(`SELECT * FROM prestamos WHERE id_prestamo = ?`, [idPrestamo]);
+  if (prestamo.length === 0) return { error: 404, message: "Préstamo no encontrado" };
+  const p = prestamo[0];
+  if (p.estado === "pagado") return { error: 400, message: "El préstamo ya está pagado" };
+  if (p.estado === "pendiente") return { error: 400, message: "El préstamo aún no ha sido aprobado" };
+
+  const [ultimo] = await conn.query(
+    `SELECT fecha_pago FROM pagos_prestamo WHERE id_prestamo = ? ORDER BY fecha_pago DESC LIMIT 1`,
+    [idPrestamo]
+  );
+  const hoy = hoyISO();
+  const fechaBase = soloFecha(ultimo.length > 0 ? ultimo[0].fecha_pago : p.fecha_otorgado) || hoy;
+  const dias = Math.max(DIAS_MES, diasEntre(fechaBase, hoy));
+  const saldo = parseFloat(p.saldo_restante);
+  const interes = calcularInteresPeriodo(saldo, p.tasa_interes, dias);
+  return {
+    prestamo: p,
+    saldo,
+    interes,
+    dias,
+    fecha_base: fechaBase,
+    total: parseFloat((saldo + interes).toFixed(2)),
+  };
+};
+
+router.get("/:id/cotizar-liquidacion", async (req, res) => {
+  try {
+    const c = await cotizarLiquidacion(pool, req.params.id);
+    if (c.error) return res.status(c.error).json({ message: c.message });
+    res.json({
+      success: true,
+      data: {
+        saldo_capital: c.saldo,
+        interes: c.interes,
+        dias: c.dias,
+        desde: c.fecha_base,
+        total_a_pagar: c.total,
+      },
+    });
+  } catch (error) {
+    console.error("ERROR AL COTIZAR LIQUIDACIÓN:", error);
+    res.status(500).json({ message: "Error al cotizar la liquidación", error: error.message });
+  }
+});
+
+// ============================================
+// LIQUIDAR UN PRÉSTAMO COMPLETAMENTE (cobra saldo + interés devengado)
+// ============================================
 router.post("/:id/liquidar", async (req, res) => {
   const connection = await pool.getConnection();
-  
+
   try {
-    // Obtener el préstamo
-    const [prestamo] = await connection.query(
-      `SELECT * FROM prestamos WHERE id_prestamo = ?`,
-      [req.params.id]
-    );
-
-    if (prestamo.length === 0) {
-      return res.status(404).json({ message: "Préstamo no encontrado" });
-    }
-
-    if (prestamo[0].estado === 'pagado') {
-      return res.status(400).json({ message: "El préstamo ya está pagado" });
-    }
-
-    const saldoRestante = parseFloat(prestamo[0].saldo_restante);
+    const c = await cotizarLiquidacion(connection, req.params.id);
+    if (c.error) return res.status(c.error).json({ message: c.message });
 
     await connection.beginTransaction();
 
-    // Registrar el pago final
+    // Registrar el pago final con su desglose capital / interés
     await connection.query(
-      `INSERT INTO pagos_prestamo (id_prestamo, monto_pagado, saldo_restante, metodo_pago, fecha_pago) 
-       VALUES (?, ?, 0.00, 'Liquidación total', NOW())`,
-      [req.params.id, saldoRestante]
+      `INSERT INTO pagos_prestamo (id_prestamo, monto_pagado, monto_capital, monto_interes, saldo_restante, metodo_pago, fecha_pago)
+       VALUES (?, ?, ?, ?, 0.00, 'Liquidación total', NOW())`,
+      [req.params.id, c.total, c.saldo, c.interes]
     );
 
-    // Actualizar préstamo a pagado
     await connection.query(
       `UPDATE prestamos SET saldo_restante = 0.00, estado = 'pagado' WHERE id_prestamo = ?`,
       [req.params.id]
     );
 
-    // Registrar en bitácora
     await connection.query(
-      `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) 
+      `INSERT INTO bitacora (id_usuario, accion, detalle, fecha)
        VALUES (?, ?, ?, NOW())`,
       [
-        prestamo[0].id_usuario,
+        c.prestamo.id_usuario,
         "Liquidación de préstamo",
-        `Préstamo #${req.params.id} liquidado completamente. Monto final: L. ${saldoRestante.toFixed(2)}`
+        `Préstamo #${req.params.id} liquidado. Capital: L. ${c.saldo.toFixed(2)}, interés (${c.dias} días): L. ${c.interes.toFixed(2)}, total: L. ${c.total.toFixed(2)}`,
       ]
     );
 
@@ -596,15 +639,16 @@ router.post("/:id/liquidar", async (req, res) => {
     res.json({
       success: true,
       message: "Préstamo liquidado completamente",
-      monto_liquidado: saldoRestante,
+      monto_liquidado: c.total,
+      saldo_capital: c.saldo,
+      interes: c.interes,
     });
-
   } catch (error) {
     await connection.rollback();
     console.error("ERROR AL LIQUIDAR PRÉSTAMO:", error);
-    res.status(500).json({ 
-      message: "Error al liquidar el préstamo", 
-      error: error.message 
+    res.status(500).json({
+      message: "Error al liquidar el préstamo",
+      error: error.message,
     });
   } finally {
     connection.release();

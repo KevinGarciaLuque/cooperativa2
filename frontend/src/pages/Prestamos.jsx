@@ -1416,8 +1416,8 @@ function ModalPrestamo({
                         }}
                       />
                       <datalist id="plazo-opciones">
-                        {[3,6,9,12,18,24,36,48,60,72,84,96,120].map(m => (
-                          <option key={m} value={m}>{m} meses{m >= 12 ? ` (${m/12} año${m/12>1?"s":""})` : ""}</option>
+                        {[1,2,3,6,9,12,18,24,36,48,60,72,84,96,120].map(m => (
+                          <option key={m} value={m}>{m} {m === 1 ? "mes" : "meses"}{m >= 12 ? ` (${m/12} año${m/12>1?"s":""})` : ""}</option>
                         ))}
                       </datalist>
                       {esIndefinido ? (

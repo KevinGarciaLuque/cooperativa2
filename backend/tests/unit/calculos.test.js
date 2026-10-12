@@ -95,3 +95,13 @@ test("numeración de recibos y finiquitos", () => {
   assert.equal(numeroRecibo(12, "pago_prestamo"), "R-000012");
   assert.equal(numeroRecibo(5, "finiquito"), "F-000005");
 });
+
+test("nombres con mayúscula inicial", () => {
+  const { formatearNombre } = require("../../utils/nombres");
+  assert.equal(formatearNombre("maría josé HERNÁNDEZ"), "María José Hernández");
+  assert.equal(formatearNombre("  juan   carlos  pérez "), "Juan Carlos Pérez");
+  assert.equal(formatearNombre("MARÍA DE LOS ÁNGELES díaz"), "María de los Ángeles Díaz");
+  assert.equal(formatearNombre("De la Cruz pedro"), "De la Cruz Pedro");
+  assert.equal(formatearNombre("ana-lucía o'neil"), "Ana-Lucía O'Neil");
+  assert.equal(formatearNombre(""), "");
+});

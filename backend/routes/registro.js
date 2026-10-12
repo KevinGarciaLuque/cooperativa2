@@ -10,6 +10,7 @@ const { leerRegistro } = require("../utils/registroConfig");
 const { notificarAdministradores, escaparHtml } = require("../utils/notificaciones");
 const { parametrosSolicitud, validarSolicitud, insertarSolicitud } = require("../utils/solicitudPrestamo");
 const { subidaIdentidad, mensajeErrorSubida, guardarLado } = require("../utils/identidad");
+const { formatearNombre } = require("../utils/nombres");
 
 const validarDNI = (v) => /^\d{13}$/.test(v);
 const validarTelefono = (v) => /^\d{8}$/.test(v);
@@ -96,7 +97,7 @@ router.post("/", recibirFormulario, async (req, res) => {
       return res.status(403).json({ message: "Este enlace de registro no es válido o ya venció. Pide uno nuevo a la cooperativa." });
     }
 
-    const nombre = String(nombre_completo || "").trim();
+    const nombre = formatearNombre(nombre_completo);
     if (nombre.length < 5 || nombre.split(/\s+/).length < 2) {
       return res.status(400).json({ message: "Escribe tu nombre completo (nombre y apellido)." });
     }

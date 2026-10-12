@@ -2,6 +2,7 @@
 // para que ambos pidan exactamente lo mismo.
 import InputMonto from "../ui/InputMonto";
 import { OCUPACIONES, PROPOSITOS, fmt, simular } from "../utils/solicitud";
+import { formatearNombre } from "../utils/nombres";
 
 export const AvisoRelacion = ({ sim }) =>
   sim.relacionAlta ? (
@@ -125,6 +126,8 @@ export function CamposIngresos({ form, setForm }) {
                   <input
                     className="form-control" placeholder={`Referencia ${n}: nombre`} maxLength={100}
                     name={`ref${n}_nombre`} value={form[`ref${n}_nombre`]} onChange={cambiar}
+                    autoCapitalize="words"
+                    onBlur={(e) => setForm((f) => ({ ...f, [e.target.name]: formatearNombre(f[e.target.name]) }))}
                   />
                 </div>
                 <div className="col-6 col-md-3">

@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { formatearNombre } = require("../utils/nombres");
 const pool = require("../db");
 const bcrypt = require("bcryptjs");
 const { validarPassword } = require("../utils/passwordPolicy");
@@ -295,6 +296,7 @@ router.post("/", async (req, res) => {
   const connection = await pool.getConnection();
   
   try {
+    if (req.body.nombre_completo) req.body.nombre_completo = formatearNombre(req.body.nombre_completo);
     const {
       nombre_completo,
       dni,
@@ -433,6 +435,7 @@ router.post("/", async (req, res) => {
 // ============================================
 router.put("/:id", async (req, res) => {
   try {
+    if (req.body.nombre_completo) req.body.nombre_completo = formatearNombre(req.body.nombre_completo);
     const {
       nombre_completo,
       telefono,

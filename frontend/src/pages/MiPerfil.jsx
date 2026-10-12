@@ -10,6 +10,7 @@ import {
 } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
 import FirmaDigital from "../components/FirmaDigital";
+import { formatearNombre } from "../utils/nombres";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -435,6 +436,8 @@ export default function MiPerfil() {
                         {editando
                           ? <input className="mp-input" value={form.nombre_completo}
                               onChange={(e) => setForm({ ...form, nombre_completo: e.target.value })}
+                              autoCapitalize="words"
+                              onBlur={() => setForm((f) => ({ ...f, nombre_completo: formatearNombre(f.nombre_completo) }))}
                               required />
                           : <div className="mp-field-value">{perfil?.nombre_completo || "—"}</div>
                         }

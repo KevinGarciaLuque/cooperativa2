@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { comprimirImagen } from "../../utils/imagen";
+import { formatearNombre } from "../../utils/nombres";
 import { useAuth } from "../../context/AuthContext";
 import { useAlerta } from "../../context/AlertaContext";
 import { 
@@ -264,6 +265,8 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
                   className="form-control form-control-lg"
                   value={form.nombre_completo}
                   onChange={handleInput}
+                  autoCapitalize="words"
+                  onBlur={() => setForm((f) => ({ ...f, nombre_completo: formatearNombre(f.nombre_completo) }))}
                   required
                   autoFocus={tipo === "crear"}
                   placeholder="Ej: Juan Carlos Pérez"

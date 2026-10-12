@@ -2,6 +2,7 @@
 // y desde el enlace de registro (donde la solicitud llega junto con los datos del socio).
 const config = require("./configFinanciera");
 const { calcularCuotaMensual } = require("./calculosPrestamo");
+const { formatearNombre } = require("./nombres");
 
 const PROPOSITOS = ["negocio", "vivienda", "educacion", "salud", "agricultura", "consumo", "otro"];
 const OCUPACIONES = ["empleado", "negocio_propio", "agricultor", "independiente", "jubilado", "otro"];
@@ -45,7 +46,7 @@ const validarSolicitud = (b = {}) => {
   const referencias = (Array.isArray(b.referencias) ? b.referencias : [])
     .slice(0, 2)
     .map((r) => ({
-      nombre: aTexto(r?.nombre, 100),
+      nombre: formatearNombre(aTexto(r?.nombre, 100)),
       telefono: aTexto(r?.telefono, 20),
       parentesco: aTexto(r?.parentesco, 50),
     }))

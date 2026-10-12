@@ -6,6 +6,7 @@ import { FaHandHoldingUsd, FaCheckCircle, FaExclamationTriangle, FaArrowLeft } f
 import { CamposMonto, CamposIngresos, AvisoRelacion } from "../components/CamposSolicitud";
 import { SOLICITUD_VACIA, fmt, solicitudDesde, simular } from "../utils/solicitud";
 import { CampoFotoIdentidad } from "../components/FotosIdentidad";
+import { formatearNombre } from "../utils/nombres";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const AZUL = "#1a2035";
@@ -271,7 +272,14 @@ export default function Registro() {
                   <div className="row g-3">
                     {campo("Nombre completo", "nombre_completo", {
                       requerido: true,
-                      input: { required: true, maxLength: 100, placeholder: "Nombre y apellidos", autoComplete: "name" },
+                      input: {
+                        required: true,
+                        maxLength: 100,
+                        placeholder: "Nombre y apellidos",
+                        autoComplete: "name",
+                        autoCapitalize: "words",
+                        onBlur: () => setForm((f) => ({ ...f, nombre_completo: formatearNombre(f.nombre_completo) })),
+                      },
                     })}
                     {campo("Número de identidad", "dni", {
                       requerido: true,

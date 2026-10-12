@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
+import { comprimirImagen } from "../utils/imagen";
 import {
   FaUserCircle, FaShieldAlt, FaHistory,
   FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt,
@@ -171,7 +172,7 @@ export default function MiPerfil() {
     setSubiendoFoto(true);
     try {
       const fd = new FormData();
-      fd.append("foto", file);
+      fd.append("foto", await comprimirImagen(file, 900));
       const res = await axios.put(
         `${API_URL}/usuarios/${user.id_usuario}/foto`,
         fd,

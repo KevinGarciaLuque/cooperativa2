@@ -428,6 +428,46 @@ test("contabilidad: cierre mensual congelado y reapertura", async () => {
   assert.equal((await api("DELETE", "/contabilidad/cierre-mensual/2026/1?motivo=correccion%20autorizada", null, ids.tSuper)).s, 200);
 });
 
+test("fotos de perfil: se guardan en la base de datos y sobreviven al disco", async () => {
+  const subir = async (token, id, nombre, mime, bytes) => {
+    const fd = new FormData();
+    fd.append("foto", new Blob([bytes], { type: mime }), nombre);
+    const r = await fetch(`${base}/api/usuarios/${id}/foto`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}` },
+      body: fd,
+    });
+    return { s: r.status, b: await r.json().catch(() => null) };
+  };
+
+  // formato no permitido
+  assert.equal((await subir(ids.tSocio, ids.socio, "x.exe", "application/octet-stream", "MZ")).s, 400);
+
+  // un socio no puede cambiar la foto de otro
+  assert.equal((await subir(ids.tSocio2, ids.socio, "a.png", "image/png", Buffer.from([1, 2, 3]))).s, 403);
+
+  const png = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
+  const ok = await subir(ids.tSocio, ids.socio, "yo.png", "image/png", png);
+  assert.equal(ok.s, 200);
+  assert.match(ok.b.foto, /^\/uploads\/usuarios\/usuario_\d+_\d+\.png$/);
+
+  // la imagen se sirve desde la base de datos (no hay archivo en disco)
+  const fs = require("fs");
+  const path = require("path");
+  assert.equal(fs.existsSync(path.join(__dirname, "../..", ok.b.foto)), false);
+  const img = await fetch(`${base}${ok.b.foto}`);
+  assert.equal(img.status, 200);
+  assert.equal(img.headers.get("content-type"), "image/png");
+  assert.equal((await img.arrayBuffer()).byteLength, png.length);
+
+  // al reemplazarla, la anterior se elimina
+  await new Promise((r) => setTimeout(r, 5));
+  const otra = await subir(ids.tSocio, ids.socio, "yo2.png", "image/png", png);
+  assert.equal(otra.s, 200);
+  assert.equal((await fetch(`${base}${ok.b.foto}`)).status, 404);
+  assert.equal((await fetch(`${base}${otra.b.foto}`)).status, 200);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

@@ -86,7 +86,9 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Ruta para archivos subidos (si usas uploads)
+// Imágenes subidas: primero desde la base de datos (persisten entre despliegues);
+// si no están, los archivos que ya existían en disco.
+app.use("/uploads", require("./utils/archivos").servirArchivos);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Estado del servicio (para monitoreo): público y sin datos sensibles

@@ -3,26 +3,16 @@ const router = express.Router();
 const pool = require("../db");
 const bcrypt = require("bcryptjs");
 const { validarPassword } = require("../utils/passwordPolicy");
+const archivos = require("../utils/archivos");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
-// Multer: almacenamiento de fotos de perfil
-const storageUsuarios = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, "../uploads/usuarios");
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `usuario_${req.params.id}_${Date.now()}${ext}`);
-  },
-});
+// Multer: las fotos se reciben en memoria y se guardan en la base de datos
 const uploadFoto = multer({
-  storage: storageUsuarios,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8 MB
   fileFilter: (req, file, cb) => {
     const allowed = [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".gif"];
     if (allowed.includes(path.extname(file.originalname).toLowerCase())) {
@@ -638,7 +628,16 @@ router.delete("/:id", async (req, res) => {
 // ============================================
 // SUBIR / ACTUALIZAR FOTO DE PERFIL
 // ============================================
-router.put("/:id/foto", uploadFoto.single("foto"), async (req, res) => {
+// Recibe la imagen y convierte los errores de carga en respuestas claras (400)
+const recibirFoto = (req, res, next) =>
+  uploadFoto.single("foto")(req, res, (err) => {
+    if (!err) return next();
+    const mensaje =
+      err.code === "LIMIT_FILE_SIZE" ? "La imagen es muy grande (máximo 8 MB)." : err.message || "No se pudo recibir la imagen.";
+    res.status(400).json({ message: mensaje });
+  });
+
+router.put("/:id/foto", recibirFoto, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: "No se recibió ningún archivo." });
@@ -654,11 +653,12 @@ router.put("/:id/foto", uploadFoto.single("foto"), async (req, res) => {
 
     // Eliminar foto anterior si existe
     if (usuario[0].foto) {
-      const oldPath = path.join(__dirname, "..", usuario[0].foto.replace(/^\//, ""));
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      await archivos.eliminarArchivo(usuario[0].foto);
     }
 
-    const fotoPath = `/uploads/usuarios/${req.file.filename}`;
+    const ext = path.extname(req.file.originalname).toLowerCase() || ".jpg";
+    const fotoPath = `/uploads/usuarios/usuario_${req.params.id}_${Date.now()}${ext}`;
+    await archivos.guardarArchivo(fotoPath, req.file.mimetype, req.file.buffer);
     await pool.query(
       `UPDATE usuarios SET foto = ? WHERE id_usuario = ?`,
       [fotoPath, req.params.id]

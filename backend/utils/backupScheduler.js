@@ -4,7 +4,8 @@ const path = require("path");
 const pool = require("../db");
 
 const CONFIG_FILE = path.join(__dirname, "../backup_config.json");
-const BACKUPS_DIR = path.join(__dirname, "../backups");
+// En Railway, apunta BACKUPS_DIR a un volumen persistente (ej. /data/backups)
+const BACKUPS_DIR = process.env.BACKUPS_DIR || path.join(__dirname, "../backups");
 
 const DEFAULT_CONFIG = {
   activo: false,

@@ -241,6 +241,23 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_10_009_archivos",
+    descripcion: "Almacén de imágenes (fotos de perfil y logo) en la base de datos",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS archivos (
+          id_archivo INT AUTO_INCREMENT PRIMARY KEY,
+          ruta VARCHAR(255) NOT NULL,
+          mime VARCHAR(80) NOT NULL,
+          tamano INT NOT NULL,
+          contenido MEDIUMBLOB NOT NULL,
+          creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_archivo_ruta (ruta)
+        )
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

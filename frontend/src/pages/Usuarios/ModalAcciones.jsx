@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { comprimirImagen } from "../../utils/imagen";
 import { useAuth } from "../../context/AuthContext";
 import { useAlerta } from "../../context/AlertaContext";
 import { 
@@ -120,7 +121,7 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
       // Subir foto si se seleccionó una
       if (fotoFile && nuevoId) {
         const fd = new FormData();
-        fd.append("foto", fotoFile);
+        fd.append("foto", await comprimirImagen(fotoFile, 900));
         const fotoRes = await axios.put(`${API_URL}/usuarios/${nuevoId}/foto`, fd, {
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
         });

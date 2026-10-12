@@ -2,25 +2,15 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const configFin = require("../utils/configFinanciera");
+const archivos = require("../utils/archivos");
 const { verificarToken } = require("../middleware/auth");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
-// Multer para logo del sitio
-const storageLogo = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, "../uploads/logos");
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `logo_${Date.now()}${ext}`);
-  },
-});
+// Multer para logo del sitio: en memoria, se guarda en la base de datos
 const uploadLogo = multer({
-  storage: storageLogo,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
   fileFilter: (req, file, cb) => {
     const allowed = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"];
@@ -229,7 +219,8 @@ router.post("/logo", verificarToken, soloSuperAdmin, (req, res) => {
       return res.status(400).json({ message: "No se recibió ninguna imagen" });
     }
 
-    const logoUrl = `/uploads/logos/${req.file.filename}`;
+    const ext = path.extname(req.file.originalname).toLowerCase() || ".png";
+    const logoUrl = `/uploads/logos/logo_${Date.now()}${ext}`;
 
     try {
       // Eliminar logo anterior si existía y no es el default
@@ -237,9 +228,9 @@ router.post("/logo", verificarToken, soloSuperAdmin, (req, res) => {
         "SELECT valor FROM configuracion_sitio WHERE clave = 'logo_url'"
       );
       if (prev.length > 0 && prev[0].valor && !prev[0].valor.includes("smartcoop.png")) {
-        const oldPath = path.join(__dirname, "..", prev[0].valor);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        await archivos.eliminarArchivo(prev[0].valor);
       }
+      await archivos.guardarArchivo(logoUrl, req.file.mimetype, req.file.buffer);
 
       await pool.query(
         "INSERT INTO configuracion_sitio (clave, valor) VALUES ('logo_url', ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)",

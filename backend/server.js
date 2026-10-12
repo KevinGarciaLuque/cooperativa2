@@ -21,6 +21,12 @@ aplicarMigraciones()
     logger.error("migraciones_fallidas", error);
   })
   .finally(() => {
+    // Copia a la base de datos las fotos y logos que existan en disco
+    require("./utils/archivos")
+      .importarArchivosExistentes()
+      .then((n) => n && logger.info("archivos_importados", { cantidad: n }))
+      .catch((e) => logger.error("archivos_importacion_fallida", e));
+
     configFinanciera.iniciar();
     iniciarScheduler(); // respaldos automáticos
     iniciarMoraScheduler(); // verificación diaria de mora

@@ -4,39 +4,9 @@ import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { FaPrint, FaTimes, FaWhatsapp, FaFilePdf, FaCamera, FaCheckCircle } from "react-icons/fa";
 import { generarReciboPdf, nombreArchivoRecibo } from "../utils/reciboPdf";
+import { comprimirImagen } from "../utils/imagen";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-
-// Reduce las fotos del celular (suelen pesar varios MB) antes de subirlas
-const comprimirImagen = (archivo) =>
-  new Promise((resolver) => {
-    if (!archivo.type.startsWith("image/")) return resolver(archivo);
-    const url = URL.createObjectURL(archivo);
-    const img = new Image();
-    img.onload = () => {
-      const maximo = 1800;
-      const escala = Math.min(1, maximo / Math.max(img.width, img.height));
-      const lienzo = document.createElement("canvas");
-      lienzo.width = Math.round(img.width * escala);
-      lienzo.height = Math.round(img.height * escala);
-      lienzo.getContext("2d").drawImage(img, 0, 0, lienzo.width, lienzo.height);
-      lienzo.toBlob(
-        (blob) => {
-          URL.revokeObjectURL(url);
-          resolver(
-            blob ? new File([blob], archivo.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }) : archivo
-          );
-        },
-        "image/jpeg",
-        0.82
-      );
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      resolver(archivo);
-    };
-    img.src = url;
-  });
 
 const fmt = (n) =>
   `L. ${parseFloat(n || 0).toLocaleString("es-HN", {

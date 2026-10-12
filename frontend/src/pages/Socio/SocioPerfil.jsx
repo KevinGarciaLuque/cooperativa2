@@ -2,6 +2,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useConfigSitio } from "../../hooks/useConfigSitio";
 import SolicitudPrestamoSocio from "../../components/SolicitudPrestamoSocio";
 import ReciboModal from "../../components/ReciboModal";
+import { comprimirImagen } from "../../utils/imagen";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import {
@@ -124,7 +125,7 @@ export default function SocioPerfil() {
     setFotoError("");
     try {
       const formData = new FormData();
-      formData.append("foto", file);
+      formData.append("foto", await comprimirImagen(file, 900));
       const res = await axios.put(
         `${API_URL}/usuarios/${user.id_usuario}/foto`,
         formData,

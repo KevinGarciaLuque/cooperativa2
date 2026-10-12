@@ -33,9 +33,22 @@ Frontend: `VITE_API_URL` (URL de la API terminada en `/api`). Se define en Railw
   Deben ser idempotentes y aditivas (crear tablas o columnas; no borrar datos).
 - Si cambia el esquema base, regenera `backend/sql/esquema_base.sql` con `npm run db:exportar`.
 
+## Fotos, logo y comprobantes firmados
+
+Las imágenes (fotos de perfil, logo) y las copias firmadas de los comprobantes de desembolso se guardan
+**dentro de la base de datos** (tablas `archivos` y `comprobantes_firmados`), no en el disco del servidor.
+Así sobreviven a los despliegues de Railway, que borran el disco, y viajan con los respaldos.
+
+- Las URL siguen siendo `/uploads/...`; el servidor las sirve desde la base de datos.
+- Al arrancar, el sistema copia a la base de datos cualquier imagen que exista en `backend/uploads/`
+  (por ejemplo, las que estén en el repositorio).
+- Las fotos que se suben desde el navegador se reducen antes de enviarse para no inflar la base.
+
 ## Respaldos
 
 - **Automáticos y manuales:** pantalla Base de Datos (Super Administrador). Se guardan en `backend/backups/`.
+- **Carpeta persistente (opcional):** crea un *Volume* en Railway (Settings → Volumes), móntalo en
+  `/data` y define `BACKUPS_DIR=/data/backups`. Así los respaldos guardados en el servidor no se borran al desplegar.
 - **Importante:** el disco de Railway es temporal. Un redespliegue puede borrar `backend/backups/`.
   Descarga respaldos periódicamente desde la pantalla Base de Datos y guárdalos fuera del servidor
   (Google Drive, correo, disco externo).

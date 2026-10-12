@@ -61,7 +61,7 @@ module.exports = { verificarRespaldo };
 
 if (require.main === module) {
   require("dotenv").config({ path: path.join(__dirname, "../.env") });
-  const dir = path.join(__dirname, "../backups");
+  const dir = process.env.BACKUPS_DIR || path.join(__dirname, "../backups");
   let archivo = process.argv[2];
   if (!archivo && fs.existsSync(dir)) {
     const lista = fs

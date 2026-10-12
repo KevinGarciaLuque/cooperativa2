@@ -60,6 +60,7 @@ export default function SocioPerfil() {
   const [aportaciones, setAportaciones] = useState([]);
   const [prestamos, setPrestamos]       = useState([]);
   const [ultimoPagoFecha, setUltimoPagoFecha] = useState(null); // último pago a préstamos
+  const [moras, setMoras] = useState({}); // id_prestamo -> { dias, mora, porDia }
   const [loading, setLoading]           = useState(true);
   const [tab, setTab]                   = useState("resumen");
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -82,6 +83,24 @@ export default function SocioPerfil() {
     .pop() || null;
   const prestamosPrimero =
     !!ultimoPagoFecha && (!ultimaAportacionFecha || ultimoPagoFecha > ultimaAportacionFecha);
+
+  const totalMora = Object.values(moras).reduce((s, m) => s + m.mora, 0);
+
+  const AvisoMora = ({ mora }) =>
+    mora ? (
+      <div
+        className="rounded-3 p-2 px-3 mt-2 d-flex align-items-start gap-2"
+        style={{ background: "#fee2e2", border: "1px solid #fecaca", color: "#991b1b" }}
+      >
+        <FaExclamationTriangle className="mt-1" />
+        <div className="small">
+          <strong>{mora.dias} día{mora.dias !== 1 ? "s" : ""} de mora</strong> · Mora generada:{" "}
+          <strong>L. {fmt(mora.mora)}</strong>
+          {mora.porDia > 0 && <> (aprox. L. {fmt(mora.porDia)} por día)</>}
+          <div style={{ color: "#b45309" }}>Se cobra junto con tu próximo pago.</div>
+        </div>
+      </div>
+    ) : null;
 
   const handleFotoChange = async (e) => {
     const file = e.target.files[0];
@@ -150,7 +169,35 @@ export default function SocioPerfil() {
         ]);
         setCuentas(cuentasRes.data.data || []);
         setAportaciones(aportacionesRes.data.data || aportacionesRes.data || []);
-        setPrestamos(prestamosRes.data.data || prestamosRes.data || []);
+        const listaPrestamos = prestamosRes.data.data || prestamosRes.data || [];
+        setPrestamos(listaPrestamos);
+
+        // Días de mora y mora generada de cada préstamo vigente
+        const vigentes = listaPrestamos.filter((p) =>
+          ["activo", "mora"].includes((p.estado || "").toLowerCase())
+        );
+        const moraMap = {};
+        await Promise.all(
+          vigentes.map(async (p) => {
+            try {
+              const r = await axios.get(`${API_URL}/pagos/prestamo/${p.id_prestamo}/proximo-pago`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              const pp = r.data.proximo_pago;
+              if (pp && pp.dias_mora > 0) {
+                moraMap[p.id_prestamo] = {
+                  dias: pp.dias_mora,
+                  mora: parseFloat(pp.interes_moratorio || 0),
+                  porDia: parseFloat(pp.mora_por_dia || 0),
+                };
+              }
+            } catch {
+              // sin datos de mora para este préstamo
+            }
+          })
+        );
+        setMoras(moraMap);
+
         const listaPagos = pagosRes.data.data || pagosRes.data || [];
         const fechas = listaPagos
           .map((pg) => (pg.fecha_pago || "").substring(0, 10))
@@ -362,6 +409,22 @@ export default function SocioPerfil() {
           {/* TAB: RESUMEN */}
           {tab === "resumen" && (
             <div className="row g-4">
+              {totalMora > 0 && (
+                <div className="col-12" style={{ order: -1 }}>
+                  <div
+                    className="rounded-4 p-3 d-flex align-items-center gap-3"
+                    style={{ background: "#fee2e2", border: "1px solid #fecaca", color: "#991b1b" }}
+                  >
+                    <FaExclamationTriangle size={22} />
+                    <div>
+                      <div className="fw-bold">Tienes cuotas atrasadas</div>
+                      <div className="small">
+                        Mora generada hasta hoy: <strong>L. {fmt(totalMora)}</strong>. Mientras más días pasen, mayor será el cargo.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* Cuentas */}
               <div className="col-md-6" style={{ order: 1 }}>
                 <div className="card border-0 shadow-sm rounded-4 h-100">
@@ -497,6 +560,7 @@ export default function SocioPerfil() {
                                   <div className="sp-progress-fill" style={{ width: `${progreso}%` }} />
                                 </div>
                                 <div className="small text-muted mt-1 text-end">{progreso.toFixed(0)}% pagado</div>
+                                <AvisoMora mora={moras[p.id_prestamo]} />
                               </div>
                             </div>
                           );
@@ -638,6 +702,9 @@ export default function SocioPerfil() {
                           }
                         </div>
                       </div>
+
+                      <AvisoMora mora={moras[p.id_prestamo]} />
+                      <div className="mb-2" />
 
                       {/* Botón historial */}
                       <button

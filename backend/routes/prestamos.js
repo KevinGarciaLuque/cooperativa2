@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const {
+  calcularDiasMora,
+  calcularInteresMoratorio,
   DIAS_MES,
   soloFecha,
   hoyISO,
@@ -570,13 +572,17 @@ const cotizarLiquidacion = async (conn, idPrestamo) => {
   const dias = Math.max(DIAS_MES, diasEntre(fechaBase, hoy));
   const saldo = parseFloat(p.saldo_restante);
   const interes = calcularInteresPeriodo(saldo, p.tasa_interes, dias);
+  const diasMora = calcularDiasMora(p.fecha_otorgado, ultimo.length > 0 ? ultimo[0].fecha_pago : null);
+  const mora = parseFloat(calcularInteresMoratorio(saldo, diasMora).toFixed(2));
   return {
     prestamo: p,
     saldo,
     interes,
+    mora,
+    dias_mora: diasMora,
     dias,
     fecha_base: fechaBase,
-    total: parseFloat((saldo + interes).toFixed(2)),
+    total: parseFloat((saldo + interes + mora).toFixed(2)),
   };
 };
 
@@ -589,6 +595,8 @@ router.get("/:id/cotizar-liquidacion", async (req, res) => {
       data: {
         saldo_capital: c.saldo,
         interes: c.interes,
+        mora: c.mora,
+        dias_mora: c.dias_mora,
         dias: c.dias,
         desde: c.fecha_base,
         total_a_pagar: c.total,
@@ -630,7 +638,7 @@ router.post("/:id/liquidar", async (req, res) => {
       [
         c.prestamo.id_usuario,
         "Liquidación de préstamo",
-        `Préstamo #${req.params.id} liquidado. Capital: L. ${c.saldo.toFixed(2)}, interés (${c.dias} días): L. ${c.interes.toFixed(2)}, total: L. ${c.total.toFixed(2)}`,
+        `Préstamo #${req.params.id} liquidado. Capital: L. ${c.saldo.toFixed(2)}, interés (${c.dias} días): L. ${c.interes.toFixed(2)}, mora (${c.dias_mora} días): L. ${c.mora.toFixed(2)}, total: L. ${c.total.toFixed(2)}`,
       ]
     );
 
@@ -642,6 +650,7 @@ router.post("/:id/liquidar", async (req, res) => {
       monto_liquidado: c.total,
       saldo_capital: c.saldo,
       interes: c.interes,
+      mora: c.mora,
     });
   } catch (error) {
     await connection.rollback();

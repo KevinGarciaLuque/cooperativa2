@@ -148,6 +148,10 @@ export default function Ventanilla() {
       deuda: vigentes.reduce((s, p) => s + parseFloat(p.saldo_restante || 0), 0),
       saldoCuentas: ficha.cuentas.reduce((s, c) => s + parseFloat(c.saldo_actual || 0), 0),
       aportado: ficha.aportaciones.reduce((s, a) => s + parseFloat(a.monto || 0), 0),
+      moraTotal: vigentes.reduce(
+        (s, p) => s + parseFloat(ficha.proximos[p.id_prestamo]?.interes_moratorio || 0),
+        0
+      ),
       enMora: vigentes.some(
         (p) => (p.estado || "").toLowerCase() === "mora" || ficha.proximos[p.id_prestamo]?.en_mora
       ),
@@ -325,6 +329,7 @@ export default function Ventanilla() {
               {resumen?.enMora && (
                 <span className="badge rounded-pill px-3 py-2" style={{ background: "#fee2e2", color: "#991b1b" }}>
                   <FaExclamationTriangle className="me-1" /> Cuota en mora
+                  {resumen.moraTotal > 0 && <> · Mora generada L. {fmt(resumen.moraTotal)}</>}
                 </span>
               )}
             </div>
@@ -425,6 +430,12 @@ export default function Ventanilla() {
                             <div className="fw-bold">{prox?.fecha_vencimiento || "—"}</div>
                           </div>
                         </div>
+                        {prox?.en_mora && (
+                          <div className="small mb-2" style={{ color: "#991b1b" }}>
+                            Mora generada: <strong>L. {fmt(prox.interes_moratorio)}</strong>
+                            {prox.mora_por_dia > 0 && <> · genera L. {fmt(prox.mora_por_dia)} por día</>}
+                          </div>
+                        )}
                         {prox?.total_para_saldar != null && (
                           <div className="small text-muted mb-3">
                             Para saldar hoy ({prox.dias_desde_ultimo_pago} día(s) desde el último pago):{" "}

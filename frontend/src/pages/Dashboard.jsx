@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
+import CierreMensual from "../components/CierreMensual";
 import {
   FaUsers,
   FaHandHoldingUsd,
@@ -65,6 +66,7 @@ export default function Dashboard() {
   const [distribuciones, setDistribuciones] = useState(null);
   const [rankings, setRankings] = useState(null);
   const [resumenEjecutivo, setResumenEjecutivo] = useState(null);
+  const [morosidad, setMorosidad] = useState(null);
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -92,6 +94,14 @@ export default function Dashboard() {
       setDistribuciones(distribRes.data);
       setRankings(rankingsRes.data);
       setResumenEjecutivo(resumenRes.data);
+
+      // Mora generada (si falla no debe tumbar el resto del dashboard)
+      try {
+        const morosidadRes = await axios.get(`${API_URL}/pagos/reportes/morosidad`, { headers });
+        setMorosidad(morosidadRes.data);
+      } catch {
+        setMorosidad(null);
+      }
     } catch (error) {
       console.error("Error cargando dashboard:", error);
     } finally {
@@ -290,7 +300,7 @@ export default function Dashboard() {
 
           {/* KPIs Financieros */}
           <div className="row g-3 mb-4">
-            <div className="col-12 col-md-4">
+            <div className="col-12 col-sm-6 col-lg-3">
               <div className="card border-0 shadow-sm" style={{ borderRadius: "15px" }}>
                 <div className="card-body text-center py-4">
                   <div
@@ -310,7 +320,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            <div className="col-12 col-md-4">
+            <div className="col-12 col-sm-6 col-lg-3">
               <div className="card border-0 shadow-sm" style={{ borderRadius: "15px" }}>
                 <div className="card-body text-center py-4">
                   <div
@@ -330,7 +340,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            <div className="col-12 col-md-4">
+            <div className="col-12 col-sm-6 col-lg-3">
               <div className="card border-0 shadow-sm" style={{ borderRadius: "15px" }}>
                 <div className="card-body text-center py-4">
                   <div
@@ -343,7 +353,27 @@ export default function Dashboard() {
                   >
                     <FaMoneyBillWave style={{ fontSize: "24px", color: COLORS.purple }} />
                   </div>
-                  <p className="text-muted mb-2 small fw-semibold">Intereses Generados</p>
+                  <p className="text-muted mb-2 small fw-semibold">Intereses Recaudados del Mes</p>
+                  <h4 className="mb-0 fw-bold" style={{ color: COLORS.purple }}>
+                    {formatCurrency(kpis.finanzas.interesesMesActual || 0)}
+                  </h4>
+                </div>
+              </div>
+            </div>
+            <div className="col-12 col-sm-6 col-lg-3">
+              <div className="card border-0 shadow-sm" style={{ borderRadius: "15px" }}>
+                <div className="card-body text-center py-4">
+                  <div
+                    className="rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3"
+                    style={{
+                      width: "50px",
+                      height: "50px",
+                      background: `${COLORS.purple}20`,
+                    }}
+                  >
+                    <FaMoneyBillWave style={{ fontSize: "24px", color: COLORS.purple }} />
+                  </div>
+                  <p className="text-muted mb-2 small fw-semibold">Intereses Generados (acumulado)</p>
                   <h4 className="mb-0 fw-bold" style={{ color: COLORS.purple }}>
                     {formatCurrency(kpis.finanzas.interesesGeneradosTotales)}
                   </h4>
@@ -353,6 +383,76 @@ export default function Dashboard() {
           </div>
         </>
       )}
+
+      {/* ==================== MORA GENERADA ==================== */}
+      {morosidad && (
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: "15px" }}>
+          <div className="card-body p-4">
+            <h5 className="fw-bold d-flex align-items-center mb-3" style={{ color: "#2c3e50" }}>
+              <FaExclamationTriangle className="me-2" style={{ color: COLORS.danger }} />
+              Mora generada
+            </h5>
+            <div className="row g-3 mb-3">
+              <div className="col-12 col-md-4">
+                <div className="p-3 h-100" style={{ background: "#fdecea", borderRadius: "12px" }}>
+                  <div className="small text-muted fw-semibold">Mora generada hoy (por cobrar)</div>
+                  <div className="fw-bold fs-4" style={{ color: COLORS.danger }}>
+                    {formatCurrency(morosidad.totales.intereses_moratorios_total)}
+                  </div>
+                </div>
+              </div>
+              <div className="col-6 col-md-4">
+                <div className="p-3 h-100" style={{ background: "#f6f8fb", borderRadius: "12px" }}>
+                  <div className="small text-muted fw-semibold">Préstamos con atraso</div>
+                  <div className="fw-bold fs-4">{morosidad.totales.total_prestamos_mora}</div>
+                </div>
+              </div>
+              <div className="col-6 col-md-4">
+                <div className="p-3 h-100" style={{ background: "#f6f8fb", borderRadius: "12px" }}>
+                  <div className="small text-muted fw-semibold">Saldo en atraso</div>
+                  <div className="fw-bold fs-4">{formatCurrency(morosidad.totales.monto_total_mora)}</div>
+                </div>
+              </div>
+            </div>
+            {morosidad.prestamos_en_mora.length === 0 ? (
+              <div className="text-muted small">No hay préstamos con atraso. 🎉</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-sm mb-0">
+                  <thead>
+                    <tr className="small text-muted">
+                      <th>Socio</th>
+                      <th>Préstamo</th>
+                      <th className="text-end">Días de mora</th>
+                      <th className="text-end">Saldo</th>
+                      <th className="text-end">Mora generada</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {morosidad.prestamos_en_mora.map((m) => (
+                      <tr key={m.id_prestamo}>
+                        <td>{m.socio.nombre}</td>
+                        <td>#{m.id_prestamo}</td>
+                        <td className="text-end">{m.dias_mora}</td>
+                        <td className="text-end">{formatCurrency(m.saldo_restante)}</td>
+                        <td className="text-end fw-semibold" style={{ color: COLORS.danger }}>
+                          {formatCurrency(m.interes_moratorio)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div className="small text-muted mt-2">
+              La mora se cobra al registrar el pago. El Super Administrador puede omitirla en el formulario de pagos.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== CIERRE MENSUAL ==================== */}
+      <CierreMensual token={token} />
 
       {/* ==================== SECCIÓN 2: RESUMEN EJECUTIVO ==================== */}
       {resumenEjecutivo && (

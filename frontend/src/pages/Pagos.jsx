@@ -34,6 +34,8 @@ import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 const fmt = (n) =>
   parseFloat(n || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const API_URL_MODAL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
 export default function Pagos() {
   const { token } = useAuth();
   const { mostrarAlerta } = useAlerta();
@@ -184,6 +186,7 @@ export default function Pagos() {
         tipo_pago: form.tipo_pago || "cuota_fija",
         fecha_pago: form.fecha || undefined,
         fecha_referencia: form.fecha_referencia || undefined,
+        condonar_mora: form.condonar_mora ? true : undefined,
       };
       if (editPago) {
         await axios.put(`${API_URL}/pagos/${editPago.id_pago}`, payload, {
@@ -1154,6 +1157,41 @@ function ModalPago({
     (p) => p.id_prestamo === parseInt(form.id_prestamo)
   );
 
+  // ── Mora del préstamo seleccionado ─────────────────────────────────────
+  const { user: usuarioActual, token: tokenModal } = useAuth();
+  const esSuperAdmin = usuarioActual?.rol === "Super Administrador";
+  const [moraInfo, setMoraInfo] = useState(null); // { dias, mora, porDia }
+  const condonarMora = !!form.condonar_mora;
+
+  useEffect(() => {
+    setMoraInfo(null);
+    handleInput({ target: { name: "condonar_mora", value: false } });
+    if (editPago || !prestamoSeleccionado) return;
+    let activo = true;
+    axios
+      .get(`${API_URL_MODAL}/pagos/prestamo/${prestamoSeleccionado.id_prestamo}/proximo-pago`, {
+        headers: { Authorization: `Bearer ${tokenModal}` },
+      })
+      .then((r) => {
+        const pp = r.data.proximo_pago;
+        if (activo && pp && pp.dias_mora > 0) {
+          setMoraInfo({
+            dias: pp.dias_mora,
+            mora: parseFloat(pp.interes_moratorio || 0),
+            porDia: parseFloat(pp.mora_por_dia || 0),
+          });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      activo = false;
+    };
+  // eslint-disable-next-line
+  }, [prestamoSeleccionado?.id_prestamo, editPago]);
+
+  // Mora que realmente se cobra con este pago
+  const moraAplicable = !editPago && moraInfo && !condonarMora ? moraInfo.mora : 0;
+
   // Cuando cambia el préstamo: inicio del período + auto-selección de tipo
   useEffect(() => {
     if (prestamoSeleccionado) {
@@ -1179,14 +1217,14 @@ function ModalPago({
   // Auto-relleno de monto: Cuota Fija (se dispara al cambiar tipo o préstamo)
   useEffect(() => {
     if (editPago || !prestamoSeleccionado || tipoPago !== "cuota_fija") return;
-    const valor = parseFloat((prestamoSeleccionado.cuota_mensual || 0).toFixed(2));
+    const valor = parseFloat(((prestamoSeleccionado.cuota_mensual || 0) + moraAplicable).toFixed(2));
     const raw = String(valor);
     const parts = raw.split(".");
     const intFmt = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     setMontoDisplay(parts.length > 1 ? intFmt + "." + parts[1] : intFmt);
     handleInput({ target: { name: "monto", value: raw } });
   // eslint-disable-next-line
-  }, [tipoPago, prestamoSeleccionado?.id_prestamo]);
+  }, [tipoPago, prestamoSeleccionado?.id_prestamo, moraAplicable]);
 
   // Auto-relleno y recálculo: Desglose Total (se actualiza al cambiar período o fecha)
   useEffect(() => {
@@ -1200,14 +1238,14 @@ function ModalPago({
     const tasaDia = tasaMens / 30;
     const saldo = parseFloat(prestamoSeleccionado.saldo_restante || 0);
     const interes = parseFloat((saldo * tasaDia * dias).toFixed(2));
-    const valor = parseFloat((saldo + interes).toFixed(2));
+    const valor = parseFloat((saldo + interes + moraAplicable).toFixed(2));
     const raw = String(valor);
     const parts = raw.split(".");
     const intFmt = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     setMontoDisplay(parts.length > 1 ? intFmt + "." + parts[1] : intFmt);
     handleInput({ target: { name: "monto", value: raw } });
   // eslint-disable-next-line
-  }, [tipoPago, prestamoSeleccionado?.id_prestamo, fechaReferencia, form.fecha]);
+  }, [tipoPago, prestamoSeleccionado?.id_prestamo, fechaReferencia, form.fecha, moraAplicable]);
 
   // El backend calcula el interés con la misma regla: enviarle el tipo y el período elegidos
   useEffect(() => {
@@ -1253,8 +1291,9 @@ function ModalPago({
   const interesBase30 = parseFloat((saldoActualPrestamo * tasaMensual).toFixed(2)); // referencia mes completo
 
   const montoPagoIngresado = parseFloat(form.monto) || 0;
-  const interesDelPago = parseFloat(Math.min(montoPagoIngresado, interesEsperado).toFixed(2));
-  const capitalDelPago = parseFloat(Math.max(0, montoPagoIngresado - interesEsperado).toFixed(2));
+  const montoNetoPago = Math.max(0, montoPagoIngresado - moraAplicable);
+  const interesDelPago = parseFloat(Math.min(montoNetoPago, interesEsperado).toFixed(2));
+  const capitalDelPago = parseFloat(Math.max(0, montoNetoPago - interesEsperado).toFixed(2));
   const hayDesglose = prestamoSeleccionado && montoPagoIngresado > 0;
 
   return (
@@ -1655,6 +1694,39 @@ function ModalPago({
                         ♾️ Pago libre — ingresa el monto a abonar
                       </div>
                     )}
+                    {/* ── Mora ── */}
+                    {moraInfo && (
+                      <div className="small px-2 py-2"
+                        style={{ background: "rgba(231,76,60,0.08)", borderRadius: 8, border: "1.5px solid #e74c3c", color: "#c0392b" }}>
+                        <div className="fw-bold">
+                          ⚠ {moraInfo.dias} día(s) de mora — Mora generada: L. {fmt(moraInfo.mora)}
+                          {moraInfo.porDia > 0 && <span className="fw-normal"> (≈ L. {fmt(moraInfo.porDia)} por día)</span>}
+                        </div>
+                        {esSuperAdmin ? (
+                          <div className="form-check mt-1">
+                            <input
+                              id="chk-condonar-mora"
+                              type="checkbox"
+                              className="form-check-input"
+                              checked={condonarMora}
+                              onChange={(e) =>
+                                handleInput({ target: { name: "condonar_mora", value: e.target.checked } })
+                              }
+                            />
+                            <label className="form-check-label fw-semibold" htmlFor="chk-condonar-mora">
+                              Omitir mora (cobrar normal, como si no hubiera mora)
+                            </label>
+                          </div>
+                        ) : (
+                          <div style={{ color: "#7f8c8d" }}>La mora se suma al pago. Solo el Super Administrador puede omitirla.</div>
+                        )}
+                        {condonarMora && (
+                          <div className="fw-semibold mt-1" style={{ color: "#27ae60" }}>
+                            ✔ La mora no se cobrará en este pago.
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {/* ── Período del préstamo: distinto según tipo de pago ── */}
                     {tipoPago === "cuota_fija" ? (
                       /* Cuota fija: período estándar 30 días, sin selector de fecha */
@@ -1742,7 +1814,7 @@ function ModalPago({
                           💰 Cuota acordada:
                         </span>
                         <strong style={{ color: "#2980b9", fontSize: "1rem" }}>
-                          L. {fmt(prestamoSeleccionado.cuota_mensual)}
+                          L. {fmt((prestamoSeleccionado.cuota_mensual || 0) + moraAplicable)}
                         </strong>
                       </div>
                     ) : (
@@ -1753,7 +1825,7 @@ function ModalPago({
                           💰 Total a pagar ({diasTranscurridos}d):
                         </span>
                         <strong style={{ color: "#1e8449", fontSize: "1rem" }}>
-                          L. {fmt(saldoActualPrestamo + interesEsperado)}
+                          L. {fmt(saldoActualPrestamo + interesEsperado + moraAplicable)}
                         </strong>
                       </div>
                     )}

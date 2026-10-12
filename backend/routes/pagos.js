@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const jwt = require("jsonwebtoken");
 const {
   DIAS_MES,
   soloFecha,
@@ -201,7 +202,7 @@ router.post("/", async (req, res) => {
   const connection = await pool.getConnection();
   
   try {
-    const { id_prestamo, monto_pagado, metodo_pago, incluir_mora, tipo_pago, fecha_pago, fecha_referencia } = req.body;
+    const { id_prestamo, monto_pagado, metodo_pago, condonar_mora, tipo_pago, fecha_pago, fecha_referencia } = req.body;
 
     // Validaciones
     if (!id_prestamo || !monto_pagado) {
@@ -268,11 +269,27 @@ router.post("/", async (req, res) => {
       ultimoPago.length > 0 ? ultimoPago[0].fecha_pago : null
     );
 
-    // Calcular interés moratorio si aplica
-    let interesMoratorio = 0;
-    if (diasMora > 0 && incluir_mora) {
-      interesMoratorio = calcularInteresMoratorio(saldoActual, diasMora);
+    // ── Mora ───────────────────────────────────────────────────────────────
+    // Se cobra siempre que haya días de atraso. Solo un Super Administrador
+    // puede omitirla (condonar_mora): entonces se cobra como si no hubiera mora.
+    const moraGenerada = diasMora > 0 ? calcularInteresMoratorio(saldoActual, diasMora) : 0;
+    let moraCondonada = false;
+    if (condonar_mora && moraGenerada > 0) {
+      let rolSolicitante = null;
+      try {
+        const token = req.header("Authorization")?.replace("Bearer ", "");
+        rolSolicitante = token
+          ? jwt.verify(token, process.env.JWT_SECRET || "clave_secreta").rol
+          : null;
+      } catch {
+        rolSolicitante = null;
+      }
+      if (rolSolicitante !== "Super Administrador") {
+        return res.status(403).json({ message: "Solo el Super Administrador puede omitir la mora." });
+      }
+      moraCondonada = true;
     }
+    const interesMoratorio = moraCondonada ? 0 : moraGenerada;
 
     // ── Interés del período ────────────────────────────────────────────────
     // Mes completo siempre: mínimo 30 días de interés; pasado el mes, por días reales.
@@ -303,6 +320,13 @@ router.post("/", async (req, res) => {
     let montoAplicado = montoPagadoNum;
     if (interesMoratorio > 0) {
       montoAplicado -= interesMoratorio;
+    }
+
+    if (montoPagadoNum < interesMoratorio - 0.005) {
+      return res.status(400).json({
+        message: `El pago no alcanza a cubrir la mora generada (L. ${interesMoratorio.toFixed(2)}).`,
+        interes_moratorio: parseFloat(interesMoratorio.toFixed(2)),
+      });
     }
 
     // No se acepta más de lo adeudado: saldo + interés del período + mora
@@ -350,8 +374,8 @@ router.post("/", async (req, res) => {
         `UPDATE prestamos SET estado = 'pagado', saldo_restante = 0.00 WHERE id_prestamo = ?`,
         [id_prestamo]
       );
-    } else if (prestamoData.estado === 'mora' && diasMora === 0) {
-      // Si estaba en mora pero ya no tiene días de mora, volver a activo
+    } else if (prestamoData.estado === 'mora' && (diasMora === 0 || interesMoratorio > 0 || moraCondonada)) {
+      // La mora quedó pagada (o fue omitida) con este pago: el préstamo vuelve a activo
       await connection.query(
         `UPDATE prestamos SET estado = 'activo' WHERE id_prestamo = ?`,
         [id_prestamo]
@@ -363,6 +387,9 @@ router.post("/", async (req, res) => {
     
     if (interesMoratorio > 0) {
       detalleBitacora += `. Incluye interés moratorio: L. ${interesMoratorio.toFixed(2)} (${diasMora} días de mora)`;
+    }
+    if (moraCondonada) {
+      detalleBitacora += `. MORA OMITIDA por Super Administrador: L. ${moraGenerada.toFixed(2)} (${diasMora} días de mora)`;
     }
     
     if (prestamoLiquidado) {
@@ -392,6 +419,7 @@ router.post("/", async (req, res) => {
         dias_interes: diasInteres,
         modo_interes: modo,
         interes_moratorio: parseFloat(interesMoratorio.toFixed(2)),
+        mora_condonada: moraCondonada ? parseFloat(moraGenerada.toFixed(2)) : 0,
         prestamo_liquidado: prestamoLiquidado,
       },
     });
@@ -499,13 +527,14 @@ router.get("/prestamo/:id_prestamo/proximo-pago", async (req, res) => {
         saldo_actual: parseFloat(prestamoData.saldo_restante),
         dias_mora: diasMora,
         interes_moratorio: parseFloat(interesMoratorio.toFixed(2)),
+        mora_por_dia: parseFloat(calcularInteresMoratorio(parseFloat(prestamoData.saldo_restante), 1).toFixed(2)),
         total_a_pagar: parseFloat(totalAPagar.toFixed(2)),
         cuotas_pagadas: cuotasPagadas,
         cuotas_faltantes: cuotasFaltantes,
         en_mora: diasMora > 0,
         dias_desde_ultimo_pago: diasLiq,
         interes_para_saldar: interesLiq,
-        total_para_saldar: parseFloat((parseFloat(prestamoData.saldo_restante) + interesLiq).toFixed(2)),
+        total_para_saldar: parseFloat((parseFloat(prestamoData.saldo_restante) + interesLiq + interesMoratorio).toFixed(2)),
       },
     });
 

@@ -1,7 +1,9 @@
 const jwt = require("jsonwebtoken");
 
 // Campos que un socio no debe ver: intereses, tasas y el desglose de capital.
-const CAMPO_OCULTO = /interes|tasa|capital/i;
+// El interés moratorio sí se muestra: el socio debe saber cuánto genera su atraso.
+const CAMPO_OCULTO_RE = /interes|tasa|capital/i;
+const CAMPO_OCULTO = { test: (k) => CAMPO_OCULTO_RE.test(k) && !/morator|mora_/i.test(k) };
 
 // Cuota mínima calculada igual que el backend (tasa_interes anual / 12), para que
 // el socio siga viendo su cuota sin ver la tasa.

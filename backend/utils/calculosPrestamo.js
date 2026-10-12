@@ -39,7 +39,20 @@ const calcularInteresPeriodo = (saldo, tasaAnual, dias) => {
 const diasDeInteres = (modo, fechaBase, fechaPago) =>
   modo === "cuota_fija" ? DIAS_MES : Math.max(DIAS_MES, diasEntre(fechaBase, fechaPago));
 
+// Días de atraso: pasados 30 días desde el último pago (o desde el otorgamiento)
+const calcularDiasMora = (fechaOtorgado, fechaUltimoPago = null) => {
+  const base = soloFecha(fechaUltimoPago) || soloFecha(fechaOtorgado);
+  if (!base) return 0;
+  return Math.max(0, diasEntre(base, hoyISO()) - DIAS_MES);
+};
+
+// Mora: 24% anual (2% mensual) sobre el saldo, por día de atraso
+const calcularInteresMoratorio = (saldo, diasMora) =>
+  parseFloat(saldo) * (24 / 365 / 100) * diasMora;
+
 module.exports = {
+  calcularDiasMora,
+  calcularInteresMoratorio,
   DIAS_MES,
   soloFecha,
   esFechaISO,

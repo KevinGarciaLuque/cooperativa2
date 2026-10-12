@@ -91,6 +91,14 @@ router.get("/kpis", async (req, res) => {
     
     const interesesTotales = parseFloat(interesesGenerados[0].total_intereses);
 
+    // Intereses recaudados en el mes actual (todos los socios)
+    const [interesesMes] = await pool.query(
+      `SELECT IFNULL(SUM(monto_interes), 0) as total
+       FROM pagos_prestamo
+       WHERE MONTH(fecha_pago) = MONTH(CURRENT_DATE())
+       AND YEAR(fecha_pago) = YEAR(CURRENT_DATE())`
+    );
+
     res.json({
       socios: {
         total: socios[0].total,
@@ -114,12 +122,158 @@ router.get("/kpis", async (req, res) => {
         })),
         ingresosMesActual: ingresosTotalesMes,
         liquidacionesAnioActual: parseFloat(liquidaciones[0].total_distribuido),
-        interesesGeneradosTotales: interesesTotales
+        interesesGeneradosTotales: interesesTotales,
+        interesesMesActual: parseFloat(interesesMes[0].total)
       }
     });
   } catch (error) {
     console.error("ERROR AL OBTENER KPIs:", error);
     res.status(500).json({ message: "Error obteniendo los KPIs", error: error.message });
+  }
+});
+
+// ============================================
+// CIERRE MENSUAL: resumen de cualquier mes
+// GET /api/dashboard/cierre-mensual?anio=2026&mes=9
+// ============================================
+const resumenMes = async (anio, mes) => {
+  const desde = new Date(Date.UTC(anio, mes - 1, 1)).toISOString().substring(0, 10);
+  const hasta = new Date(Date.UTC(anio, mes, 1)).toISOString().substring(0, 10);
+  const rango = [desde, hasta];
+
+  const [[pagos]] = await pool.query(
+    `SELECT COUNT(*) AS cantidad,
+            IFNULL(SUM(monto_pagado), 0) AS total,
+            IFNULL(SUM(monto_capital), 0) AS capital,
+            IFNULL(SUM(monto_interes), 0) AS interes,
+            IFNULL(SUM(CASE
+              WHEN monto_capital IS NOT NULL AND monto_interes IS NOT NULL
+                   AND monto_pagado - monto_capital - monto_interes > 0.005
+              THEN monto_pagado - monto_capital - monto_interes ELSE 0 END), 0) AS mora
+     FROM pagos_prestamo WHERE fecha_pago >= ? AND fecha_pago < ?`,
+    rango
+  );
+  const [[aportes]] = await pool.query(
+    `SELECT COUNT(*) AS cantidad, IFNULL(SUM(monto), 0) AS total
+     FROM aportaciones WHERE fecha >= ? AND fecha < ?`,
+    rango
+  );
+  const [[actividades]] = await pool.query(
+    `SELECT COUNT(*) AS cantidad, IFNULL(SUM(monto), 0) AS total
+     FROM actividades WHERE fecha >= ? AND fecha < ?`,
+    rango
+  );
+  return { desde, hasta, rango, pagos, aportes, actividades };
+};
+
+router.get("/cierre-mensual", async (req, res) => {
+  try {
+    const hoy = new Date();
+    const anio = parseInt(req.query.anio) || hoy.getUTCFullYear();
+    const mes = parseInt(req.query.mes) || hoy.getUTCMonth() + 1;
+    if (mes < 1 || mes > 12 || anio < 2000 || anio > 2100) {
+      return res.status(400).json({ message: "Mes o año inválido" });
+    }
+
+    const actual = await resumenMes(anio, mes);
+    const anterior = await resumenMes(mes === 1 ? anio - 1 : anio, mes === 1 ? 12 : mes - 1);
+
+    const [prestamosOtorgados] = await pool.query(
+      `SELECT COUNT(*) AS cantidad, IFNULL(SUM(monto), 0) AS monto
+       FROM prestamos
+       WHERE fecha_otorgado >= ? AND fecha_otorgado < ?
+       AND estado IN ('activo', 'mora', 'pagado')`,
+      actual.rango
+    );
+
+    const [nuevosSocios] = await pool.query(
+      `SELECT COUNT(*) AS cantidad FROM usuarios
+       WHERE rol_id != 1 AND fecha_registro >= ? AND fecha_registro < ?`,
+      actual.rango
+    );
+
+    const [liquidaciones] = await pool.query(
+      `SELECT IFNULL(SUM(monto_total), 0) AS total FROM liquidaciones
+       WHERE fecha >= ? AND fecha < ?`,
+      actual.rango
+    );
+
+    const [actividadesPorTipo] = await pool.query(
+      `SELECT tipo, IFNULL(SUM(monto), 0) AS total
+       FROM actividades WHERE fecha >= ? AND fecha < ?
+       GROUP BY tipo ORDER BY total DESC`,
+      actual.rango
+    );
+
+    // Intereses y total pagado por socio
+    const [porSocio] = await pool.query(
+      `SELECT u.id_usuario, u.nombre_completo,
+              COUNT(*) AS pagos,
+              IFNULL(SUM(pp.monto_pagado), 0) AS total_pagado,
+              IFNULL(SUM(pp.monto_capital), 0) AS capital,
+              IFNULL(SUM(pp.monto_interes), 0) AS interes
+       FROM pagos_prestamo pp
+       INNER JOIN prestamos pr ON pp.id_prestamo = pr.id_prestamo
+       INNER JOIN usuarios u ON pr.id_usuario = u.id_usuario
+       WHERE pp.fecha_pago >= ? AND pp.fecha_pago < ?
+       GROUP BY u.id_usuario, u.nombre_completo
+       ORDER BY interes DESC, total_pagado DESC`,
+      actual.rango
+    );
+
+    // Intereses por día del mes
+    const [porDia] = await pool.query(
+      `SELECT DAY(fecha_pago) AS dia,
+              IFNULL(SUM(monto_interes), 0) AS interes,
+              IFNULL(SUM(monto_pagado), 0) AS total
+       FROM pagos_prestamo WHERE fecha_pago >= ? AND fecha_pago < ?
+       GROUP BY DAY(fecha_pago) ORDER BY dia`,
+      actual.rango
+    );
+
+    const num = (v) => parseFloat(v || 0);
+    const ingresos = (r) => num(r.pagos.total) + num(r.aportes.total) + num(r.actividades.total);
+
+    res.json({
+      periodo: { anio, mes, desde: actual.desde, hasta: actual.hasta },
+      intereses: {
+        recaudados: num(actual.pagos.interes),
+        mes_anterior: num(anterior.pagos.interes),
+      },
+      pagos: {
+        cantidad: actual.pagos.cantidad,
+        total: num(actual.pagos.total),
+        capital: num(actual.pagos.capital),
+        interes: num(actual.pagos.interes),
+        mora: num(actual.pagos.mora),
+      },
+      aportaciones: { cantidad: actual.aportes.cantidad, total: num(actual.aportes.total) },
+      actividades: {
+        cantidad: actual.actividades.cantidad,
+        total: num(actual.actividades.total),
+        por_tipo: actividadesPorTipo.map((a) => ({ tipo: a.tipo, total: num(a.total) })),
+      },
+      prestamos_otorgados: {
+        cantidad: prestamosOtorgados[0].cantidad,
+        monto: num(prestamosOtorgados[0].monto),
+      },
+      nuevos_socios: nuevosSocios[0].cantidad,
+      liquidaciones: num(liquidaciones[0].total),
+      ingresos_totales: ingresos(actual),
+      ingresos_mes_anterior: ingresos(anterior),
+      por_socio: porSocio.map((s) => ({
+        id_usuario: s.id_usuario,
+        nombre_completo: s.nombre_completo,
+        pagos: s.pagos,
+        total_pagado: num(s.total_pagado),
+        capital: num(s.capital),
+        interes: num(s.interes),
+      })),
+      por_dia: porDia.map((d) => ({ dia: d.dia, interes: num(d.interes), total: num(d.total) })),
+    });
+  } catch (error) {
+    console.error("ERROR EN CIERRE MENSUAL:", error);
+    res.status(500).json({ message: "Error obteniendo el cierre mensual", error: error.message });
   }
 });
 

@@ -1,6 +1,6 @@
 {
-  "name": "Cooperativa",
-  "short_name": "Cooperativa",
+  "name": "SmartCoop",
+  "short_name": "SmartCoop",
   "description": "Consulta tus aportaciones, préstamos y pagos desde el celular.",
   "start_url": "/",
   "scope": "/",

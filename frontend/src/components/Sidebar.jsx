@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
+import { useConfigSitio } from "../hooks/useConfigSitio";
 import {
   FaTachometerAlt,
   FaUsers,
@@ -78,6 +79,8 @@ const menuSocio = [
 
 export default function Sidebar({ collapsed, onCollapseChange }) {
   const { user, token } = useAuth();
+  const { config } = useConfigSitio();
+  const siteName = config.site_name || "SmartCoop";
   const [open, setOpen] = useState(false); // móvil/tablet offcanvas
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 992);
   const [permisosRol, setPermisosRol] = useState(null); // null = cargando
@@ -365,7 +368,7 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
         {/* Logo */}
         <div className="sidebar-logo-area">
           <LogoCoop size={68} />
-          {!collapsed && <span className="sidebar-brand-text">Demo</span>}
+          {!collapsed && <span className="sidebar-brand-text">{siteName}</span>}
         </div>
 
         {/* Navegación */}
@@ -426,7 +429,7 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
         >
           <div className="d-flex align-items-center">
             <LogoCoop size={68} />
-            <span className="sidebar-brand-text">Demo</span>
+            <span className="sidebar-brand-text">{siteName}</span>
           </div>
           <button
             type="button"

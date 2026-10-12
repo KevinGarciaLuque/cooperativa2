@@ -1,10 +1,42 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
-import { FaPrint, FaTimes, FaWhatsapp, FaFilePdf } from "react-icons/fa";
+import { FaPrint, FaTimes, FaWhatsapp, FaFilePdf, FaCamera, FaCheckCircle } from "react-icons/fa";
 import { generarReciboPdf, nombreArchivoRecibo } from "../utils/reciboPdf";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
+// Reduce las fotos del celular (suelen pesar varios MB) antes de subirlas
+const comprimirImagen = (archivo) =>
+  new Promise((resolver) => {
+    if (!archivo.type.startsWith("image/")) return resolver(archivo);
+    const url = URL.createObjectURL(archivo);
+    const img = new Image();
+    img.onload = () => {
+      const maximo = 1800;
+      const escala = Math.min(1, maximo / Math.max(img.width, img.height));
+      const lienzo = document.createElement("canvas");
+      lienzo.width = Math.round(img.width * escala);
+      lienzo.height = Math.round(img.height * escala);
+      lienzo.getContext("2d").drawImage(img, 0, 0, lienzo.width, lienzo.height);
+      lienzo.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(url);
+          resolver(
+            blob ? new File([blob], archivo.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }) : archivo
+          );
+        },
+        "image/jpeg",
+        0.82
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolver(archivo);
+    };
+    img.src = url;
+  });
 
 const fmt = (n) =>
   `L. ${parseFloat(n || 0).toLocaleString("es-HN", {
@@ -43,6 +75,9 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
   const [generando, setGenerando] = useState(false);
   const [verFiniquito, setVerFiniquito] = useState(false);
   const [aviso, setAviso] = useState("");
+  const [version, setVersion] = useState(0);
+  const [subiendo, setSubiendo] = useState(false);
+  const inputArchivo = useRef(null);
 
   useEffect(() => {
     let activo = true;
@@ -60,9 +95,45 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
     return () => {
       activo = false;
     };
-  }, [idRecibo, referenciaTipo, referenciaId, finiquitoDe, token]);
+  }, [idRecibo, referenciaTipo, referenciaId, finiquitoDe, token, version]);
 
   const d = recibo?.detalle || {};
+
+  const subirFirmado = async (e) => {
+    const original = e.target.files?.[0];
+    e.target.value = "";
+    if (!original) return;
+    setSubiendo(true);
+    setAviso("");
+    try {
+      const archivo = await comprimirImagen(original);
+      const datos = new FormData();
+      datos.append("archivo", archivo);
+      await axios.post(`${API_URL}/recibos/${recibo.id_recibo}/comprobante-firmado`, datos, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAviso("Comprobante firmado recibido. ¡Gracias!");
+      setVersion((v) => v + 1);
+    } catch (err) {
+      setAviso(err.response?.data?.message || "No se pudo subir el archivo.");
+    } finally {
+      setSubiendo(false);
+    }
+  };
+
+  const verFirmado = async () => {
+    try {
+      const r = await axios.get(`${API_URL}/recibos/${recibo.id_recibo}/comprobante-firmado`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "blob",
+      });
+      const url = URL.createObjectURL(r.data);
+      window.open(url, "_blank", "noopener");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      setAviso("No se pudo abrir el comprobante firmado.");
+    }
+  };
 
   const descargarArchivo = (blob, nombre) => {
     const url = URL.createObjectURL(blob);
@@ -127,16 +198,20 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
     }
   };
 
-  return (
+  return createPortal(
     <div
-      className="modal show d-block"
+      className="recibo-portal modal show d-block"
       style={{ background: "rgba(0,0,0,.6)", zIndex: 6000, position: "fixed", inset: 0, overflowY: "auto" }}
     >
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          .recibo-print, .recibo-print * { visibility: visible; }
-          .recibo-print { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none !important; }
+          @page { size: A5 portrait; margin: 0; }
+          html, body { background: #fff !important; height: auto !important; }
+          body > #root { display: none !important; }
+          .recibo-portal { position: static !important; background: none !important; overflow: visible !important; }
+          .recibo-portal .modal-dialog { margin: 0 !important; max-width: 100% !important; min-height: 0 !important; display: block !important; }
+          .recibo-portal .modal-content { border: 0 !important; box-shadow: none !important; border-radius: 0 !important; }
+          .recibo-print { padding: 16mm !important; }
           .recibo-no-print { display: none !important; }
         }
       `}</style>
@@ -170,6 +245,51 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
               </button>
             </div>
           </div>
+
+          {recibo?.tipo === "desembolso" && !recibo.anulado && (
+            <div
+              className="recibo-no-print mx-3 mt-2 p-2 rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-2"
+              style={{
+                background: recibo.comprobante_firmado ? "#ecfdf5" : "#fffbeb",
+                border: `1px solid ${recibo.comprobante_firmado ? "#a7f3d0" : "#fde68a"}`,
+              }}
+            >
+              <div className="small">
+                {recibo.comprobante_firmado ? (
+                  <span style={{ color: "#065f46" }}>
+                    <FaCheckCircle className="me-1" />
+                    Comprobante firmado recibido el {String(recibo.comprobante_firmado.subido_en).substring(0, 10)}
+                  </span>
+                ) : (
+                  <span style={{ color: "#92400e" }}>
+                    Falta el comprobante firmado por el socio. Fírmalo y sube una foto o el archivo.
+                  </span>
+                )}
+              </div>
+              <div className="d-flex gap-2">
+                {recibo.comprobante_firmado && (
+                  <button className="btn btn-sm btn-outline-success" onClick={verFirmado}>
+                    Ver firmado
+                  </button>
+                )}
+                <button
+                  className="btn btn-sm btn-dark"
+                  onClick={() => inputArchivo.current?.click()}
+                  disabled={subiendo}
+                >
+                  <FaCamera className="me-1" />
+                  {subiendo ? "Subiendo..." : recibo.comprobante_firmado ? "Reemplazar" : "Subir firmado"}
+                </button>
+                <input
+                  ref={inputArchivo}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  className="d-none"
+                  onChange={subirFirmado}
+                />
+              </div>
+            </div>
+          )}
 
           {aviso && (
             <div className="recibo-no-print alert alert-info py-2 mx-3 mt-2 mb-0 small">{aviso}</div>
@@ -318,6 +438,7 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

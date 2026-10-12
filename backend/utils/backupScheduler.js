@@ -75,6 +75,7 @@ async function generarSQL() {
           if (val === null || val === undefined) return "NULL";
           if (val instanceof Date)
             return `'${val.toISOString().slice(0, 19).replace("T", " ")}'`;
+          if (Buffer.isBuffer(val)) return val.length ? `0x${val.toString("hex")}` : "''";
           if (typeof val === "boolean") return val ? 1 : 0;
           if (typeof val === "number") return val;
           return `'${String(val)

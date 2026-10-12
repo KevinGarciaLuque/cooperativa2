@@ -397,6 +397,26 @@ router.post("/prestamos/:id/aprobar", soloPersonal, async (req, res) => {
   }
 });
 
+// Desembolsos recientes que todavía no tienen la copia firmada
+router.get("/desembolsos-sin-firma", soloPersonal, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT r.id_recibo, r.referencia_id AS id_prestamo, r.monto, r.fecha, r.metodo,
+              u.nombre_completo, u.telefono
+       FROM recibos r
+       INNER JOIN usuarios u ON r.id_socio = u.id_usuario
+       WHERE r.tipo = 'desembolso' AND r.anulado = 0
+         AND r.fecha >= DATE_SUB(NOW(), INTERVAL 120 DAY)
+         AND NOT EXISTS (SELECT 1 FROM comprobantes_firmados c WHERE c.id_recibo = r.id_recibo)
+       ORDER BY r.fecha DESC LIMIT 100`
+    );
+    res.json({ success: true, data: rows.map((r) => ({ ...r, monto: num(r.monto) })) });
+  } catch (error) {
+    console.error("ERROR AL LISTAR DESEMBOLSOS SIN FIRMA:", error);
+    res.status(500).json({ message: "No se pudo cargar la lista" });
+  }
+});
+
 // ============================================
 // ENLACE DE REGISTRO
 // ============================================

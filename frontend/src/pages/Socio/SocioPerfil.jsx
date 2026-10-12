@@ -72,6 +72,8 @@ export default function SocioPerfil() {
   const [prestamos, setPrestamos]       = useState([]);
   const [ultimoPagoFecha, setUltimoPagoFecha] = useState(null); // último pago a préstamos
   const [moras, setMoras] = useState({}); // id_prestamo -> { dias, mora, porDia }
+  const [entregas, setEntregas] = useState({}); // id_prestamo -> { id_recibo, firmado }
+  const [reciboEntrega, setReciboEntrega] = useState(null);
   const [loading, setLoading]           = useState(true);
   const pendiente = user?.estado === "pendiente";
   const [tab, setTab]                   = useState(pendiente ? "solicitar" : "resumen");
@@ -222,6 +224,22 @@ export default function SocioPerfil() {
           })
         );
         setMoras(moraMap);
+
+        // Comprobantes de entrega (desembolso) y si ya están firmados
+        try {
+          const rec = await axios.get(`${API_URL}/recibos/socio/${user.id_usuario}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const mapa = {};
+          (rec.data.data || [])
+            .filter((r) => r.tipo === "desembolso" && !r.anulado)
+            .forEach((r) => {
+              mapa[r.referencia_id] = { id_recibo: r.id_recibo, firmado: !!r.comprobante_firmado };
+            });
+          setEntregas(mapa);
+        } catch {
+          setEntregas({});
+        }
 
         const listaPagos = pagosRes.data.data || pagosRes.data || [];
         const fechas = listaPagos
@@ -816,6 +834,23 @@ export default function SocioPerfil() {
                           </span>
                         )}
                       </button>
+                      {entregas[p.id_prestamo] && (
+                        <button
+                          className="btn btn-sm fw-semibold ms-2"
+                          style={{
+                            background: entregas[p.id_prestamo].firmado ? "#ecfdf5" : "#fef3c7",
+                            color: entregas[p.id_prestamo].firmado ? "#065f46" : "#92400e",
+                            border: `1.5px solid ${entregas[p.id_prestamo].firmado ? "#a7f3d0" : "#fde68a"}`,
+                            borderRadius: ".6rem",
+                            padding: "6px 16px",
+                          }}
+                          onClick={() => setReciboEntrega(entregas[p.id_prestamo].id_recibo)}
+                        >
+                          {entregas[p.id_prestamo].firmado
+                            ? "Comprobante de entrega firmado ✓"
+                            : "Comprobante de entrega: firmar y subir"}
+                        </button>
+                      )}
                       {estaPagado && (
                         <button
                           className="btn btn-sm fw-semibold ms-2"
@@ -1008,6 +1043,15 @@ export default function SocioPerfil() {
 
           {finiquitoDe && (
             <ReciboModal finiquitoDe={finiquitoDe} onClose={() => setFiniquitoDe(null)} />
+          )}
+          {reciboEntrega && (
+            <ReciboModal
+              idRecibo={reciboEntrega}
+              onClose={() => {
+                setReciboEntrega(null);
+                window.location.reload();
+              }}
+            />
           )}
 
           {/* Footer */}

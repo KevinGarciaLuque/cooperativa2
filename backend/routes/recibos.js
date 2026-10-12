@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const multer = require("multer");
 const { numeroRecibo, emitirFiniquito } = require("../utils/recibos");
 
 const formatear = (r, cooperativa) => {
@@ -24,6 +25,7 @@ const formatear = (r, cooperativa) => {
     anulado: !!r.anulado,
     socio: r.socio_nombre ? { nombre: r.socio_nombre, dni: r.socio_dni, telefono: r.socio_telefono || null } : null,
     emitido_por: r.emisor_nombre || null,
+    comprobante_firmado: r.firmado_en ? { subido_en: r.firmado_en } : null,
     cooperativa,
   };
 };
@@ -38,7 +40,8 @@ const nombreCooperativa = async () => {
 };
 
 const SELECT_RECIBO = `
-  SELECT r.*, s.nombre_completo AS socio_nombre, s.dni AS socio_dni, s.telefono AS socio_telefono, e.nombre_completo AS emisor_nombre
+  SELECT r.*, s.nombre_completo AS socio_nombre, s.dni AS socio_dni, s.telefono AS socio_telefono, e.nombre_completo AS emisor_nombre,
+         (SELECT MAX(c.subido_en) FROM comprobantes_firmados c WHERE c.id_recibo = r.id_recibo) AS firmado_en
   FROM recibos r
   LEFT JOIN usuarios s ON r.id_socio = s.id_usuario
   LEFT JOIN usuarios e ON r.emitido_por = e.id_usuario`;
@@ -93,6 +96,90 @@ router.get("/socio/:id_usuario", async (req, res) => {
   } catch (error) {
     console.error("ERROR AL LISTAR RECIBOS:", error);
     res.status(500).json({ message: "Error al listar los recibos" });
+  }
+});
+
+// Comprobante firmado: foto o archivo que devuelve el socio (o que sube el personal)
+const MIMES_PERMITIDOS = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+const subida = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 6 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (MIMES_PERMITIDOS.includes(file.mimetype)) return cb(null, true);
+    cb(new Error("FORMATO"));
+  },
+});
+
+// POST /api/recibos/:id/comprobante-firmado   (campo "archivo")
+router.post("/:id/comprobante-firmado", (req, res) => {
+  subida.single("archivo")(req, res, async (err) => {
+    if (err) {
+      const mensaje =
+        err.message === "FORMATO"
+          ? "Formato no permitido. Sube una foto (JPG, PNG, WEBP) o un PDF."
+          : err.code === "LIMIT_FILE_SIZE"
+          ? "El archivo es muy grande (máximo 6 MB)."
+          : "No se pudo recibir el archivo.";
+      return res.status(400).json({ message: mensaje });
+    }
+    try {
+      if (!req.file) return res.status(400).json({ message: "Selecciona la foto o el archivo del comprobante firmado." });
+
+      const [rows] = await pool.query("SELECT * FROM recibos WHERE id_recibo = ?", [req.params.id]);
+      if (!rows.length) return res.status(404).json({ message: "Recibo no encontrado" });
+      const r = rows[0];
+      if (r.tipo !== "desembolso" || r.anulado) {
+        return res.status(400).json({ message: "Solo los comprobantes de desembolso vigentes llevan copia firmada." });
+      }
+
+      await pool.query(
+        `INSERT INTO comprobantes_firmados
+           (id_recibo, id_socio, nombre_archivo, mime, tamano, contenido, subido_por, subido_por_rol)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          r.id_recibo,
+          r.id_socio,
+          String(req.file.originalname || "comprobante").substring(0, 150),
+          req.file.mimetype,
+          req.file.size,
+          req.file.buffer,
+          req.usuario.id_usuario,
+          req.usuario.rol,
+        ]
+      );
+
+      await pool.query(
+        `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
+        [
+          r.id_socio,
+          "Comprobante firmado",
+          `Se recibió el comprobante firmado ${numeroRecibo(r.id_recibo, r.tipo)} (${req.usuario.rol})`,
+        ]
+      );
+
+      res.status(201).json({ success: true, message: "Comprobante firmado recibido." });
+    } catch (error) {
+      console.error("ERROR AL GUARDAR COMPROBANTE FIRMADO:", error);
+      res.status(500).json({ message: "No se pudo guardar el comprobante." });
+    }
+  });
+});
+
+// GET /api/recibos/:id/comprobante-firmado  → el archivo más reciente
+router.get("/:id/comprobante-firmado", async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT nombre_archivo, mime, contenido FROM comprobantes_firmados
+       WHERE id_recibo = ? ORDER BY id_comprobante DESC LIMIT 1`,
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ message: "Aún no hay comprobante firmado." });
+    res.setHeader("Content-Type", rows[0].mime);
+    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(rows[0].nombre_archivo)}"`);
+    res.send(rows[0].contenido);
+  } catch (error) {
+    console.error("ERROR AL LEER COMPROBANTE FIRMADO:", error);
+    res.status(500).json({ message: "No se pudo leer el comprobante." });
   }
 });
 

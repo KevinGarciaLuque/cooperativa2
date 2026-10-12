@@ -38,6 +38,7 @@ const MODULO_POR_PREFIJO = {
 // ── Qué puede consultar/hacer un Socio: solo lo suyo ──────────────────────
 const SQL_PRESTAMO = "SELECT id_usuario FROM prestamos WHERE id_prestamo = ?";
 const SQL_CUENTA = "SELECT id_usuario FROM cuentas WHERE id_cuenta = ?";
+const SQL_RECIBO = "SELECT id_socio AS id_usuario FROM recibos WHERE id_recibo = ?";
 const REGLAS_SOCIO = [
   // Permitidas también para un socio que aún no ha sido aprobado
   { metodo: "GET", re: /^\/usuarios\/(\d+)$/, propio: 1, pendiente: true },
@@ -57,6 +58,10 @@ const REGLAS_SOCIO = [
   { metodo: "GET", re: /^\/aportaciones\/(\d+)$/, sql: "SELECT id_usuario FROM aportaciones WHERE id_aportacion = ?", id: 1 },
   { metodo: "GET", re: /^\/prestamos\/(\d+)$/, sql: SQL_PRESTAMO, id: 1 },
   { metodo: "GET", re: /^\/recibos\/finiquito\/(\d+)$/, sql: SQL_PRESTAMO, id: 1 },
+  { metodo: "GET", re: /^\/recibos\/socio\/(\d+)$/, propio: 1 },
+  { metodo: "GET", re: /^\/recibos\/(\d+)$/, sql: SQL_RECIBO, id: 1 },
+  { metodo: "GET", re: /^\/recibos\/(\d+)\/comprobante-firmado$/, sql: SQL_RECIBO, id: 1 },
+  { metodo: "POST", re: /^\/recibos\/(\d+)\/comprobante-firmado$/, sql: SQL_RECIBO, id: 1 },
   { metodo: "GET", re: /^\/pagos\/prestamo\/(\d+)(\/proximo-pago)?$/, sql: SQL_PRESTAMO, id: 1 },
   {
     metodo: "GET",
@@ -164,6 +169,15 @@ const guardiaApi = async (req, res, next) => {
 
     // 4. Socio: solo sus propios datos
     if (usuario.rol === "Socio") {
+      // Comprobante de desembolso de un préstamo propio (se busca por la operación)
+      if (metodo === "GET" && ruta === "/recibos/buscar" && !socioPendiente) {
+        if (req.query.referencia_tipo === "prestamo" && /^\d+$/.test(String(req.query.referencia_id || ""))) {
+          const [pr] = await pool.query(SQL_PRESTAMO, [req.query.referencia_id]);
+          if (pr.length && pr[0].id_usuario === usuario.id_usuario) return next();
+        }
+        return prohibido(res);
+      }
+
       for (const regla of REGLAS_SOCIO) {
         if (regla.metodo !== metodo) continue;
         const m = regla.re.exec(ruta);

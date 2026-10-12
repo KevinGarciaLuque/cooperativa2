@@ -220,6 +220,27 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_10_008_comprobantes_firmados",
+    descripcion: "Copias firmadas de los comprobantes de desembolso (foto o archivo)",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS comprobantes_firmados (
+          id_comprobante INT AUTO_INCREMENT PRIMARY KEY,
+          id_recibo INT NOT NULL,
+          id_socio INT NULL,
+          nombre_archivo VARCHAR(150) NOT NULL,
+          mime VARCHAR(80) NOT NULL,
+          tamano INT NOT NULL,
+          contenido MEDIUMBLOB NOT NULL,
+          subido_por INT NULL,
+          subido_por_rol VARCHAR(40) NULL,
+          subido_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_comprobante_recibo (id_recibo)
+        )
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

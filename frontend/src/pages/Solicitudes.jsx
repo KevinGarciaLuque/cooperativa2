@@ -6,6 +6,8 @@ import { useAlerta } from "../context/AlertaContext";
 import { FaInbox, FaLink, FaCopy, FaWhatsapp, FaSyncAlt } from "react-icons/fa";
 import { EmptyState, PageHeader } from "../ui/Componentes";
 import InputMonto from "../ui/InputMonto";
+import DesembolsoModal from "../components/DesembolsoModal";
+import ReciboModal from "../components/ReciboModal";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const ACCENT = "#a8cd3a";
@@ -45,16 +47,22 @@ export default function Solicitudes() {
   const [revisando, setRevisando] = useState(null); // solicitud de préstamo en revisión
   const [condiciones, setCondiciones] = useState({ monto: "", plazo_meses: "", tasa_mensual: "", aprobar_socio: true });
   const [procesando, setProcesando] = useState(false);
+  const [aDesembolsar, setADesembolsar] = useState(null);
+  const [desembolsando, setDesembolsando] = useState(false);
+  const [reciboAbierto, setReciboAbierto] = useState(null);
+  const [sinFirma, setSinFirma] = useState([]);
 
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      const [s, e] = await Promise.all([
+      const [s, e, f] = await Promise.all([
         axios.get(`${API_URL}/solicitudes`, { headers }),
         axios.get(`${API_URL}/solicitudes/enlace`, { headers }),
+        axios.get(`${API_URL}/solicitudes/desembolsos-sin-firma`, { headers }).catch(() => ({ data: { data: [] } })),
       ]);
       setData(s.data);
       setEnlace(e.data);
+      setSinFirma(f.data.data || []);
     } catch {
       mostrarAlerta("No se pudieron cargar las solicitudes.", "error");
     } finally {
@@ -165,6 +173,25 @@ export default function Solicitudes() {
     }
   };
 
+  const confirmarDesembolso = async ({ metodo, referencia }) => {
+    setDesembolsando(true);
+    try {
+      const r = await axios.post(
+        `${API_URL}/prestamos/${aDesembolsar.id_prestamo}/desembolsar`,
+        { metodo, referencia },
+        { headers }
+      );
+      mostrarAlerta("Préstamo desembolsado correctamente.", "success");
+      setADesembolsar(null);
+      if (r.data?.id_recibo) setReciboAbierto(r.data.id_recibo);
+      cargar();
+    } catch (err) {
+      mostrarAlerta(err.response?.data?.message || "No se pudo registrar el desembolso.", "error");
+    } finally {
+      setDesembolsando(false);
+    }
+  };
+
   const nSocios = data?.socios.length || 0;
   const nPrestamos = data?.prestamos.filter((p) => p.estado === "pendiente").length || 0;
   const porDesembolsar = data?.prestamos.filter((p) => p.estado === "aprobado") || [];
@@ -181,6 +208,7 @@ export default function Solicitudes() {
         {[
           ["prestamos", `Solicitudes de préstamo${nPrestamos ? ` (${nPrestamos})` : ""}`],
           ["socios", `Nuevos socios${nSocios ? ` (${nSocios})` : ""}`],
+          ["firmas", `Comprobantes firmados${sinFirma.length ? ` (${sinFirma.length})` : ""}`],
           ["enlace", "Enlace de registro"],
         ].map(([k, t]) => (
           <li className="nav-item" key={k}>
@@ -201,13 +229,30 @@ export default function Solicitudes() {
       {tab === "prestamos" && data && (
         <>
           {porDesembolsar.length > 0 && (
-            <div className="alert alert-success d-flex flex-wrap justify-content-between align-items-center">
-              <span>
-                <strong>{porDesembolsar.length}</strong> solicitud(es) aprobada(s) esperan el desembolso.
-              </span>
-              <button className="btn btn-sm btn-success" onClick={() => navigate("/prestamos")}>
-                Ir a Préstamos
-              </button>
+            <div className="ui-card p-3 mb-3" style={{ border: "1.5px solid #a7f3d0" }}>
+              <div className="fw-bold mb-2" style={{ color: "#065f46" }}>
+                Aprobadas, listas para desembolsar ({porDesembolsar.length})
+              </div>
+              {porDesembolsar.map((p) => (
+                <div
+                  key={p.id_prestamo}
+                  className="d-flex flex-wrap justify-content-between align-items-center gap-2 py-2 border-top"
+                >
+                  <div>
+                    <div className="fw-semibold">{p.nombre_completo}</div>
+                    <div className="small text-muted">
+                      {fmt(p.monto)} a {p.plazo_meses} meses · Préstamo #{p.id_prestamo}
+                    </div>
+                  </div>
+                  <button
+                    className="btn fw-semibold"
+                    style={{ background: ACCENT, color: "#1a2a00" }}
+                    onClick={() => setADesembolsar(p)}
+                  >
+                    Desembolsar
+                  </button>
+                </div>
+              ))}
             </div>
           )}
 
@@ -362,6 +407,48 @@ export default function Solicitudes() {
         </div>
       )}
 
+      {/* ── Comprobantes de entrega sin firma ── */}
+      {tab === "firmas" && (
+        <div className="ui-card">
+          {sinFirma.length === 0 ? (
+            <EmptyState titulo="Todos los comprobantes de entrega tienen su copia firmada" />
+          ) : (
+            <div className="table-responsive">
+              <table className="table align-middle mb-0">
+                <thead>
+                  <tr className="small text-muted">
+                    <th>Socio</th>
+                    <th>Préstamo</th>
+                    <th>Entregado</th>
+                    <th className="text-end">Monto</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sinFirma.map((d) => (
+                    <tr key={d.id_recibo}>
+                      <td className="fw-semibold">{d.nombre_completo}</td>
+                      <td>#{d.id_prestamo}</td>
+                      <td className="small">{String(d.fecha).substring(0, 10)}</td>
+                      <td className="text-end">{fmt(d.monto)}</td>
+                      <td className="text-end">
+                        <button className="btn btn-sm btn-outline-dark" onClick={() => setReciboAbierto(d.id_recibo)}>
+                          Ver / subir firmado
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="small text-muted p-3">
+            El comprobante de desembolso se envía al socio para que lo firme. Puede subir una foto desde su panel o la
+            subes tú aquí.
+          </div>
+        </div>
+      )}
+
       {/* ── Enlace de registro ── */}
       {tab === "enlace" && enlace && (
         <div className="ui-card p-4" style={{ maxWidth: 720 }}>
@@ -411,6 +498,26 @@ export default function Solicitudes() {
             </label>
           </div>
         </div>
+      )}
+
+      {aDesembolsar && (
+        <DesembolsoModal
+          prestamo={aDesembolsar}
+          nombreSocio={aDesembolsar.nombre_completo}
+          enviando={desembolsando}
+          onConfirmar={confirmarDesembolso}
+          onCancelar={() => setADesembolsar(null)}
+        />
+      )}
+
+      {reciboAbierto && (
+        <ReciboModal
+          idRecibo={reciboAbierto}
+          onClose={() => {
+            setReciboAbierto(null);
+            cargar();
+          }}
+        />
       )}
 
       {/* ── Modal de revisión ── */}

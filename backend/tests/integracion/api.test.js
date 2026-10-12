@@ -261,6 +261,53 @@ test("desembolso → pago total → finiquito", async () => {
   if (otro) assert.equal((await api("GET", `/recibos/finiquito/${otro.id_prestamo}`, null, nuevoToken)).s, 403);
 });
 
+test("comprobante de entrega firmado: lo sube el socio y lo ve el personal", async () => {
+  const login = await api("POST", "/usuarios/login", { dni: "0801000000010", password: "Clave1234" });
+  const t = login.b.token;
+
+  // el socio localiza su comprobante de desembolso
+  const buscar = await api("GET", `/recibos/buscar?referencia_tipo=prestamo&referencia_id=${ids.prestamoNuevo}`, null, t);
+  assert.equal(buscar.s, 200);
+  assert.equal(buscar.b.data.tipo, "desembolso");
+  assert.equal(buscar.b.data.comprobante_firmado, null);
+  const idRecibo = buscar.b.data.id_recibo;
+
+  const enviar = async (token, nombre, mime, contenido, id = idRecibo) => {
+    const fd = new FormData();
+    fd.append("archivo", new Blob([contenido], { type: mime }), nombre);
+    const r = await fetch(`${base}/api/recibos/${id}/comprobante-firmado`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: fd,
+    });
+    return { s: r.status, b: await r.json().catch(() => null) };
+  };
+
+  // formato no permitido
+  assert.equal((await enviar(t, "virus.exe", "application/x-msdownload", "MZ")).s, 400);
+  // otro socio no puede subir en un recibo ajeno
+  assert.equal((await enviar(ids.tSocio2, "foto.jpg", "image/jpeg", "abc")).s, 403);
+
+  const ok = await enviar(t, "firmado.jpg", "image/jpeg", Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]));
+  assert.equal(ok.s, 201);
+
+  // el personal ve el estado y descarga el archivo
+  const recibo = await api("GET", `/recibos/${idRecibo}`, null, ids.tSuper);
+  assert.ok(recibo.b.data.comprobante_firmado);
+  const archivo = await fetch(`${base}/api/recibos/${idRecibo}/comprobante-firmado`, {
+    headers: { Authorization: `Bearer ${ids.tSuper}` },
+  });
+  assert.equal(archivo.status, 200);
+  assert.equal(archivo.headers.get("content-type"), "image/jpeg");
+  assert.equal((await archivo.arrayBuffer()).byteLength, 7);
+
+  // ya no aparece entre los desembolsos pendientes de firma
+  const pend = await api("GET", "/solicitudes/desembolsos-sin-firma", null, ids.tSuper);
+  assert.ok(!pend.b.data.some((d) => d.id_recibo === idRecibo));
+  // el socio no puede ver la lista del personal
+  assert.equal((await api("GET", "/solicitudes/desembolsos-sin-firma", null, t)).s, 403);
+});
+
 test("integridad: anular exige motivo, archiva y revierte el finiquito", async () => {
   const id = ids.prestamoNuevo;
   assert.equal((await api("DELETE", `/pagos/${ids.pagoFinal}`, null, ids.tSuper)).s, 400); // sin motivo

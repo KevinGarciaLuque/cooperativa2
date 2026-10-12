@@ -282,6 +282,7 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
             {recibo && (
               <>
                 <div className="text-center mb-3">
+                  <img src="/smartcoop.png" alt="SmartCoop" style={{ height: 64, marginBottom: 6 }} />
                   <div className="fw-bold fs-5">{recibo.cooperativa}</div>
                   <div className="text-muted small">{TIPOS[recibo.tipo] || "Recibo"}</div>
                   <div className="fw-bold mt-1" style={{ letterSpacing: 1 }}>N.º {recibo.numero}</div>

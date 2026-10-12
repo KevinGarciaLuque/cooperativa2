@@ -25,21 +25,11 @@ const leerConfig = async (clave) => {
   return rows.length ? rows[0].valor : null;
 };
 
-// Logo subido en Configuración (solo PNG o JPG, que es lo que admite el PDF);
-// si no hay, el de SmartCoop
-const LOGO_PREDETERMINADO = path.join(__dirname, "..", "assets", "smartcoop.png");
-const leerLogo = async () => {
+// Todos los documentos llevan el logo de SmartCoop
+const LOGO = path.join(__dirname, "..", "assets", "smartcoop.png");
+const leerLogo = () => {
   try {
-    const ruta = await leerConfig("logo_url");
-    if (ruta) {
-      const [rows] = await pool.query("SELECT mime, contenido FROM archivos WHERE ruta = ? LIMIT 1", [ruta]);
-      if (rows.length && ["image/png", "image/jpeg"].includes(rows[0].mime)) return rows[0].contenido;
-    }
-  } catch {
-    // sin logo subido: se usa el predeterminado
-  }
-  try {
-    return fs.readFileSync(LOGO_PREDETERMINADO);
+    return fs.readFileSync(LOGO);
   } catch {
     return null;
   }
@@ -63,7 +53,7 @@ const datosCarta = async (idPrestamo) => {
   const plazo = parseInt(p.plazo_meses) || 0;
   return {
     cooperativa: (await leerConfig("site_name")) || "SmartCoop",
-    logo: await leerLogo(),
+    logo: leerLogo(),
     id_prestamo: p.id_prestamo,
     id_usuario: p.id_usuario,
     socio: p.nombre_completo,

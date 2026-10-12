@@ -8,6 +8,8 @@ const PUBLICAS = [
   { metodo: "POST", re: /^\/usuarios\/login$/ },
   { metodo: "*", re: /^\/recuperar(\/.*)?$/ },
   { metodo: "GET", re: /^\/configuracion$/ }, // logo y nombre para la pantalla de login
+  { metodo: "GET", re: /^\/registro\/estado$/ },
+  { metodo: "POST", re: /^\/registro$/ },
 ];
 
 // Primer segmento de la ruta → módulo de permisos (los mismos del menú)
@@ -27,6 +29,7 @@ const MODULO_POR_PREFIJO = {
   dashboard: "dashboard",
   caja: "caja",
   cobranza: "cobranza",
+  solicitudes: "prestamos",
   contabilidad: "contabilidad",
   recibos: "pagos",
   socios: "usuarios",
@@ -36,7 +39,12 @@ const MODULO_POR_PREFIJO = {
 const SQL_PRESTAMO = "SELECT id_usuario FROM prestamos WHERE id_prestamo = ?";
 const SQL_CUENTA = "SELECT id_usuario FROM cuentas WHERE id_cuenta = ?";
 const REGLAS_SOCIO = [
-  { metodo: "GET", re: /^\/usuarios\/(\d+)$/, propio: 1 },
+  // Permitidas también para un socio que aún no ha sido aprobado
+  { metodo: "GET", re: /^\/usuarios\/(\d+)$/, propio: 1, pendiente: true },
+  { metodo: "POST", re: /^\/usuarios\/(\d+)\/cambiar-password$/, propio: 1, pendiente: true },
+  { metodo: "GET", re: /^\/prestamos$/, forzarUsuario: true, pendiente: true },
+  { metodo: "GET", re: /^\/solicitudes\/(parametros|mias)$/, libre: true, pendiente: true },
+  { metodo: "POST", re: /^\/solicitudes\/prestamo$/, libre: true, pendiente: true },
   { metodo: "GET", re: /^\/socios\/(\d+)\/estado-cuenta$/, propio: 1 },
   { metodo: "PUT", re: /^\/usuarios\/(\d+)\/foto$/, propio: 1 },
   { metodo: "POST", re: /^\/usuarios\/(\d+)\/cambiar-password$/, propio: 1 },
@@ -48,6 +56,7 @@ const REGLAS_SOCIO = [
   { metodo: "GET", re: /^\/movimientos\/cuenta\/(\d+)$/, sql: SQL_CUENTA, id: 1 },
   { metodo: "GET", re: /^\/aportaciones\/(\d+)$/, sql: "SELECT id_usuario FROM aportaciones WHERE id_aportacion = ?", id: 1 },
   { metodo: "GET", re: /^\/prestamos\/(\d+)$/, sql: SQL_PRESTAMO, id: 1 },
+  { metodo: "GET", re: /^\/recibos\/finiquito\/(\d+)$/, sql: SQL_PRESTAMO, id: 1 },
   { metodo: "GET", re: /^\/pagos\/prestamo\/(\d+)(\/proximo-pago)?$/, sql: SQL_PRESTAMO, id: 1 },
   {
     metodo: "GET",
@@ -143,9 +152,10 @@ const guardiaApi = async (req, res, next) => {
     }
     req.usuario = usuario;
 
-    // 2. El usuario debe seguir activo
+    // 2. El usuario debe seguir activo (un socio nuevo puede estar pendiente de aprobación)
     const estado = await estadoDelUsuario(usuario.id_usuario);
-    if (estado !== "activo") {
+    const socioPendiente = estado === "pendiente" && usuario.rol === "Socio";
+    if (estado !== "activo" && !socioPendiente) {
       return res.status(401).json({ message: "Tu cuenta está inactiva o ya no existe." });
     }
 
@@ -158,6 +168,9 @@ const guardiaApi = async (req, res, next) => {
         if (regla.metodo !== metodo) continue;
         const m = regla.re.exec(ruta);
         if (!m) continue;
+        if (socioPendiente && !regla.pendiente) continue;
+
+        if (regla.libre) return next();
 
         if (regla.forzarUsuario) {
           req.query.id_usuario = String(usuario.id_usuario);
@@ -171,7 +184,9 @@ const guardiaApi = async (req, res, next) => {
           return rows.length && rows[0].id_usuario === usuario.id_usuario ? next() : prohibido(res);
         }
       }
-      return prohibido(res);
+      return socioPendiente
+        ? prohibido(res, "Tu cuenta está pendiente de aprobación por la cooperativa.")
+        : prohibido(res);
     }
 
     // 5. Resto del personal: permisos por módulo del rol
@@ -229,4 +244,7 @@ const guardiaApi = async (req, res, next) => {
   }
 };
 
-module.exports = { guardiaApi, limpiarRespuestas };
+// Fuerza que el cambio de estado de un usuario se vea de inmediato
+const invalidarEstado = (idUsuario) => cacheEstado.delete(idUsuario);
+
+module.exports = { guardiaApi, limpiarRespuestas, invalidarEstado };

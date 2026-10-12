@@ -3,7 +3,7 @@ const router = express.Router();
 const pool = require("../db");
 const jwt = require("jsonwebtoken");
 const { registrarCaja } = require("../utils/caja");
-const { crearRecibo } = require("../utils/recibos");
+const { crearRecibo, emitirFiniquito } = require("../utils/recibos");
 const {
   DIAS_MES,
   calcularCuotaMensual,
@@ -390,12 +390,14 @@ router.post("/", async (req, res) => {
       emitido_por: req.usuario?.id_usuario,
     });
 
-    // Si el préstamo fue liquidado, cambiar estado
+    // Si el préstamo fue liquidado, cambiar estado y emitir la constancia de finiquito
+    let idFiniquito = null;
     if (prestamoLiquidado) {
       await connection.query(
         `UPDATE prestamos SET estado = 'pagado', saldo_restante = 0.00 WHERE id_prestamo = ?`,
         [id_prestamo]
       );
+      idFiniquito = await emitirFiniquito(connection, id_prestamo, req.usuario?.id_usuario);
     } else if (prestamoData.estado === 'mora' && (diasMora === 0 || interesMoratorio > 0 || moraCondonada)) {
       // La mora quedó pagada (o fue omitida) con este pago: el préstamo vuelve a activo
       await connection.query(
@@ -431,6 +433,7 @@ router.post("/", async (req, res) => {
       message: prestamoLiquidado ? "Pago registrado. ¡PRÉSTAMO LIQUIDADO!" : "Pago registrado correctamente",
       id_pago: nuevoPagoId,
       id_recibo: idRecibo,
+      id_finiquito: idFiniquito,
       detalles: {
         monto_pagado: montoPagadoNum,
         monto_capital: capitalDelPeriodo,
@@ -861,6 +864,13 @@ router.delete("/:id", async (req, res) => {
     await connection.query(
       `UPDATE recibos SET anulado = 1 WHERE referencia_tipo = 'pago' AND referencia_id = ?`,
       [pagoData.id_pago]
+    );
+
+    // El préstamo vuelve a quedar con saldo: la constancia de finiquito deja de ser válida
+    await connection.query(
+      `UPDATE recibos SET anulado = 1
+       WHERE tipo = 'finiquito' AND referencia_tipo = 'finiquito' AND referencia_id = ?`,
+      [pagoData.id_prestamo]
     );
 
     // Contrapartida en caja: sale el dinero que había entrado por este pago

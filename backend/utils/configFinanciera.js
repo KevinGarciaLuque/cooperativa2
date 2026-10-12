@@ -11,6 +11,11 @@ const DEFAULTS = {
   prov_31_60: 20,
   prov_61_90: 50,
   prov_90_mas: 100,
+  // Solicitudes de préstamo hechas por el socio
+  sol_tasa_mensual: 10, // tasa referencial mensual (%) para la cuota estimada
+  sol_monto_max: 200000,
+  sol_plazo_max: 60,
+  sol_pct_ingreso_max: 40, // % del ingreso que no conviene superar con la cuota
 };
 
 let cache = { ...DEFAULTS };

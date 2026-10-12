@@ -1,5 +1,7 @@
 import { useAuth } from "../../context/AuthContext";
 import { useConfigSitio } from "../../hooks/useConfigSitio";
+import SolicitudPrestamoSocio from "../../components/SolicitudPrestamoSocio";
+import ReciboModal from "../../components/ReciboModal";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import {
@@ -64,7 +66,9 @@ export default function SocioPerfil() {
   const [ultimoPagoFecha, setUltimoPagoFecha] = useState(null); // último pago a préstamos
   const [moras, setMoras] = useState({}); // id_prestamo -> { dias, mora, porDia }
   const [loading, setLoading]           = useState(true);
-  const [tab, setTab]                   = useState("resumen");
+  const pendiente = user?.estado === "pendiente";
+  const [tab, setTab]                   = useState(pendiente ? "solicitar" : "resumen");
+  const [finiquitoDe, setFiniquitoDe]   = useState(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [password, setPassword]         = useState("");
   const [msg, setMsg]                   = useState("");
@@ -149,6 +153,18 @@ export default function SocioPerfil() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        if (pendiente) {
+          // Aún no tiene cuentas: solo se verifica si ya fue aprobado
+          const u = await axios.get(`${API_URL}/usuarios/${user.id_usuario}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const datos = u.data.usuario || u.data;
+          if (datos?.estado && datos.estado !== "pendiente") {
+            updateUser({ estado: datos.estado });
+            window.location.reload();
+          }
+          return;
+        }
         const [cuentasRes, aportacionesRes, prestamosRes, usuarioRes, pagosRes] = await Promise.all([
           axios.get(`${API_URL}/cuentas?id_usuario=${user.id_usuario}`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -247,12 +263,18 @@ export default function SocioPerfil() {
   const prestamosActivos  = prestamos.filter((p) => ["aprobado", "activo"].includes((p.estado || "").toLowerCase())).length;
 
   /* ——— Tabs config ——— */
-  const tabs = [
-    { key: "resumen",      label: "Resumen",      icon: <FaChartLine /> },
-    { key: "prestamos",    label: "Préstamos",     icon: <FaHandHoldingUsd /> },
-    { key: "aportaciones", label: "Aportaciones",  icon: <FaPiggyBank /> },
-    { key: "seguridad",    label: "Seguridad",      icon: <FaShieldAlt /> },
-  ];
+  const tabs = pendiente
+    ? [
+        { key: "solicitar", label: "Solicitar préstamo", icon: <FaHandHoldingUsd /> },
+        { key: "seguridad", label: "Seguridad",          icon: <FaShieldAlt /> },
+      ]
+    : [
+        { key: "resumen",      label: "Resumen",            icon: <FaChartLine /> },
+        { key: "prestamos",    label: "Préstamos",           icon: <FaHandHoldingUsd /> },
+        { key: "solicitar",    label: "Solicitar préstamo",  icon: <FaClipboardList /> },
+        { key: "aportaciones", label: "Aportaciones",        icon: <FaPiggyBank /> },
+        { key: "seguridad",    label: "Seguridad",           icon: <FaShieldAlt /> },
+      ];
 
   return (
     <>
@@ -368,7 +390,7 @@ export default function SocioPerfil() {
                 { label: "Saldo Total",          value: `L. ${fmt(totalSaldo)}`,          icon: <FaMoneyBillWave />, color: "#a8cd3a" },
                 { label: "Total Aportaciones",   value: `L. ${fmt(totalAportaciones)}`,   icon: <FaPiggyBank />,     color: "#60a5fa" },
                 { label: "Préstamos Activos",    value: prestamosActivos,                  icon: <FaHandHoldingUsd />,color: "#f59e0b" },
-                { label: "Total Préstamos",      value: prestamos.length,                  icon: <FaClipboardList />, color: "#c084fc" },
+                { label: "Total Préstamos",      value: prestamos.filter((p) => p.estado !== "rechazado").length,                  icon: <FaClipboardList />, color: "#c084fc" },
               ].map((s) => (
                 <div className="col-6 col-md-3" key={s.label}>
                   <div style={{
@@ -413,6 +435,23 @@ export default function SocioPerfil() {
           )}
 
           {/* ===== CONTENIDO TABS ===== */}
+
+          {pendiente && (
+            <div className="alert alert-warning d-flex gap-2 align-items-start rounded-4 border-0 shadow-sm">
+              <FaExclamationTriangle className="mt-1" />
+              <div>
+                <strong>Tu cuenta está pendiente de aprobación.</strong>
+                <div className="small">
+                  Ya puedes enviar tu solicitud de préstamo. La cooperativa revisará tus datos y activará tu cuenta.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: SOLICITAR PRÉSTAMO */}
+          {tab === "solicitar" && (
+            <SolicitudPrestamoSocio token={token} />
+          )}
 
           {/* TAB: RESUMEN */}
           {tab === "resumen" && (
@@ -735,6 +774,16 @@ export default function SocioPerfil() {
                           </span>
                         )}
                       </button>
+                      {estaPagado && (
+                        <button
+                          className="btn btn-sm fw-semibold ms-2"
+                          style={{ background: "#059669", color: "#fff", borderRadius: ".6rem", padding: "6px 16px" }}
+                          onClick={() => setFiniquitoDe(p.id_prestamo)}
+                        >
+                          <FaCheckCircle className="me-1" size={12} />
+                          Constancia de finiquito
+                        </button>
+                      )}
                     </div>
 
                     {/* Panel de pagos expandible */}
@@ -913,6 +962,10 @@ export default function SocioPerfil() {
                 </div>
               </div>
             </div>
+          )}
+
+          {finiquitoDe && (
+            <ReciboModal finiquitoDe={finiquitoDe} onClose={() => setFiniquitoDe(null)} />
           )}
 
           {/* Footer */}

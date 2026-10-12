@@ -16,6 +16,7 @@ export default function ParametrosFinancieros() {
   const [tasa, setTasa] = useState("");
   const [gracia, setGracia] = useState("");
   const [prov, setProv] = useState({ prov_al_dia: "", prov_1_30: "", prov_31_60: "", prov_61_90: "", prov_90_mas: "" });
+  const [sol, setSol] = useState({ sol_tasa_mensual: "", sol_monto_max: "", sol_plazo_max: "", sol_pct_ingreso_max: "" });
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
 
@@ -25,6 +26,12 @@ export default function ParametrosFinancieros() {
       .then((res) => {
         setTasa(String(res.data.data.mora_tasa_anual));
         setGracia(String(res.data.data.mora_dias_gracia));
+        setSol({
+          sol_tasa_mensual: String(res.data.data.sol_tasa_mensual),
+          sol_monto_max: String(res.data.data.sol_monto_max),
+          sol_plazo_max: String(res.data.data.sol_plazo_max),
+          sol_pct_ingreso_max: String(res.data.data.sol_pct_ingreso_max),
+        });
         setProv({
           prov_al_dia: String(res.data.data.prov_al_dia),
           prov_1_30: String(res.data.data.prov_1_30),
@@ -44,7 +51,7 @@ export default function ParametrosFinancieros() {
     try {
       await axios.put(
         `${API_URL}/configuracion/financiera`,
-        { mora_tasa_anual: parseFloat(tasa), mora_dias_gracia: parseInt(gracia), ...prov },
+        { mora_tasa_anual: parseFloat(tasa), mora_dias_gracia: parseInt(gracia), ...prov, ...sol },
         { headers }
       );
       mostrarAlerta("Parámetros financieros guardados.", "success");
@@ -99,6 +106,32 @@ export default function ParametrosFinancieros() {
             />
             <div className="form-text">Días desde el último pago antes de que empiece a contar la mora.</div>
           </div>
+        </div>
+
+        <h5 className="fw-bold mt-4 mb-1" style={{ color: AZUL }}>Solicitudes de préstamo de los socios</h5>
+        <p className="text-muted small">
+          Valores que usa el formulario que ve el socio. La tasa es solo referencial: tú confirmas las condiciones al aprobar.
+        </p>
+        <div className="row g-3">
+          {[
+            ["sol_tasa_mensual", "Tasa referencial mensual (%)", "0.01"],
+            ["sol_monto_max", "Monto máximo a solicitar (L.)", "1"],
+            ["sol_plazo_max", "Plazo máximo (meses)", "1"],
+            ["sol_pct_ingreso_max", "Alerta si la cuota supera (% del ingreso)", "1"],
+          ].map(([k, etiqueta, paso]) => (
+            <div className="col-12 col-md-6" key={k}>
+              <label className="form-label fw-semibold small">{etiqueta}</label>
+              <input
+                type="number"
+                step={paso}
+                min="0"
+                className="form-control"
+                value={sol[k]}
+                onChange={(e) => setSol({ ...sol, [k]: e.target.value })}
+                disabled={cargando}
+              />
+            </div>
+          ))}
         </div>
 
         <h5 className="fw-bold mt-4 mb-1" style={{ color: AZUL }}>Provisión de cartera</h5>

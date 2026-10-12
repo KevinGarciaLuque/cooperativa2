@@ -180,6 +180,46 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_10_007_registro_solicitudes",
+    descripcion: "Socios pendientes de aprobación y solicitudes de préstamo del socio",
+    async up(conn) {
+      const [[col]] = await conn.query(
+        `SELECT COLUMN_TYPE AS tipo FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND COLUMN_NAME = 'estado'`
+      );
+      if (col && !col.tipo.includes("'pendiente'")) {
+        await conn.query(
+          `ALTER TABLE usuarios MODIFY estado ENUM('activo','inactivo','pendiente','rechazado') NOT NULL DEFAULT 'activo'`
+        );
+      }
+      const [[existe]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND COLUMN_NAME = 'motivo_rechazo'`
+      );
+      if (!existe.n) await conn.query(`ALTER TABLE usuarios ADD COLUMN motivo_rechazo VARCHAR(255) NULL`);
+
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS solicitudes_prestamo (
+          id_solicitud INT AUTO_INCREMENT PRIMARY KEY,
+          id_prestamo INT NOT NULL,
+          id_usuario INT NOT NULL,
+          proposito VARCHAR(30) NOT NULL,
+          descripcion VARCHAR(300) NULL,
+          ocupacion VARCHAR(30) NOT NULL,
+          lugar_trabajo VARCHAR(120) NULL,
+          ingreso_mensual DECIMAL(12,2) NOT NULL,
+          cuota_posible DECIMAL(12,2) NOT NULL,
+          cuota_estimada DECIMAL(12,2) NOT NULL,
+          tasa_referencial DECIMAL(6,3) NOT NULL,
+          referencias TEXT NULL,
+          creada_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_solicitud_prestamo (id_prestamo),
+          INDEX idx_solicitud_usuario (id_usuario)
+        )
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

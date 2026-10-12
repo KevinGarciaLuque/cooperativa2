@@ -27,6 +27,7 @@ import {
   FaSlidersH,
   FaPhoneAlt,
   FaBalanceScale,
+  FaInbox,
 } from "react-icons/fa";
 import LogoCoop from "./LogoCoop";
 
@@ -48,6 +49,7 @@ const TODOS_MODULOS = [
   { key: "cuentas",       to: "/cuentas",       icon: <FaUniversity />,     label: "Cuentas" },
   { key: "prestamos",     to: "/prestamos",     icon: <FaHandHoldingUsd />, label: "Préstamos" },
   { key: "aportaciones",  to: "/aportaciones",  icon: <FaPiggyBank />,      label: "Aportaciones" },
+  { key: "prestamos",     to: "/solicitudes",    icon: <FaInbox />,          label: "Solicitudes" },
   { key: "contabilidad",  to: "/contabilidad",  icon: <FaBalanceScale />,   label: "Contabilidad" },
   { key: "cobranza",      to: "/cobranza",      icon: <FaPhoneAlt />,       label: "Cobranza" },
   { key: "caja",          to: "/caja",          icon: <FaCashRegister />,   label: "Caja" },
@@ -79,6 +81,24 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
   const [open, setOpen] = useState(false); // móvil/tablet offcanvas
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 992);
   const [permisosRol, setPermisosRol] = useState(null); // null = cargando
+  const [solicitudesPendientes, setSolicitudesPendientes] = useState(0);
+
+  // Contador de solicitudes por revisar (personal)
+  useEffect(() => {
+    if (!user || user.rol === "Socio" || !token) return;
+    let activo = true;
+    const cargar = () =>
+      axios
+        .get(`${API_URL}/solicitudes/resumen`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => activo && setSolicitudesPendientes(r.data.total || 0))
+        .catch(() => {});
+    cargar();
+    const id = setInterval(cargar, 60000);
+    return () => {
+      activo = false;
+      clearInterval(id);
+    };
+  }, [user, token]);
 
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth >= 992);
@@ -364,6 +384,14 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
                   >
                     <span className="sidebar-icon">{icon}</span>
                     <span className="sidebar-label">{label}</span>
+                    {to === "/solicitudes" && solicitudesPendientes > 0 && (
+                      <span
+                        className="badge rounded-pill ms-auto"
+                        style={{ background: "#e74c3c", color: "#fff", fontSize: ".7rem" }}
+                      >
+                        {solicitudesPendientes}
+                      </span>
+                    )}
                   </NavLink>
                 </li>
               ))}
@@ -432,6 +460,14 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
                   >
                     <span className="sidebar-icon">{icon}</span>
                     <span className="sidebar-label">{label}</span>
+                    {to === "/solicitudes" && solicitudesPendientes > 0 && (
+                      <span
+                        className="badge rounded-pill ms-auto"
+                        style={{ background: "#e74c3c", color: "#fff", fontSize: ".7rem" }}
+                      >
+                        {solicitudesPendientes}
+                      </span>
+                    )}
                   </NavLink>
                 </li>
               ))}

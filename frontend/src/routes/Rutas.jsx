@@ -25,6 +25,8 @@ const Ventanilla = lazy(() => import("../pages/Ventanilla"));
 const Caja = lazy(() => import("../pages/Caja"));
 const Cobranza = lazy(() => import("../pages/Cobranza"));
 const Contabilidad = lazy(() => import("../pages/Contabilidad"));
+const Registro = lazy(() => import("../pages/Registro"));
+const Solicitudes = lazy(() => import("../pages/Solicitudes"));
 const ParametrosFinancieros = lazy(() => import("../pages/SuperAdmin/ParametrosFinancieros"));
 // Vistas de usuario socio
 const SocioPerfil = lazy(() => import("../pages/Socio/SocioPerfil"));
@@ -52,6 +54,7 @@ export default function Rutas() {
 
       {/* --- Rutas públicas --- */}
       <Route path="/login" element={<Login />} />
+      <Route path="/registro" element={<Registro />} />
       <Route path="/recuperar" element={<Recuperar />} />
       <Route path="/" element={<Home />} />
 
@@ -93,6 +96,14 @@ export default function Rutas() {
             element={
               <PrivateRoute>
                 <Contabilidad />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/solicitudes"
+            element={
+              <PrivateRoute>
+                <Solicitudes />
               </PrivateRoute>
             }
           />

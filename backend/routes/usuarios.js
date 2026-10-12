@@ -133,6 +133,10 @@ router.post("/login", async (req, res) => {
       return res.status(403).json({ message: "Usuario inactivo. Contacte al administrador." });
     }
 
+    if (user.estado === "rechazado") {
+      return res.status(403).json({ message: "Tu solicitud de registro no fue aprobada. Comunícate con la cooperativa." });
+    }
+
     if (user.estado === "suspendido") {
       return res.status(403).json({ message: "Usuario suspendido. Contacte al administrador." });
     }
@@ -171,6 +175,7 @@ router.post("/login", async (req, res) => {
         rol_id: user.rol_id,
         rol: user.rol,
         foto: user.foto,
+        estado: user.estado,
         fecha_registro: user.fecha_registro,
       },
     });

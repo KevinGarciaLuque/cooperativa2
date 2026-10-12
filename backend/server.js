@@ -80,6 +80,18 @@ const limiteRecuperar = rateLimit({
 });
 app.use("/api/recuperar", limiteRecuperar);
 
+// Límite para registros nuevos (evita altas masivas)
+app.use(
+  "/api/registro",
+  rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Demasiados registros desde esta conexión. Intenta de nuevo más tarde." },
+  })
+);
+
 // Límite general de la API
 app.use(
   "/api",
@@ -117,6 +129,8 @@ app.use("/api/caja", require("./routes/caja"));
 app.use("/api/recibos", require("./routes/recibos"));
 app.use("/api/cobranza", require("./routes/cobranza"));
 app.use("/api/contabilidad", require("./routes/contabilidad"));
+app.use("/api/registro", require("./routes/registro"));
+app.use("/api/solicitudes", require("./routes/solicitudes"));
 app.use("/api/socios", ocultarInteresSocio, require("./routes/socios"));
 
 // Iniciar el scheduler de backups automáticos

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import ReciboModal from "../components/ReciboModal";
 import {
   FaArrowLeft,
   FaPrint,
@@ -61,6 +62,7 @@ export default function DetallePrestamoVentanilla({
 }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
+  const [verFiniquito, setVerFiniquito] = useState(false);
 
   useEffect(() => {
     let activo = true;
@@ -191,6 +193,7 @@ export default function DetallePrestamoVentanilla({
 
   return (
     <div className="container-fluid py-3">
+      {verFiniquito && <ReciboModal finiquitoDe={idPrestamo} onClose={() => setVerFiniquito(false)} />}
       <style>{`
         .dp-card { border: 0; border-radius: 1rem; box-shadow: 0 2px 12px #0000000f; background: #fff; }
         .dp-kpi { border-radius: .9rem; padding: .85rem 1rem; background: #f6f8fb; height: 100%; }
@@ -217,6 +220,11 @@ export default function DetallePrestamoVentanilla({
             <button className="btn btn-outline-dark" onClick={() => window.print()}>
               <FaPrint className="me-2" /> Imprimir
             </button>
+            {calc.liquidado && (
+              <button className="btn btn-success fw-semibold" onClick={() => setVerFiniquito(true)}>
+                Constancia de finiquito
+              </button>
+            )}
             {!calc.liquidado && (
               <>
                 <button className="btn fw-semibold" style={{ background: ACCENT, color: "#1a2a00" }} onClick={onCobrar}>

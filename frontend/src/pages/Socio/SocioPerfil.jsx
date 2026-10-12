@@ -1,4 +1,5 @@
 import { useAuth } from "../../context/AuthContext";
+import { useConfigSitio } from "../../hooks/useConfigSitio";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import {
@@ -56,6 +57,7 @@ const estadoBadge = (estado) => {
 
 export default function SocioPerfil() {
   const { user, token, logout, updateUser } = useAuth();
+  const { config: configSitio } = useConfigSitio();
   const [cuentas, setCuentas]           = useState([]);
   const [aportaciones, setAportaciones] = useState([]);
   const [prestamos, setPrestamos]       = useState([]);
@@ -261,6 +263,12 @@ export default function SocioPerfil() {
           color: #6b7280; transition: all .2s; display:flex; align-items:center; gap:.45rem; font-size:.92rem; }
         .sp-tab-btn:hover { background: #e5f0d6; color: ${AZUL}; }
         .sp-tab-btn.active { background: ${VERDE}; color: #1a2a00; font-weight: 700; box-shadow: 0 2px 8px #a8cd3a55; }
+        /* Móvil: pestañas con desplazamiento horizontal y tarjetas más compactas */
+        @media (max-width: 575.98px) {
+          .sp-tabs { flex-wrap: nowrap !important; overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; }
+          .sp-tab-btn { padding: .5rem .9rem; font-size: .88rem; white-space: nowrap; flex: 0 0 auto; }
+          .sp-table thead th, .sp-table tbody td { padding: .55rem .6rem; font-size: .8rem; }
+        }
         .sp-stat { border-radius: 1.2rem; padding: 1.25rem 1.5rem; border: none; transition: transform .18s, box-shadow .18s; }
         .sp-stat:hover { transform: translateY(-3px); box-shadow: 0 8px 24px #00000018; }
         .sp-table thead { background: linear-gradient(90deg, ${AZUL} 0%, ${AZUL_CLARO} 100%); color:#fff; }
@@ -380,7 +388,7 @@ export default function SocioPerfil() {
           </div>
 
           {/* ===== TABS ===== */}
-          <div className="d-flex gap-2 flex-wrap mb-4 p-1"
+          <div className="sp-tabs d-flex gap-2 flex-wrap mb-4 p-1"
             style={{ background: "#fff", borderRadius: "2rem", display: "inline-flex", boxShadow: "0 2px 8px #0000000d" }}>
             {tabs.map((t) => (
               <button
@@ -909,7 +917,7 @@ export default function SocioPerfil() {
 
           {/* Footer */}
           <div className="text-center mt-4 text-muted small" style={{ opacity: .6 }}>
-            Demo © {new Date().getFullYear()} • Panel de Socio
+            {configSitio.site_name} © {new Date().getFullYear()} • Panel de Socio
           </div>
 
         </div>

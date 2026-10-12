@@ -1,0 +1,120 @@
+/* ─────────────────────────────────────────────────────────────
+   Sistema de diseño: valores compartidos por todas las pantallas.
+   Las pantallas nuevas usan estas variables; las antiguas se irán
+   migrando de forma gradual.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  /* Marca */
+  --ui-azul: #1a2035;
+  --ui-azul-2: #222d45;
+  --ui-acento: #a8cd3a;
+  --ui-acento-texto: #1a2a00;
+
+  /* Estados */
+  --ui-ok: #27ae60;
+  --ui-ok-bg: #ecfdf5;
+  --ui-aviso: #f39c12;
+  --ui-aviso-bg: #fffbeb;
+  --ui-error: #e74c3c;
+  --ui-error-bg: #fef2f2;
+  --ui-info: #3498db;
+  --ui-info-bg: #eff6ff;
+
+  /* Superficies y texto */
+  --ui-fondo: #f8f9fa;
+  --ui-superficie: #ffffff;
+  --ui-superficie-2: #f6f8fb;
+  --ui-borde: #e2e8f0;
+  --ui-texto: #1e293b;
+  --ui-texto-suave: #64748b;
+
+  /* Forma */
+  --ui-radio: 1rem;
+  --ui-radio-chico: 0.6rem;
+  --ui-sombra: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* Tarjeta base */
+.ui-card {
+  background: var(--ui-superficie);
+  border-radius: var(--ui-radio);
+  box-shadow: var(--ui-sombra);
+}
+
+/* Encabezado de página */
+.ui-page-title {
+  color: var(--ui-azul);
+  font-weight: 700;
+  margin: 0;
+}
+.ui-page-sub {
+  color: var(--ui-texto-suave);
+}
+
+/* Indicador */
+.ui-stat {
+  background: var(--ui-superficie-2);
+  border-radius: 0.9rem;
+  padding: 0.85rem 1rem;
+  height: 100%;
+}
+.ui-stat-label {
+  font-size: 0.78rem;
+  color: var(--ui-texto-suave);
+  font-weight: 600;
+}
+.ui-stat-value {
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--ui-azul);
+}
+
+/* Esqueletos de carga */
+@keyframes ui-brillo {
+  0% { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+.ui-skeleton {
+  display: inline-block;
+  width: 100%;
+  height: 1em;
+  border-radius: 6px;
+  background-color: #e8edf3;
+  background-image: linear-gradient(90deg, #e8edf3, #f4f7fa, #e8edf3);
+  background-size: 200px 100%;
+  background-repeat: no-repeat;
+  animation: ui-brillo 1.3s ease-in-out infinite;
+}
+
+/* Tabla de datos */
+.ui-table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--ui-texto-suave);
+  white-space: nowrap;
+  user-select: none;
+}
+.ui-table th.ui-ordenable { cursor: pointer; }
+.ui-table th.ui-ordenable:hover { color: var(--ui-azul); }
+.ui-table td { vertical-align: middle; }
+
+/* Foco visible y accesible */
+.ui-card button:focus-visible,
+.ui-card a:focus-visible,
+.ui-card input:focus-visible,
+.ui-card select:focus-visible {
+  outline: 2px solid var(--ui-acento);
+  outline-offset: 2px;
+}
+
+/* Móvil: más aire en los bordes y botones táctiles */
+@media (max-width: 575.98px) {
+  .ui-card { border-radius: 0.8rem; }
+  .btn { min-height: 40px; }
+}
+
+/* Impresión */
+@media print {
+  .ui-no-print { display: none !important; }
+}

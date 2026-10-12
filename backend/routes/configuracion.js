@@ -133,6 +133,15 @@ router.put("/financiera", verificarToken, soloSuperAdmin, async (req, res) => {
       ["fin_mora_tasa_anual", String(tasa)],
       ["fin_mora_dias_gracia", String(gracia)],
     ];
+    const clavesProv = ["prov_al_dia", "prov_1_30", "prov_31_60", "prov_61_90", "prov_90_mas"];
+    for (const k of clavesProv) {
+      if (req.body[k] === undefined || req.body[k] === "") continue;
+      const v = parseFloat(req.body[k]);
+      if (isNaN(v) || v < 0 || v > 100) {
+        return res.status(400).json({ message: "Los porcentajes de provisión deben estar entre 0 y 100." });
+      }
+      guardar.push([`fin_${k}`, String(v)]);
+    }
     for (const [clave, valor] of guardar) {
       await pool.query(
         "INSERT INTO configuracion_sitio (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)",

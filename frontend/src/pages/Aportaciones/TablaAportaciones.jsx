@@ -1,3 +1,9 @@
+import { useState } from "react";
+import { Paginacion } from "../../ui/Componentes";
+import { paginar } from "../../ui/paginar";
+
+const TAM_PAG = 20;
+
 import {
   FaEdit,
   FaTrash,
@@ -15,6 +21,8 @@ export default function TablaAportaciones({
   onEdit,
   onDelete,
 }) {
+  const [pagina, setPagina] = useState(1);
+
   if (!aportaciones || aportaciones.length === 0) {
     return (
       <div
@@ -68,7 +76,7 @@ export default function TablaAportaciones({
       {/* Body de la tabla */}
       <div className="card-body p-0">
         <div style={{ maxHeight: "600px", overflowY: "auto" }}>
-          {aportaciones.map((aportacion, index) => {
+          {paginar(aportaciones, pagina, TAM_PAG).items.map((aportacion, index) => {
             const usuario = usuarios.find(
               (u) => u.id_usuario === aportacion.id_usuario
             );
@@ -273,6 +281,8 @@ export default function TablaAportaciones({
           })}
         </div>
       </div>
+
+      {<Paginacion total={aportaciones.length} pagina={Math.min(pagina, Math.max(1, Math.ceil(aportaciones.length / TAM_PAG)))} tam={TAM_PAG} onCambiar={setPagina} />}
 
       {/* Footer con resumen */}
       <div

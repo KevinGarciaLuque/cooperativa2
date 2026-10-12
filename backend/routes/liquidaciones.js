@@ -242,6 +242,113 @@ router.get("/socio/:id_usuario", async (req, res) => {
 });
 
 // ============================================
+// CÁLCULO DEL REPARTO (compartido por la vista previa y el registro)
+// Solo reciben utilidades los usuarios con rol Socio y estado activo.
+// ============================================
+const calcularReparto = async (conn, montoTotal, tipoReparto) => {
+  const [socios] = await conn.query(
+    `SELECT u.id_usuario, u.nombre_completo, u.dni,
+            IFNULL((SELECT SUM(ap.monto) FROM aportaciones ap WHERE ap.id_usuario = u.id_usuario), 0) AS total_aportado
+     FROM usuarios u
+     INNER JOIN roles r ON u.rol_id = r.id_rol
+     WHERE u.estado = 'activo' AND r.nombre = 'Socio'
+     ORDER BY u.nombre_completo`
+  );
+
+  if (socios.length === 0) {
+    throw new Error("No hay socios activos para liquidar");
+  }
+
+  let detalle;
+  if (tipoReparto === "igualitario") {
+    detalle = socios.map((s) => ({
+      id_usuario: s.id_usuario,
+      nombre_completo: s.nombre_completo,
+      dni: s.dni,
+      total_aportado: parseFloat(s.total_aportado),
+      porcentaje: parseFloat((100 / socios.length).toFixed(4)),
+      monto_recibido: Math.floor((montoTotal / socios.length) * 100) / 100,
+    }));
+  } else {
+    const totalSistema = socios.reduce((sum, s) => sum + parseFloat(s.total_aportado), 0);
+    if (totalSistema === 0) {
+      throw new Error("No hay aportaciones registradas para hacer reparto proporcional. Use reparto igualitario.");
+    }
+    detalle = socios.map((s) => {
+      const porcentaje = (parseFloat(s.total_aportado) / totalSistema) * 100;
+      return {
+        id_usuario: s.id_usuario,
+        nombre_completo: s.nombre_completo,
+        dni: s.dni,
+        total_aportado: parseFloat(s.total_aportado),
+        porcentaje: parseFloat(porcentaje.toFixed(4)),
+        monto_recibido: Math.floor(((montoTotal * porcentaje) / 100) * 100) / 100,
+      };
+    });
+  }
+
+  // Los centavos que sobran por redondeo se asignan al socio con mayor participación,
+  // para que la suma repartida sea exactamente el monto de la utilidad.
+  const repartido = detalle.reduce((s, d) => s + d.monto_recibido, 0);
+  const residuo = parseFloat((montoTotal - repartido).toFixed(2));
+  if (Math.abs(residuo) > 0 && detalle.length) {
+    const mayor = detalle.reduce((a, b) => (b.monto_recibido > a.monto_recibido ? b : a));
+    mayor.monto_recibido = parseFloat((mayor.monto_recibido + residuo).toFixed(2));
+  }
+
+  return detalle;
+};
+
+// ============================================
+// VISTA PREVIA: GET /api/liquidaciones/preview?id_actividad=&tipo_reparto=
+// ============================================
+router.get("/preview", async (req, res) => {
+  try {
+    const { id_actividad, tipo_reparto = "proporcional" } = req.query;
+    if (!id_actividad) return res.status(400).json({ message: "Indica la actividad a liquidar." });
+    if (!["proporcional", "igualitario"].includes(tipo_reparto)) {
+      return res.status(400).json({ message: "Tipo de reparto inválido." });
+    }
+    const [act] = await pool.query("SELECT * FROM actividades WHERE id_actividad = ?", [id_actividad]);
+    if (!act.length) return res.status(404).json({ message: "Actividad no encontrada" });
+
+    const [liq] = await pool.query("SELECT id_liquidacion FROM liquidaciones WHERE id_actividad = ?", [id_actividad]);
+    const monto = parseFloat(act[0].monto);
+    const detalle = await calcularReparto(pool, monto, tipo_reparto);
+
+    res.json({
+      success: true,
+      actividad: { id_actividad: act[0].id_actividad, nombre: act[0].nombre, tipo: act[0].tipo, monto },
+      ya_liquidada: liq.length > 0,
+      tipo_reparto,
+      total_socios: detalle.length,
+      total_repartido: parseFloat(detalle.reduce((s, d) => s + d.monto_recibido, 0).toFixed(2)),
+      detalle,
+    });
+  } catch (error) {
+    res.status(400).json({ message: error.message || "No se pudo calcular el reparto" });
+  }
+});
+
+// ============================================
+// ACTIVIDADES PENDIENTES DE LIQUIDAR
+// ============================================
+router.get("/actividades-disponibles", async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT a.id_actividad, a.nombre, a.tipo, a.monto, a.fecha
+       FROM actividades a
+       WHERE NOT EXISTS (SELECT 1 FROM liquidaciones l WHERE l.id_actividad = a.id_actividad)
+       ORDER BY a.fecha DESC`
+    );
+    res.json({ success: true, data: rows.map((r) => ({ ...r, monto: parseFloat(r.monto) })) });
+  } catch (error) {
+    console.error("ERROR AL LISTAR ACTIVIDADES DISPONIBLES:", error);
+    res.status(500).json({ message: "Error al listar las actividades" });
+  }
+});
+
+// ============================================
 // CREAR NUEVA LIQUIDACIÓN (REPARTO PROPORCIONAL O IGUALITARIO)
 // ============================================
 router.post("/", async (req, res) => {
@@ -296,57 +403,7 @@ router.post("/", async (req, res) => {
 
       const monto_total = parseFloat(actividad[0].monto);
 
-      // Obtener socios activos
-      const [socios] = await connection.query(
-        'SELECT id_usuario FROM usuarios WHERE estado = "activo"'
-      );
-
-      if (socios.length === 0) {
-        throw new Error('No hay socios activos para liquidar');
-      }
-
-      let repartoDetalle = [];
-
-      if (tipo_reparto === 'igualitario') {
-        // ========== REPARTO IGUALITARIO ==========
-        const monto_por_socio = parseFloat((monto_total / socios.length).toFixed(2));
-        
-        repartoDetalle = socios.map(socio => ({
-          id_usuario: socio.id_usuario,
-          monto_recibido: monto_por_socio,
-          porcentaje: parseFloat((100 / socios.length).toFixed(2))
-        }));
-
-      } else {
-        // ========== REPARTO PROPORCIONAL POR APORTACIONES ==========
-        // Obtener total de aportaciones por socio activo
-        const [aportaciones] = await connection.query(
-          `SELECT 
-           u.id_usuario,
-           IFNULL(SUM(ap.monto), 0) as total_aportado
-           FROM usuarios u
-           LEFT JOIN aportaciones ap ON u.id_usuario = ap.id_usuario
-           WHERE u.estado = "activo"
-           GROUP BY u.id_usuario`
-        );
-
-        const total_aportaciones_sistema = aportaciones.reduce((sum, a) => sum + parseFloat(a.total_aportado), 0);
-
-        if (total_aportaciones_sistema === 0) {
-          throw new Error('No hay aportaciones registradas para hacer reparto proporcional. Use reparto igualitario.');
-        }
-
-        repartoDetalle = aportaciones.map(socio => {
-          const porcentaje = (parseFloat(socio.total_aportado) / total_aportaciones_sistema) * 100;
-          const monto_recibido = (monto_total * porcentaje) / 100;
-          
-          return {
-            id_usuario: socio.id_usuario,
-            monto_recibido: parseFloat(monto_recibido.toFixed(2)),
-            porcentaje: parseFloat(porcentaje.toFixed(4))
-          };
-        });
-      }
+      const repartoDetalle = await calcularReparto(connection, monto_total, tipo_reparto);
 
       // Crear la liquidación
       const [resultLiq] = await connection.query(

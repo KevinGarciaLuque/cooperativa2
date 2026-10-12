@@ -26,6 +26,7 @@ import {
   FaCashRegister,
   FaSlidersH,
   FaPhoneAlt,
+  FaBalanceScale,
 } from "react-icons/fa";
 import LogoCoop from "./LogoCoop";
 
@@ -47,6 +48,7 @@ const TODOS_MODULOS = [
   { key: "cuentas",       to: "/cuentas",       icon: <FaUniversity />,     label: "Cuentas" },
   { key: "prestamos",     to: "/prestamos",     icon: <FaHandHoldingUsd />, label: "Préstamos" },
   { key: "aportaciones",  to: "/aportaciones",  icon: <FaPiggyBank />,      label: "Aportaciones" },
+  { key: "contabilidad",  to: "/contabilidad",  icon: <FaBalanceScale />,   label: "Contabilidad" },
   { key: "cobranza",      to: "/cobranza",      icon: <FaPhoneAlt />,       label: "Cobranza" },
   { key: "caja",          to: "/caja",          icon: <FaCashRegister />,   label: "Caja" },
   { key: "pagos",         to: "/pagos",         icon: <FaMoneyCheckAlt />,  label: "Pagos" },

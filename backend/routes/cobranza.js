@@ -1,29 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
-const {
-  DIAS_MES,
-  soloFecha,
-  hoyISO,
-  diasEntre,
-  calcularCuotaMensual,
-  calcularDiasMora,
-  calcularInteresMoratorio,
-} = require("../utils/calculosPrestamo");
-
-const sumarMeses = (fecha, meses) => {
-  const [y, m, d] = fecha.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1 + meses, d)).toISOString().substring(0, 10);
-};
-
-const clasificar = (diasMora, diasParaVencer) => {
-  if (diasMora > 90) return "mora_90_mas";
-  if (diasMora > 60) return "mora_61_90";
-  if (diasMora > 30) return "mora_31_60";
-  if (diasMora > 0) return "mora_1_30";
-  if (diasParaVencer <= 7) return "por_vencer";
-  return "al_dia";
-};
+const { DIAS_MES } = require("../utils/calculosPrestamo");
+const { obtenerCartera, resumirCartera } = require("../utils/cartera");
 
 // ============================================
 // CARTERA: préstamos vigentes clasificados por antigüedad
@@ -31,63 +10,8 @@ const clasificar = (diasMora, diasParaVencer) => {
 // ============================================
 router.get("/cartera", async (req, res) => {
   try {
-    const [prestamos] = await pool.query(
-      `SELECT p.id_prestamo, p.id_usuario, p.monto, p.saldo_restante, p.tasa_interes, p.plazo_meses,
-              p.estado, p.fecha_otorgado,
-              u.nombre_completo, u.dni, u.telefono, u.correo,
-              (SELECT MAX(fecha_pago) FROM pagos_prestamo WHERE id_prestamo = p.id_prestamo) AS ultimo_pago,
-              (SELECT nota FROM gestiones_cobro g WHERE g.id_prestamo = p.id_prestamo ORDER BY g.fecha DESC, g.id_gestion DESC LIMIT 1) AS ultima_nota,
-              (SELECT fecha FROM gestiones_cobro g WHERE g.id_prestamo = p.id_prestamo ORDER BY g.fecha DESC, g.id_gestion DESC LIMIT 1) AS ultima_gestion,
-              (SELECT promesa_fecha FROM gestiones_cobro g WHERE g.id_prestamo = p.id_prestamo AND g.promesa_fecha IS NOT NULL ORDER BY g.fecha DESC, g.id_gestion DESC LIMIT 1) AS promesa_fecha
-       FROM prestamos p
-       INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
-       WHERE p.estado IN ('activo', 'mora')`
-    );
-
-    const hoy = hoyISO();
-    const filas = prestamos.map((p) => {
-      const base = soloFecha(p.ultimo_pago) || soloFecha(p.fecha_otorgado) || hoy;
-      const vencimiento = sumarMeses(base, 1);
-      const diasParaVencer = diasEntre(hoy, vencimiento);
-      const diasMora = calcularDiasMora(p.fecha_otorgado, p.ultimo_pago);
-      const saldo = parseFloat(p.saldo_restante);
-      const cuota = calcularCuotaMensual(
-        parseFloat(p.monto),
-        parseFloat(p.tasa_interes),
-        parseInt(p.plazo_meses)
-      );
-      return {
-        id_prestamo: p.id_prestamo,
-        id_usuario: p.id_usuario,
-        socio: p.nombre_completo,
-        dni: p.dni,
-        telefono: p.telefono,
-        correo: p.correo,
-        monto: parseFloat(p.monto),
-        saldo,
-        cuota: parseFloat(cuota.toFixed(2)),
-        vencimiento,
-        dias_para_vencer: diasParaVencer,
-        dias_mora: diasMora,
-        mora_generada: parseFloat(calcularInteresMoratorio(saldo, diasMora).toFixed(2)),
-        categoria: clasificar(diasMora, diasParaVencer),
-        ultima_gestion: p.ultima_gestion,
-        ultima_nota: p.ultima_nota,
-        promesa_fecha: soloFecha(p.promesa_fecha),
-        promesa_vencida: p.promesa_fecha ? soloFecha(p.promesa_fecha) < hoy && diasMora > 0 : false,
-      };
-    });
-
-    filas.sort((a, b) => b.dias_mora - a.dias_mora || a.dias_para_vencer - b.dias_para_vencer);
-
-    const resumen = {};
-    filas.forEach((f) => {
-      if (!resumen[f.categoria]) resumen[f.categoria] = { cantidad: 0, saldo: 0, mora: 0 };
-      resumen[f.categoria].cantidad += 1;
-      resumen[f.categoria].saldo += f.saldo;
-      resumen[f.categoria].mora += f.mora_generada;
-    });
-
+    const filas = await obtenerCartera();
+    const { resumen } = resumirCartera(filas);
     res.json({ success: true, dias_mes: DIAS_MES, resumen, data: filas });
   } catch (error) {
     console.error("ERROR AL OBTENER CARTERA:", error);

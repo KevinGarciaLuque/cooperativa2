@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
+import { DataTable, EmptyState } from "../ui/Componentes";
 import {
   FaCashRegister,
   FaChevronLeft,
@@ -25,7 +26,31 @@ const CATEGORIAS = {
   anulacion_desembolso: "Reversión de desembolso",
   ajuste_pago: "Ajuste de pago",
   ajuste_aportacion: "Ajuste de aportación",
+  gasto_servicios: "Gasto: servicios",
+  gasto_salarios: "Gasto: salarios",
+  gasto_alquiler: "Gasto: alquiler",
+  gasto_papeleria: "Gasto: papelería",
+  gasto_transporte: "Gasto: transporte",
+  gasto_otros: "Gasto: otros",
+  ingreso_saldo_inicial: "Saldo inicial de caja",
+  ingreso_capital: "Aporte de capital",
+  ingreso_otro: "Otro ingreso",
 };
+
+const TIPOS_GASTO = [
+  ["servicios", "Servicios (agua, luz, internet)"],
+  ["salarios", "Salarios y honorarios"],
+  ["alquiler", "Alquiler"],
+  ["papeleria", "Papelería y útiles"],
+  ["transporte", "Transporte y viáticos"],
+  ["otros", "Otros gastos"],
+];
+
+const TIPOS_INGRESO = [
+  ["saldo_inicial", "Saldo inicial de caja"],
+  ["capital", "Aporte de capital"],
+  ["otro", "Otro ingreso"],
+];
 
 const METODOS = {
   efectivo: "Efectivo",
@@ -68,6 +93,8 @@ export default function Caja() {
   const [contado, setContado] = useState("");
   const [observacion, setObservacion] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [movimientoManual, setMovimientoManual] = useState(null); // "gasto" | "ingreso"
+  const [formManual, setFormManual] = useState({ categoria: "", monto: "", metodo: "efectivo", concepto: "", fecha: "" });
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -116,6 +143,36 @@ export default function Caja() {
     }
   };
 
+  const abrirManual = (tipo) => {
+    setFormManual({
+      categoria: tipo === "gasto" ? "servicios" : "saldo_inicial",
+      monto: "",
+      metodo: "efectivo",
+      concepto: "",
+      fecha: fecha,
+    });
+    setMovimientoManual(tipo);
+  };
+
+  const guardarManual = async (e) => {
+    e.preventDefault();
+    setGuardando(true);
+    try {
+      await axios.post(
+        `${API_URL}/caja/${movimientoManual}`,
+        { ...formManual, monto: parseFloat(formManual.monto) },
+        { headers }
+      );
+      mostrarAlerta(movimientoManual === "gasto" ? "Gasto registrado." : "Ingreso registrado.", "success");
+      setMovimientoManual(null);
+      cargar();
+    } catch (err) {
+      mostrarAlerta(err.response?.data?.message || "No se pudo registrar el movimiento.", "error");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
   const kpi = (titulo, valor, color, icono) => (
     <div className="col-6 col-lg-3">
       <div className="h-100 p-3" style={{ background: "#fff", borderRadius: "1rem", boxShadow: "0 2px 12px #0000000f" }}>
@@ -137,7 +194,13 @@ export default function Caja() {
           </h3>
           <span className="text-muted">Ingresos, egresos y cierre diario del efectivo.</span>
         </div>
-        <div className="d-flex align-items-center gap-2">
+        <div className="d-flex flex-wrap align-items-center gap-2">
+          <button className="btn btn-sm btn-outline-danger" onClick={() => abrirManual("gasto")}>
+            Registrar gasto
+          </button>
+          <button className="btn btn-sm btn-outline-success" onClick={() => abrirManual("ingreso")}>
+            Registrar ingreso
+          </button>
           <button className="btn btn-outline-secondary btn-sm" onClick={() => setFecha(moverDia(fecha, -1))}>
             <FaChevronLeft />
           </button>
@@ -323,43 +386,36 @@ export default function Caja() {
             {/* Movimientos */}
             <div className="p-4 mt-4" style={{ background: "#fff", borderRadius: "1rem", boxShadow: "0 2px 12px #0000000f" }}>
               <h5 className="fw-bold mb-3" style={{ color: AZUL }}>Movimientos del día</h5>
-              {data.movimientos.length === 0 ? (
-                <div className="text-muted">No hay movimientos registrados en esta fecha.</div>
-              ) : (
-                <div className="table-responsive">
-                  <table className="table table-sm align-middle mb-0">
-                    <thead>
-                      <tr className="small text-muted">
-                        <th>Hora</th>
-                        <th>Concepto</th>
-                        <th>Socio</th>
-                        <th>Detalle</th>
-                        <th>Método</th>
-                        <th>Registró</th>
-                        <th className="text-end">Monto</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.movimientos.map((m) => (
-                        <tr key={m.id_movimiento}>
-                          <td className="text-nowrap">{hora(m.fecha)}</td>
-                          <td>{CATEGORIAS[m.categoria] || m.categoria}</td>
-                          <td>{m.socio || "—"}</td>
-                          <td className="small text-muted">{m.descripcion}</td>
-                          <td>{METODOS[m.metodo] || m.metodo}</td>
-                          <td className="small">{m.registrado_por || (m.origen === "migracion" ? "Histórico" : "—")}</td>
-                          <td
-                            className="text-end fw-semibold text-nowrap"
-                            style={{ color: m.tipo === "ingreso" ? "#27ae60" : "#e74c3c" }}
-                          >
-                            {m.tipo === "ingreso" ? "+" : "−"} {fmt(m.monto)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <DataTable
+                filas={data.movimientos}
+                claveFila={(m) => m.id_movimiento}
+                tam={15}
+                etiqueta="movimientos"
+                vacio={<EmptyState titulo="No hay movimientos registrados en esta fecha" />}
+                columnas={[
+                  { clave: "fecha", titulo: "Hora", ordenable: true, render: (m) => hora(m.fecha) },
+                  { clave: "categoria", titulo: "Concepto", ordenable: true, render: (m) => CATEGORIAS[m.categoria] || m.categoria },
+                  { clave: "socio", titulo: "Socio", render: (m) => m.socio || "—" },
+                  { clave: "descripcion", titulo: "Detalle", render: (m) => <span className="small text-muted">{m.descripcion}</span> },
+                  { clave: "metodo", titulo: "Método", render: (m) => METODOS[m.metodo] || m.metodo },
+                  {
+                    clave: "registrado_por",
+                    titulo: "Registró",
+                    render: (m) => <span className="small">{m.registrado_por || (m.origen === "migracion" ? "Histórico" : "—")}</span>,
+                  },
+                  {
+                    clave: "monto",
+                    titulo: "Monto",
+                    alinear: "end",
+                    ordenable: true,
+                    render: (m) => (
+                      <span className="fw-semibold text-nowrap" style={{ color: m.tipo === "ingreso" ? "#27ae60" : "#e74c3c" }}>
+                        {m.tipo === "ingreso" ? "+" : "−"} {fmt(m.monto)}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
             </div>
 
             {/* Historial de cierres */}
@@ -401,6 +457,104 @@ export default function Caja() {
             )}
           </div>
         )
+      )}
+
+      {movimientoManual && (
+        <div
+          className="modal show d-block"
+          style={{ background: "rgba(0,0,0,.6)", zIndex: 6000, position: "fixed", inset: 0, overflowY: "auto" }}
+        >
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: 480 }}>
+            <form className="modal-content border-0 shadow-lg" style={{ borderRadius: 16 }} onSubmit={guardarManual}>
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title fw-bold">
+                  {movimientoManual === "gasto" ? "Registrar gasto" : "Registrar ingreso a caja"}
+                </h5>
+                <button type="button" className="btn-close" onClick={() => setMovimientoManual(null)} />
+              </div>
+              <div className="modal-body">
+                <label className="form-label small fw-semibold">
+                  {movimientoManual === "gasto" ? "Tipo de gasto" : "Tipo de ingreso"}
+                </label>
+                <select
+                  className="form-select mb-3"
+                  value={formManual.categoria}
+                  onChange={(e) => setFormManual({ ...formManual, categoria: e.target.value })}
+                >
+                  {(movimientoManual === "gasto" ? TIPOS_GASTO : TIPOS_INGRESO).map(([v, t]) => (
+                    <option key={v} value={v}>{t}</option>
+                  ))}
+                </select>
+
+                <div className="row g-2 mb-3">
+                  <div className="col-6">
+                    <label className="form-label small fw-semibold">Monto</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="form-control"
+                      value={formManual.monto}
+                      onChange={(e) => setFormManual({ ...formManual, monto: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="col-6">
+                    <label className="form-label small fw-semibold">Método</label>
+                    <select
+                      className="form-select"
+                      value={formManual.metodo}
+                      onChange={(e) => setFormManual({ ...formManual, metodo: e.target.value })}
+                    >
+                      {Object.entries(METODOS).map(([v, t]) => (
+                        <option key={v} value={v}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <label className="form-label small fw-semibold">
+                  Concepto {movimientoManual === "gasto" && <span className="text-danger">*</span>}
+                </label>
+                <input
+                  className="form-control mb-3"
+                  value={formManual.concepto}
+                  onChange={(e) => setFormManual({ ...formManual, concepto: e.target.value })}
+                  maxLength={200}
+                  required={movimientoManual === "gasto"}
+                  placeholder={movimientoManual === "gasto" ? "Ej: pago de energía eléctrica de septiembre" : "Opcional"}
+                />
+
+                <label className="form-label small fw-semibold">Fecha</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  max={hoyISO()}
+                  value={formManual.fecha}
+                  onChange={(e) => setFormManual({ ...formManual, fecha: e.target.value })}
+                />
+                {movimientoManual === "ingreso" && (
+                  <div className="small text-muted mt-2">
+                    Estos ingresos suman a la caja pero no cuentan como ingreso del período en el estado de resultados.
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer border-0 pt-0">
+                <button type="button" className="btn btn-outline-secondary" onClick={() => setMovimientoManual(null)}>
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn fw-semibold"
+                  style={{ background: ACCENT, color: "#1a2a00" }}
+                  disabled={guardando}
+                >
+                  {guardando ? "Guardando..." : "Guardar"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

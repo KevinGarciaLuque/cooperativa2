@@ -1,37 +1,40 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { PaginaSkeleton } from "../ui/Componentes";
 import AppLayout from "../components/AppLayout";
 import { useAuth } from "../context/AuthContext";
 
 // Admin y otras vistas protegidas
-import Actividades from "../pages/Actividades";
-import Aportaciones from "../pages/Aportaciones/Aportaciones";
-import BaseDatos from "../pages/BaseDatos";
-import Bitacora from "../pages/Bitacora";
-import Cuentas from "../pages/Cuentas/Cuentas";
-import Dashboard from "../pages/Dashboard";
-import Home from "../pages/Home";
-import Liquidaciones from "../pages/Liquidaciones";
-import Login from "../pages/Login";
-import Movimientos from "../pages/Movimientos";
-import Pagos from "../pages/Pagos";
-import Prestamos from "../pages/Prestamos";
-import Recuperar from "../pages/Recuperar";
-import Reportes from "../pages/Reportes";
-import Roles from "../pages/Roles";
-import Usuarios from "../pages/Usuarios/Usuarios";
-import Ventanilla from "../pages/Ventanilla";
-import Caja from "../pages/Caja";
-import Cobranza from "../pages/Cobranza";
-import ParametrosFinancieros from "../pages/SuperAdmin/ParametrosFinancieros";
+const Actividades = lazy(() => import("../pages/Actividades"));
+const Aportaciones = lazy(() => import("../pages/Aportaciones/Aportaciones"));
+const BaseDatos = lazy(() => import("../pages/BaseDatos"));
+const Bitacora = lazy(() => import("../pages/Bitacora"));
+const Cuentas = lazy(() => import("../pages/Cuentas/Cuentas"));
+const Dashboard = lazy(() => import("../pages/Dashboard"));
+const Home = lazy(() => import("../pages/Home"));
+const Liquidaciones = lazy(() => import("../pages/Liquidaciones"));
+const Login = lazy(() => import("../pages/Login"));
+const Movimientos = lazy(() => import("../pages/Movimientos"));
+const Pagos = lazy(() => import("../pages/Pagos"));
+const Prestamos = lazy(() => import("../pages/Prestamos"));
+const Recuperar = lazy(() => import("../pages/Recuperar"));
+const Reportes = lazy(() => import("../pages/Reportes"));
+const Roles = lazy(() => import("../pages/Roles"));
+const Usuarios = lazy(() => import("../pages/Usuarios/Usuarios"));
+const Ventanilla = lazy(() => import("../pages/Ventanilla"));
+const Caja = lazy(() => import("../pages/Caja"));
+const Cobranza = lazy(() => import("../pages/Cobranza"));
+const Contabilidad = lazy(() => import("../pages/Contabilidad"));
+const ParametrosFinancieros = lazy(() => import("../pages/SuperAdmin/ParametrosFinancieros"));
 // Vistas de usuario socio
-import SocioPerfil from "../pages/Socio/SocioPerfil";
+const SocioPerfil = lazy(() => import("../pages/Socio/SocioPerfil"));
 // Vista para restablecimiento por token
-import Restablecer from "../pages/Restablecer"; // <-- CREA este archivo si no existe
+const Restablecer = lazy(() => import("../pages/Restablecer")); // <-- CREA este archivo si no existe
 // Super Administrador
-import SuperAdmin from "../pages/SuperAdmin/SuperAdmin";
-import Configuracion from "../pages/SuperAdmin/Configuracion";
+const SuperAdmin = lazy(() => import("../pages/SuperAdmin/SuperAdmin"));
+const Configuracion = lazy(() => import("../pages/SuperAdmin/Configuracion"));
 // Perfil de usuario
-import MiPerfil from "../pages/MiPerfil";
+const MiPerfil = lazy(() => import("../pages/MiPerfil"));
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
@@ -42,6 +45,7 @@ export default function Rutas() {
   const { user, logout } = useAuth();
 
   return (
+    <Suspense fallback={<PaginaSkeleton />}>
     <Routes>
       {/* --- Ruta pública para restablecer contraseña con token --- */}
       <Route path="/recuperar/:token" element={<Restablecer />} />
@@ -81,6 +85,14 @@ export default function Rutas() {
             element={
               <PrivateRoute>
                 <Ventanilla />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/contabilidad"
+            element={
+              <PrivateRoute>
+                <Contabilidad />
               </PrivateRoute>
             }
           />
@@ -237,5 +249,6 @@ export default function Rutas() {
         element={<Navigate to={user ? "/dashboard" : "/login"} />}
       />
     </Routes>
+    </Suspense>
   );
 }

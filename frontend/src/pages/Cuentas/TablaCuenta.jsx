@@ -1,4 +1,10 @@
-﻿import {
+import { useState } from "react";
+import { Paginacion } from "../../ui/Componentes";
+import { paginar } from "../../ui/paginar";
+
+const TAM_PAG = 15;
+
+import {
   FaEdit,
   FaTrash,
   FaUser,
@@ -20,6 +26,7 @@ const TIPO_CONFIG = {
 
 export default function TablaCuenta({ cuentas, usuarios, onEdit, onDelete }) {
   const { user } = useAuth();
+  const [pagina, setPagina] = useState(1);
   const esAdmin = user?.rol === "Administrador";
 
   if (!cuentas || cuentas.length === 0) {
@@ -44,7 +51,8 @@ export default function TablaCuenta({ cuentas, usuarios, onEdit, onDelete }) {
     if (!grupos[uid]) grupos[uid] = {};
     grupos[uid][cuenta.tipo_cuenta] = cuenta;
   });
-  const filas = Object.entries(grupos);
+  const filasTodas = Object.entries(grupos);
+  const filas = paginar(filasTodas, pagina, TAM_PAG).items;
 
   const saldoTotal = cuentas.reduce((s, c) => s + parseFloat(c.saldo_actual || c.saldo || 0), 0);
 
@@ -236,6 +244,8 @@ export default function TablaCuenta({ cuentas, usuarios, onEdit, onDelete }) {
           })}
         </div>
       </div>
+
+      {<Paginacion total={filasTodas.length} pagina={Math.min(pagina, Math.max(1, Math.ceil(filasTodas.length / TAM_PAG)))} tam={TAM_PAG} onCambiar={setPagina} />}
 
       {/* Footer */}
       <div className="card-footer bg-light border-top-0 text-center py-3" style={{ borderRadius: "0 0 15px 15px" }}>

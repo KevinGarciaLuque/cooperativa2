@@ -176,4 +176,79 @@ router.get("/cierres", async (req, res) => {
   }
 });
 
+// ============================================
+// REGISTRAR UN GASTO: POST /api/caja/gasto
+// ============================================
+const CATEGORIAS_GASTO = ["servicios", "salarios", "alquiler", "papeleria", "transporte", "otros"];
+
+router.post("/gasto", async (req, res) => {
+  try {
+    const { categoria, monto, metodo, concepto, fecha } = req.body;
+    const cat = CATEGORIAS_GASTO.includes(categoria) ? categoria : "otros";
+    const valor = parseFloat(monto);
+    if (isNaN(valor) || valor <= 0) {
+      return res.status(400).json({ message: "El monto del gasto debe ser mayor a 0." });
+    }
+    if (!String(concepto || "").trim()) {
+      return res.status(400).json({ message: "Describe el gasto en el concepto." });
+    }
+    const metodoFinal = ["efectivo", "transferencia", "cheque", "deposito"].includes(metodo) ? metodo : "efectivo";
+    const fechaMov = esFecha(fecha) && fecha <= hoyISO() ? `${fecha} 12:00:00` : null;
+
+    await pool.query(
+      `INSERT INTO caja_movimientos
+         (fecha, tipo, categoria, monto, metodo, descripcion, referencia_tipo, id_registrado_por)
+       VALUES (COALESCE(?, NOW()), 'egreso', ?, ?, ?, ?, 'gasto', ?)`,
+      [fechaMov, `gasto_${cat}`, valor, metodoFinal, String(concepto).trim().substring(0, 255), req.usuario?.id_usuario || null]
+    );
+    await pool.query(
+      `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
+      [req.usuario?.id_usuario, "Registro de gasto", `Gasto (${cat}) de L. ${valor.toFixed(2)}: ${String(concepto).trim().substring(0, 120)}`]
+    );
+    res.status(201).json({ success: true, message: "Gasto registrado" });
+  } catch (error) {
+    console.error("ERROR AL REGISTRAR GASTO:", error);
+    res.status(500).json({ message: "Error al registrar el gasto" });
+  }
+});
+
+// ============================================
+// REGISTRAR UN INGRESO NO OPERATIVO (saldo inicial, capital): POST /api/caja/ingreso
+// No cuenta como ingreso del período en el estado de resultados.
+// ============================================
+const CATEGORIAS_INGRESO = {
+  saldo_inicial: "Saldo inicial de caja",
+  capital: "Aporte de capital",
+  otro: "Otro ingreso",
+};
+
+router.post("/ingreso", async (req, res) => {
+  try {
+    const { categoria, monto, metodo, concepto, fecha } = req.body;
+    const cat = CATEGORIAS_INGRESO[categoria] ? categoria : "otro";
+    const valor = parseFloat(monto);
+    if (isNaN(valor) || valor <= 0) {
+      return res.status(400).json({ message: "El monto debe ser mayor a 0." });
+    }
+    const metodoFinal = ["efectivo", "transferencia", "cheque", "deposito"].includes(metodo) ? metodo : "efectivo";
+    const descripcion = String(concepto || "").trim() || CATEGORIAS_INGRESO[cat];
+    const fechaMov = esFecha(fecha) && fecha <= hoyISO() ? `${fecha} 12:00:00` : null;
+
+    await pool.query(
+      `INSERT INTO caja_movimientos
+         (fecha, tipo, categoria, monto, metodo, descripcion, referencia_tipo, id_registrado_por)
+       VALUES (COALESCE(?, NOW()), 'ingreso', ?, ?, ?, ?, 'ingreso_manual', ?)`,
+      [fechaMov, `ingreso_${cat}`, valor, metodoFinal, descripcion.substring(0, 255), req.usuario?.id_usuario || null]
+    );
+    await pool.query(
+      `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
+      [req.usuario?.id_usuario, "Ingreso manual a caja", `${CATEGORIAS_INGRESO[cat]}: L. ${valor.toFixed(2)} (${metodoFinal})`]
+    );
+    res.status(201).json({ success: true, message: "Ingreso registrado" });
+  } catch (error) {
+    console.error("ERROR AL REGISTRAR INGRESO:", error);
+    res.status(500).json({ message: "Error al registrar el ingreso" });
+  }
+});
+
 module.exports = router;

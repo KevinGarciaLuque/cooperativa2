@@ -15,6 +15,7 @@ export default function ParametrosFinancieros() {
 
   const [tasa, setTasa] = useState("");
   const [gracia, setGracia] = useState("");
+  const [prov, setProv] = useState({ prov_al_dia: "", prov_1_30: "", prov_31_60: "", prov_61_90: "", prov_90_mas: "" });
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
 
@@ -24,6 +25,13 @@ export default function ParametrosFinancieros() {
       .then((res) => {
         setTasa(String(res.data.data.mora_tasa_anual));
         setGracia(String(res.data.data.mora_dias_gracia));
+        setProv({
+          prov_al_dia: String(res.data.data.prov_al_dia),
+          prov_1_30: String(res.data.data.prov_1_30),
+          prov_31_60: String(res.data.data.prov_31_60),
+          prov_61_90: String(res.data.data.prov_61_90),
+          prov_90_mas: String(res.data.data.prov_90_mas),
+        });
       })
       .catch(() => mostrarAlerta("No se pudieron cargar los parámetros.", "error"))
       .finally(() => setCargando(false));
@@ -36,7 +44,7 @@ export default function ParametrosFinancieros() {
     try {
       await axios.put(
         `${API_URL}/configuracion/financiera`,
-        { mora_tasa_anual: parseFloat(tasa), mora_dias_gracia: parseInt(gracia) },
+        { mora_tasa_anual: parseFloat(tasa), mora_dias_gracia: parseInt(gracia), ...prov },
         { headers }
       );
       mostrarAlerta("Parámetros financieros guardados.", "success");
@@ -91,6 +99,34 @@ export default function ParametrosFinancieros() {
             />
             <div className="form-text">Días desde el último pago antes de que empiece a contar la mora.</div>
           </div>
+        </div>
+
+        <h5 className="fw-bold mt-4 mb-1" style={{ color: AZUL }}>Provisión de cartera</h5>
+        <p className="text-muted small">
+          Porcentaje del saldo que se reserva según la antigüedad del atraso. Se usa en Contabilidad.
+        </p>
+        <div className="row g-3">
+          {[
+            ["prov_al_dia", "Al día / por vencer"],
+            ["prov_1_30", "Mora 1-30 días"],
+            ["prov_31_60", "Mora 31-60 días"],
+            ["prov_61_90", "Mora 61-90 días"],
+            ["prov_90_mas", "Mora de más de 90 días"],
+          ].map(([k, etiqueta]) => (
+            <div className="col-6 col-md-4" key={k}>
+              <label className="form-label fw-semibold small">{etiqueta} (%)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                className="form-control"
+                value={prov[k]}
+                onChange={(e) => setProv({ ...prov, [k]: e.target.value })}
+                disabled={cargando}
+              />
+            </div>
+          ))}
         </div>
 
         <div className="mt-4">

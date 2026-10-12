@@ -162,6 +162,24 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_10_006_cierres_mensuales",
+    descripcion: "Cierres mensuales congelados",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS cierres_mensuales (
+          id_cierre INT AUTO_INCREMENT PRIMARY KEY,
+          anio SMALLINT NOT NULL,
+          mes TINYINT NOT NULL,
+          datos LONGTEXT NOT NULL,
+          observacion VARCHAR(255) NULL,
+          cerrado_por INT NULL,
+          fecha_cierre DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_cierre_mes (anio, mes)
+        )
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

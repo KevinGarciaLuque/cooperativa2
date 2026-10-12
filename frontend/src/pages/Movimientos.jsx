@@ -1,3 +1,5 @@
+import { Paginacion } from "../ui/Componentes";
+import { paginar } from "../ui/paginar";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
@@ -640,6 +642,8 @@ export default function Movimientos() {
 }
 
 // ==================== COMPONENTE TABLA MOVIMIENTOS ====================
+const TAM_PAG = 20;
+
 function TablaMovimientos({
   movimientos,
   cuentas,
@@ -647,6 +651,8 @@ function TablaMovimientos({
   onEdit,
   onDelete,
 }) {
+  const [pagina, setPagina] = useState(1);
+
   if (!movimientos || movimientos.length === 0) {
     return (
       <div
@@ -732,7 +738,7 @@ function TablaMovimientos({
       {/* Body */}
       <div className="card-body p-0">
         <div style={{ maxHeight: "600px", overflowY: "auto" }}>
-          {movimientos.map((movimiento, index) => {
+          {paginar(movimientos, pagina, TAM_PAG).items.map((movimiento, index) => {
             const cuenta = getCuenta(movimiento.id_cuenta);
             const usuario = cuenta ? getUsuario(cuenta.id_usuario) : null;
             const tipoConfig = getTipoConfig(movimiento.tipo);
@@ -926,6 +932,8 @@ function TablaMovimientos({
           })}
         </div>
       </div>
+
+      {<Paginacion total={movimientos.length} pagina={Math.min(pagina, Math.max(1, Math.ceil(movimientos.length / TAM_PAG)))} tam={TAM_PAG} onCambiar={setPagina} />}
 
       {/* Footer */}
       <div

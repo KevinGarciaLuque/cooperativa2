@@ -116,6 +116,7 @@ app.use("/api/configuracion", require("./routes/configuracion"));
 app.use("/api/caja", require("./routes/caja"));
 app.use("/api/recibos", require("./routes/recibos"));
 app.use("/api/cobranza", require("./routes/cobranza"));
+app.use("/api/contabilidad", require("./routes/contabilidad"));
 app.use("/api/socios", ocultarInteresSocio, require("./routes/socios"));
 
 // Iniciar el scheduler de backups automáticos

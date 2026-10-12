@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
+import NuevaLiquidacionModal from "../components/NuevaLiquidacionModal";
 import {
   FaHandHoldingUsd,
   FaPlus,
@@ -566,8 +567,21 @@ export default function Liquidaciones() {
         />
       )}
 
-      {/* Modal Crear/Editar */}
-      {showModal && (
+      {/* Nueva liquidación: reparto con vista previa */}
+      {showModal && !editLiquidacion && (
+        <NuevaLiquidacionModal
+          token={token}
+          mostrarAlerta={mostrarAlerta}
+          onClose={() => setShowModal(false)}
+          onCreada={() => {
+            setShowModal(false);
+            fetchData();
+          }}
+        />
+      )}
+
+      {/* Modal Editar (compatibilidad) */}
+      {showModal && editLiquidacion && (
         <ModalLiquidacion
           show={showModal}
           editLiquidacion={editLiquidacion}

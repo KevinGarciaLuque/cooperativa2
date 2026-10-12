@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
 import { FaPhoneAlt, FaClipboardList, FaTimes } from "react-icons/fa";
+import { DataTable, EmptyState, PageHeader } from "../ui/Componentes";
 
 const AZUL = "#1a2035";
 const ACCENT = "#a8cd3a";
@@ -113,13 +114,11 @@ export default function Cobranza() {
 
   return (
     <div className="container-fluid py-3">
-      <div className="mb-3">
-        <h3 className="fw-bold mb-0" style={{ color: AZUL }}>
-          <FaClipboardList className="me-2" />
-          Cobranza
-        </h3>
-        <span className="text-muted">Cartera por vencer y en mora, con el seguimiento de cada gestión.</span>
-      </div>
+      <PageHeader
+        icono={<FaClipboardList />}
+        titulo="Cobranza"
+        subtitulo="Cartera por vencer y en mora, con el seguimiento de cada gestión."
+      />
 
       {/* Filtros por categoría */}
       <div className="d-flex flex-wrap gap-2 mb-3">
@@ -156,98 +155,107 @@ export default function Cobranza() {
         onChange={(e) => setBusqueda(e.target.value)}
       />
 
-      <div className="p-3" style={{ background: "#fff", borderRadius: "1rem", boxShadow: "0 2px 12px #0000000f" }}>
-        {cargando && !cartera ? (
-          <div className="text-center py-5">
-            <div className="spinner-border text-success" />
-          </div>
-        ) : filas.length === 0 ? (
-          <div className="text-muted text-center py-4">No hay préstamos en esta categoría.</div>
-        ) : (
-          <div className="table-responsive">
-            <table className="table align-middle mb-0">
-              <thead>
-                <tr className="small text-muted">
-                  <th>Socio</th>
-                  <th>Préstamo</th>
-                  <th>Situación</th>
-                  <th className="text-end">Saldo</th>
-                  <th className="text-end">Cuota</th>
-                  <th className="text-end">Mora</th>
-                  <th>Última gestión</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filas.map((f) => (
-                  <tr key={f.id_prestamo}>
-                    <td>
-                      <div className="fw-semibold">{f.socio}</div>
-                      <div className="small text-muted">
-                        {f.telefono ? (
-                          <>
-                            <FaPhoneAlt className="me-1" size={10} />
-                            {f.telefono}
-                          </>
-                        ) : (
-                          "Sin teléfono"
-                        )}
+      <div className="ui-card">
+        <DataTable
+          cargando={cargando && !cartera}
+          filas={filas}
+          claveFila={(f) => f.id_prestamo}
+          tam={15}
+          etiqueta="préstamos"
+          vacio={<EmptyState titulo="No hay préstamos en esta categoría" />}
+          columnas={[
+            {
+              clave: "socio",
+              titulo: "Socio",
+              ordenable: true,
+              render: (f) => (
+                <>
+                  <div className="fw-semibold">{f.socio}</div>
+                  <div className="small text-muted">
+                    {f.telefono ? (
+                      <>
+                        <FaPhoneAlt className="me-1" size={10} />
+                        {f.telefono}
+                      </>
+                    ) : (
+                      "Sin teléfono"
+                    )}
+                  </div>
+                </>
+              ),
+            },
+            { clave: "id_prestamo", titulo: "Préstamo", ordenable: true, render: (f) => `#${f.id_prestamo}` },
+            {
+              clave: "dias_mora",
+              titulo: "Situación",
+              ordenable: true,
+              render: (f) => (
+                <>
+                  <span
+                    className="badge rounded-pill"
+                    style={{ background: `${colorDe(f.categoria)}1a`, color: colorDe(f.categoria) }}
+                  >
+                    {etiquetaDe(f.categoria)}
+                  </span>
+                  <div className="small text-muted">
+                    {f.dias_mora > 0
+                      ? `${f.dias_mora} día(s) de atraso`
+                      : `Vence ${f.vencimiento} (${f.dias_para_vencer} d)`}
+                  </div>
+                </>
+              ),
+            },
+            { clave: "saldo", titulo: "Saldo", alinear: "end", ordenable: true, render: (f) => fmt(f.saldo) },
+            { clave: "cuota", titulo: "Cuota", alinear: "end", ordenable: true, render: (f) => fmt(f.cuota) },
+            {
+              clave: "mora_generada",
+              titulo: "Mora",
+              alinear: "end",
+              ordenable: true,
+              render: (f) => (
+                <span className="fw-semibold" style={{ color: f.mora_generada > 0 ? "#b91c1c" : "inherit" }}>
+                  {fmt(f.mora_generada)}
+                </span>
+              ),
+            },
+            {
+              clave: "ultima_nota",
+              titulo: "Última gestión",
+              render: (f) =>
+                f.ultima_nota ? (
+                  <div className="small" style={{ maxWidth: 220 }}>
+                    <div className="text-truncate">{f.ultima_nota}</div>
+                    {f.promesa_fecha && (
+                      <div style={{ color: f.promesa_vencida ? "#b91c1c" : "#047857" }}>
+                        Promesa: {f.promesa_fecha}
+                        {f.promesa_vencida && " (incumplida)"}
                       </div>
-                    </td>
-                    <td>#{f.id_prestamo}</td>
-                    <td>
-                      <span
-                        className="badge rounded-pill"
-                        style={{ background: `${colorDe(f.categoria)}1a`, color: colorDe(f.categoria) }}
-                      >
-                        {etiquetaDe(f.categoria)}
-                      </span>
-                      <div className="small text-muted">
-                        {f.dias_mora > 0
-                          ? `${f.dias_mora} día(s) de atraso`
-                          : `Vence ${f.vencimiento} (${f.dias_para_vencer} d)`}
-                      </div>
-                    </td>
-                    <td className="text-end">{fmt(f.saldo)}</td>
-                    <td className="text-end">{fmt(f.cuota)}</td>
-                    <td className="text-end fw-semibold" style={{ color: f.mora_generada > 0 ? "#b91c1c" : "inherit" }}>
-                      {fmt(f.mora_generada)}
-                    </td>
-                    <td className="small" style={{ maxWidth: 220 }}>
-                      {f.ultima_nota ? (
-                        <>
-                          <div className="text-truncate">{f.ultima_nota}</div>
-                          {f.promesa_fecha && (
-                            <div style={{ color: f.promesa_vencida ? "#b91c1c" : "#047857" }}>
-                              Promesa: {f.promesa_fecha}
-                              {f.promesa_vencida && " (incumplida)"}
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-muted">Sin gestiones</span>
-                      )}
-                    </td>
-                    <td className="text-nowrap">
-                      <button className="btn btn-sm btn-outline-dark me-1" onClick={() => abrirGestion(f)}>
-                        Gestión
-                      </button>
-                      <button
-                        className="btn btn-sm fw-semibold"
-                        style={{ background: ACCENT, color: "#1a2a00" }}
-                        onClick={() =>
-                          navigate(`/pagos?accion=nuevo&socio=${f.id_usuario}&prestamo=${f.id_prestamo}`)
-                        }
-                      >
-                        Cobrar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                    )}
+                  </div>
+                ) : (
+                  <span className="small text-muted">Sin gestiones</span>
+                ),
+            },
+            {
+              clave: "acciones",
+              titulo: "",
+              render: (f) => (
+                <span className="text-nowrap">
+                  <button className="btn btn-sm btn-outline-dark me-1" onClick={() => abrirGestion(f)}>
+                    Gestión
+                  </button>
+                  <button
+                    className="btn btn-sm fw-semibold"
+                    style={{ background: ACCENT, color: "#1a2a00" }}
+                    onClick={() => navigate(`/pagos?accion=nuevo&socio=${f.id_usuario}&prestamo=${f.id_prestamo}`)}
+                  >
+                    Cobrar
+                  </button>
+                </span>
+              ),
+            },
+          ]}
+        />
       </div>
 
       {/* Modal de gestión */}

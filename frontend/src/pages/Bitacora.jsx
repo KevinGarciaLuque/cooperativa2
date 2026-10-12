@@ -1,3 +1,5 @@
+import { Paginacion } from "../ui/Componentes";
+import { paginar } from "../ui/paginar";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
@@ -23,6 +25,7 @@ export default function Bitacora() {
   const [usuarios, setUsuarios] = useState([]);
   const [filtroUsuario, setFiltroUsuario] = useState("");
   const [filtroAccion, setFiltroAccion] = useState("");
+  const [pagina, setPagina] = useState(1);
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -64,6 +67,8 @@ export default function Bitacora() {
   });
 
   // Obtener estadísticas
+  const TAM_PAG = 20;
+  const pagB = paginar(bitacoraFiltrada, pagina, TAM_PAG);
   const usuariosActivos = [...new Set(bitacora.map(b => b.id_usuario))].length;
   const hoy = new Date().toLocaleDateString();
   const accionesHoy = bitacora.filter(b => {
@@ -337,11 +342,11 @@ export default function Bitacora() {
                     </td>
                   </tr>
                 ) : (
-                  bitacoraFiltrada.map((b, i) => (
+                  pagB.items.map((b, i) => (
                     <tr key={b.id_bitacora} style={{ borderBottom: "1px solid #f0f0f0" }}>
                       <td className="align-middle" style={{ padding: "16px" }}>
                         <span className="badge bg-light text-dark" style={{ borderRadius: "8px", padding: "6px 10px" }}>
-                          {i + 1}
+                          {pagB.inicio + i + 1}
                         </span>
                       </td>
                       <td className="align-middle" style={{ padding: "16px", color: "#2c3e50" }}>
@@ -379,6 +384,7 @@ export default function Bitacora() {
             </table>
           </div>
         </div>
+        <Paginacion total={bitacoraFiltrada.length} pagina={pagB.pagina} tam={TAM_PAG} onCambiar={setPagina} />
         {bitacoraFiltrada.length > 0 && (
           <div className="card-footer border-0" style={{ background: "#f8f9fa", borderRadius: "0 0 15px 15px", padding: "16px" }}>
             <div className="text-muted small">

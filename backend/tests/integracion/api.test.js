@@ -213,6 +213,20 @@ test("carta de aprobación: PDF para el personal y para el socio dueño", async 
   assert.equal(reenvio.s, 400);
   assert.ok(reenvio.b.message);
   assert.equal((await api("POST", `${ruta}/enviar`, {}, dueno)).s, 403);
+
+  // aprobar desde la pantalla de Préstamos también deja la carta lista y lo avisa
+  const sol = await api(
+    "POST", "/solicitudes/prestamo",
+    { monto: 1000, plazo_meses: 2, cuota_posible: 600, proposito: "otro", ocupacion: "empleado", ingreso_mensual: 8000, acepta: true },
+    ids.tSocio
+  );
+  assert.equal(sol.s, 201);
+  const ap = await api("PATCH", `/prestamos/${sol.b.id_prestamo}/aprobar`, {}, ids.tSuper);
+  assert.equal(ap.s, 200);
+  assert.match(ap.b.message, /carta de aprobación/);
+  assert.equal((await pdf(`/solicitudes/prestamos/${sol.b.id_prestamo}/carta`, ids.tSocio)).s, 200);
+  await pool.query("DELETE FROM solicitudes_prestamo WHERE id_prestamo = ?", [sol.b.id_prestamo]);
+  await pool.query("DELETE FROM prestamos WHERE id_prestamo = ?", [sol.b.id_prestamo]);
 });
 
 test("tras la aprobación el socio ve su tasa y puede pedir otro préstamo", async () => {

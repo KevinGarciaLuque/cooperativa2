@@ -5,6 +5,7 @@ const { registrarCaja } = require("../utils/caja");
 const { crearRecibo } = require("../utils/recibos");
 const { actualizarEstadosMora } = require("../utils/moraScheduler");
 const { notificarSocio, escaparHtml } = require("../utils/notificaciones");
+const { avisarAprobacion } = require("../utils/cartaAprobacion");
 const {
   calcularCuotaMensual,
   generarTablaAmortizacion,
@@ -343,7 +344,8 @@ router.patch("/:id/aprobar", async (req, res) => {
       [p.id_usuario, "Préstamo aprobado", `Préstamo #${req.params.id} por L. ${parseFloat(p.monto).toFixed(2)} aprobado. Pendiente de desembolso.`]
     );
     await connection.commit();
-    res.json({ success: true, message: "Préstamo aprobado. Falta registrar el desembolso." });
+    const avisoCarta = await avisarAprobacion(p.id_prestamo, p.id_usuario);
+    res.json({ success: true, message: `Préstamo aprobado. Falta registrar el desembolso.${avisoCarta}` });
   } catch (error) {
     await connection.rollback().catch(() => {});
     console.error("ERROR AL APROBAR PRÉSTAMO:", error);

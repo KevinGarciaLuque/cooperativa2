@@ -6,7 +6,7 @@ const path = require("path");
 const PDFDocument = require("pdfkit");
 const pool = require("../db");
 const { calcularCuotaMensual } = require("./calculosPrestamo");
-const { notificarSocio, escaparHtml } = require("./notificaciones");
+const { notificarSocio, escaparHtml, correoConfigurado } = require("./notificaciones");
 
 // Estados en los que el préstamo ya fue aprobado alguna vez
 const ESTADOS_APROBADOS = ["aprobado", "activo", "mora", "pagado"];
@@ -182,4 +182,20 @@ const enviarCartaAprobacion = async (idPrestamo) => {
   );
 };
 
-module.exports = { datosCarta, generarCartaPdf, enviarCartaAprobacion, nombreArchivoCarta };
+// Tras aprobar un préstamo (desde Solicitudes o desde Préstamos): la carta sale sola al
+// correo del socio sin hacer esperar al personal. Devuelve el texto para el aviso y
+// nunca falla: el préstamo ya quedó aprobado.
+const avisarAprobacion = async (idPrestamo, idUsuario) => {
+  const sinCorreo = " La carta de aprobación no se envió por correo: descárgala y compártela con el socio.";
+  try {
+    const [[u]] = await pool.query("SELECT correo FROM usuarios WHERE id_usuario = ?", [idUsuario]);
+    const correo = String(u?.correo || "").trim();
+    if (!correoConfigurado() || !correo) return sinCorreo;
+    enviarCartaAprobacion(idPrestamo).catch(() => {});
+    return ` La carta de aprobación se está enviando a ${correo}.`;
+  } catch {
+    return sinCorreo;
+  }
+};
+
+module.exports = { datosCarta, generarCartaPdf, enviarCartaAprobacion, avisarAprobacion, nombreArchivoCarta };

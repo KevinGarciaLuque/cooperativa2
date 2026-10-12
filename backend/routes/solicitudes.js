@@ -6,8 +6,8 @@ const pool = require("../db");
 const config = require("../utils/configFinanciera");
 const { parametrosSolicitud, validarSolicitud, insertarSolicitud } = require("../utils/solicitudPrestamo");
 const { leerRegistro, guardarRegistro } = require("../utils/registroConfig");
-const { notificarAdministradores, notificarSocio, correoConfigurado, escaparHtml } = require("../utils/notificaciones");
-const { datosCarta, generarCartaPdf, enviarCartaAprobacion, nombreArchivoCarta } = require("../utils/cartaAprobacion");
+const { notificarAdministradores, notificarSocio, escaparHtml } = require("../utils/notificaciones");
+const { datosCarta, generarCartaPdf, enviarCartaAprobacion, avisarAprobacion, nombreArchivoCarta } = require("../utils/cartaAprobacion");
 const { invalidarEstado } = require("../middleware/seguridad");
 
 const num = (v) => parseFloat(v || 0);
@@ -335,21 +335,8 @@ router.post("/prestamos/:id/aprobar", soloPersonal, async (req, res) => {
     );
     await connection.commit();
 
-    // La carta de aprobación sale sola al correo del socio (sin hacer esperar al personal)
-    const [[dest]] = await pool.query("SELECT correo FROM usuarios WHERE id_usuario = ?", [p.id_usuario]);
-    const correo = String(dest?.correo || "").trim();
-    const seEnvia = correoConfigurado() && !!correo;
-    if (seEnvia) enviarCartaAprobacion(p.id_prestamo).catch(() => {});
-
-    res.json({
-      success: true,
-      message:
-        "Solicitud aprobada. Falta registrar el desembolso en Préstamos." +
-        (seEnvia
-          ? ` La carta de aprobación se está enviando a ${correo}.`
-          : " La carta de aprobación no se envió por correo: descárgala y compártela con el socio."),
-      carta_por_correo: seEnvia,
-    });
+    const avisoCarta = await avisarAprobacion(p.id_prestamo, p.id_usuario);
+    res.json({ success: true, message: `Solicitud aprobada. Falta registrar el desembolso en Préstamos.${avisoCarta}` });
   } catch (error) {
     await connection.rollback().catch(() => {});
     if (error.codigo) return res.status(error.codigo).json({ message: error.message });

@@ -59,6 +59,7 @@ export default function SocioPerfil() {
   const [cuentas, setCuentas]           = useState([]);
   const [aportaciones, setAportaciones] = useState([]);
   const [prestamos, setPrestamos]       = useState([]);
+  const [ultimoPagoFecha, setUltimoPagoFecha] = useState(null); // último pago a préstamos
   const [loading, setLoading]           = useState(true);
   const [tab, setTab]                   = useState("resumen");
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -71,6 +72,16 @@ export default function SocioPerfil() {
   const [showFotoModal, setShowFotoModal] = useState(false);
   const [fotoSubiendo, setFotoSubiendo]   = useState(false);
   const [fotoError, setFotoError]         = useState("");
+
+  // La tarjeta de la última operación del socio va arriba: un pago a préstamo
+  // sube "Mis Préstamos"; una aportación sube "Mis Cuentas".
+  const ultimaAportacionFecha = aportaciones
+    .map((a) => (a.fecha || "").substring(0, 10))
+    .filter(Boolean)
+    .sort()
+    .pop() || null;
+  const prestamosPrimero =
+    !!ultimoPagoFecha && (!ultimaAportacionFecha || ultimoPagoFecha > ultimaAportacionFecha);
 
   const handleFotoChange = async (e) => {
     const file = e.target.files[0];
@@ -117,7 +128,7 @@ export default function SocioPerfil() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [cuentasRes, aportacionesRes, prestamosRes, usuarioRes] = await Promise.all([
+        const [cuentasRes, aportacionesRes, prestamosRes, usuarioRes, pagosRes] = await Promise.all([
           axios.get(`${API_URL}/cuentas?id_usuario=${user.id_usuario}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
@@ -130,10 +141,22 @@ export default function SocioPerfil() {
           axios.get(`${API_URL}/usuarios/${user.id_usuario}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
+          // El historial de pagos define qué tarjeta del resumen va primero
+          axios
+            .get(`${API_URL}/pagos?id_usuario=${user.id_usuario}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+            .catch(() => ({ data: [] })),
         ]);
         setCuentas(cuentasRes.data.data || []);
         setAportaciones(aportacionesRes.data.data || aportacionesRes.data || []);
         setPrestamos(prestamosRes.data.data || prestamosRes.data || []);
+        const listaPagos = pagosRes.data.data || pagosRes.data || [];
+        const fechas = listaPagos
+          .map((pg) => (pg.fecha_pago || "").substring(0, 10))
+          .filter(Boolean)
+          .sort();
+        setUltimoPagoFecha(fechas.length ? fechas[fechas.length - 1] : null);
         // Sincronizar foto y datos del usuario desde la base de datos
         const userActualizado = usuarioRes.data.usuario || usuarioRes.data;
         if (userActualizado?.foto !== user.foto) {
@@ -340,7 +363,7 @@ export default function SocioPerfil() {
           {tab === "resumen" && (
             <div className="row g-4">
               {/* Cuentas */}
-              <div className="col-md-6">
+              <div className="col-md-6" style={{ order: 1 }}>
                 <div className="card border-0 shadow-sm rounded-4 h-100">
                   <div className="card-body p-4">
                     <div className="d-flex align-items-center gap-2 mb-3">
@@ -376,7 +399,7 @@ export default function SocioPerfil() {
               </div>
 
               {/* Últimas Aportaciones */}
-              <div className="col-md-6">
+              <div className="col-md-6" style={{ order: 1 }}>
                 <div className="card border-0 shadow-sm rounded-4 h-100">
                   <div className="card-body p-4">
                     <div className="d-flex align-items-center justify-content-between mb-3">
@@ -415,8 +438,8 @@ export default function SocioPerfil() {
                 </div>
               </div>
 
-              {/* Mis Préstamos */}
-              <div className="col-12">
+              {/* Mis Préstamos (sube al inicio si el último movimiento fue un pago) */}
+              <div className="col-12" style={{ order: prestamosPrimero ? 0 : 2 }}>
                 <div className="card border-0 shadow-sm rounded-4">
                   <div className="card-body p-4">
                     <div className="d-flex align-items-center justify-content-between mb-3">

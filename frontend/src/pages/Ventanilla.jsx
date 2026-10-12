@@ -3,6 +3,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
+import DetallePrestamoVentanilla from "./DetallePrestamoVentanilla";
 import {
   FaSearch,
   FaUserCircle,
@@ -42,6 +43,7 @@ export default function Ventanilla() {
   const [socio, setSocio] = useState(null);
   const [ficha, setFicha] = useState(null); // { prestamos, cuentas, aportaciones, proximos }
   const [cargandoFicha, setCargandoFicha] = useState(false);
+  const [detalle, setDetalle] = useState(null); // id del préstamo cuyo detalle se está viendo
 
   // Búsqueda de socios con retardo para no consultar en cada tecla
   useEffect(() => {
@@ -69,6 +71,12 @@ export default function Ventanilla() {
   }, [busqueda, headers]);
 
   const cargarFicha = async (u) => {
+    try {
+      sessionStorage.setItem("ventanilla_socio", JSON.stringify(u));
+    } catch {
+      // sin almacenamiento disponible: solo se pierde la restauración al volver
+    }
+    setDetalle(null);
     setSocio(u);
     setBusqueda("");
     setResultados([]);
@@ -110,9 +118,26 @@ export default function Ventanilla() {
   };
 
   const limpiar = () => {
+    try {
+      sessionStorage.removeItem("ventanilla_socio");
+    } catch {
+      // ignorar
+    }
+    setDetalle(null);
     setSocio(null);
     setFicha(null);
   };
+
+  // Al volver desde otro módulo (Pagos, Préstamos...) se recupera el socio que se atendía
+  useEffect(() => {
+    try {
+      const guardado = sessionStorage.getItem("ventanilla_socio");
+      if (guardado) cargarFicha(JSON.parse(guardado));
+    } catch {
+      // ignorar datos corruptos
+    }
+    // eslint-disable-next-line
+  }, []);
 
   const resumen = useMemo(() => {
     if (!ficha) return null;
@@ -191,6 +216,20 @@ export default function Ventanilla() {
         },
       ]
     : [];
+
+  if (socio && detalle) {
+    return (
+      <DetallePrestamoVentanilla
+        idPrestamo={detalle}
+        nombreSocio={socio.nombre_completo}
+        headers={headers}
+        prox={ficha?.proximos?.[detalle]}
+        onBack={() => setDetalle(null)}
+        onCobrar={() => irNuevo("/pagos", { prestamo: detalle })}
+        onLiquidar={() => irNuevo("/pagos", { prestamo: detalle, tipo: "desglose" })}
+      />
+    );
+  }
 
   return (
     <div className="container-fluid py-3">
@@ -392,6 +431,12 @@ export default function Ventanilla() {
                             <strong>L. {fmt(prox.total_para_saldar)}</strong>
                           </div>
                         )}
+                        <button
+                          className="btn btn-outline-primary fw-semibold w-100 mb-2"
+                          onClick={() => setDetalle(p.id_prestamo)}
+                        >
+                          Ver detalles y tabla de amortización
+                        </button>
                         <div className="d-flex gap-2">
                           <button
                             className="btn fw-semibold flex-fill"

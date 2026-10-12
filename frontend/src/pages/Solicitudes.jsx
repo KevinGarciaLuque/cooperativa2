@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
 import { FaInbox, FaLink, FaCopy, FaWhatsapp, FaSyncAlt } from "react-icons/fa";
 import { EmptyState, PageHeader } from "../ui/Componentes";
+import InputMonto from "../ui/InputMonto";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const ACCENT = "#a8cd3a";
@@ -435,10 +436,10 @@ export default function Solicitudes() {
                 <div className="row g-2">
                   <div className="col-12 col-md-4">
                     <label className="form-label small fw-semibold">Monto (L.)</label>
-                    <input
-                      type="number" min="1" step="0.01" className="form-control"
+                    <InputMonto
+                      className="form-control"
                       value={condiciones.monto}
-                      onChange={(e) => setCondiciones({ ...condiciones, monto: e.target.value })}
+                      onChange={(v) => setCondiciones({ ...condiciones, monto: v })}
                     />
                   </div>
                   <div className="col-6 col-md-4">

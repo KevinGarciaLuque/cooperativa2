@@ -36,6 +36,13 @@ const AZUL_CLARO = "#3d5166";
 const GRIS_FONDO = "#f0f4f8";
 
 /* ——— Utilidades ——— */
+const fmtTasa = (t) => {
+  const n = parseFloat(t);
+  return isNaN(n) ? "—" : `${parseFloat(n.toFixed(2))}% mensual`;
+};
+
+const fecha = (v) => (v ? String(v).substring(0, 10) : "-");
+
 const fmt = (n) => parseFloat(n || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const estadoBadge = (estado) => {
@@ -260,7 +267,8 @@ export default function SocioPerfil() {
   /* ——— Resumen calculos ——— */
   const totalAportaciones = aportaciones.reduce((s, a) => s + parseFloat(a.monto || 0), 0);
   const totalSaldo        = cuentas.reduce((s, c) => s + parseFloat(c.saldo_actual || 0), 0);
-  const prestamosActivos  = prestamos.filter((p) => ["aprobado", "activo"].includes((p.estado || "").toLowerCase())).length;
+  const prestamosActivos  = prestamos.filter((p) => ["activo", "mora"].includes((p.estado || "").toLowerCase())).length;
+  const prestamosAprobados = prestamos.filter((p) => (p.estado || "").toLowerCase() === "aprobado");
 
   /* ——— Tabs config ——— */
   const tabs = pendiente
@@ -448,6 +456,26 @@ export default function SocioPerfil() {
             </div>
           )}
 
+          {/* Felicitación: préstamo aprobado, pendiente de entrega */}
+          {!pendiente && prestamosAprobados.map((p) => (
+            <div
+              key={p.id_prestamo}
+              className="d-flex gap-3 align-items-center rounded-4 shadow-sm p-3 mb-3"
+              style={{ background: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)", border: "1px solid #a7f3d0" }}
+            >
+              <div style={{ fontSize: 36, lineHeight: 1 }}>🎉</div>
+              <div>
+                <div className="fw-bold" style={{ color: "#065f46", fontSize: "1.1rem" }}>
+                  ¡Felicidades! Tu préstamo ha sido aprobado
+                </div>
+                <div className="small" style={{ color: "#047857" }}>
+                  Tu solicitud de <strong>L. {fmt(p.monto)}</strong> a {p.plazo_meses} meses fue aprobada. La
+                  cooperativa se comunicará contigo para entregarte el desembolso.
+                </div>
+              </div>
+            </div>
+          ))}
+
           {/* TAB: SOLICITAR PRÉSTAMO */}
           {tab === "solicitar" && (
             <SolicitudPrestamoSocio token={token} />
@@ -586,17 +614,23 @@ export default function SocioPerfil() {
                                   <div>
                                     <div className="fw-bold" style={{ color: AZUL, fontSize: "1.1rem" }}>L. {fmt(monto)}</div>
                                     <div className="small text-muted">
-                                      Otorgado: {p.fecha_otorgado ? p.fecha_otorgado.substring(0, 10) : "-"}
+                                      {p.estado === "aprobado"
+                                        ? `Aprobado: ${fecha(p.fecha_aprobacion)}`
+                                        : `Otorgado: ${fecha(p.fecha_otorgado)}`}
                                     </div>
                                   </div>
                                   {estadoBadge(p.estado)}
                                 </div>
                                 <div className="row g-2 mb-2 text-center">
-                                  <div className="col-6">
+                                  <div className="col-4">
+                                    <div className="small text-muted">Tasa</div>
+                                    <div className="fw-bold" style={{ color: "#2980b9" }}>{fmtTasa(p.tasa_mensual)}</div>
+                                  </div>
+                                  <div className="col-4">
                                     <div className="small text-muted">Cuota mensual</div>
                                     <div className="fw-bold" style={{ color: "#065f46" }}>L. {fmt(cuota)}</div>
                                   </div>
-                                  <div className="col-6">
+                                  <div className="col-4">
                                     <div className="small text-muted">Saldo restante</div>
                                     <div className="fw-bold" style={{ color: liquidado ? "#065f46" : "#92400e" }}>
                                       {liquidado ? "Liquidado" : `L. ${fmt(saldo)}`}
@@ -690,7 +724,9 @@ export default function SocioPerfil() {
                               L. {fmt(p.monto)}
                             </div>
                             <div className="small text-muted">
-                              Otorgado: {p.fecha_otorgado ? p.fecha_otorgado.substring(0, 10) : "-"}
+                              {p.estado === "aprobado"
+                                ? `Aprobado: ${fecha(p.fecha_aprobacion)}`
+                                : `Otorgado: ${fecha(p.fecha_otorgado)}`}
                             </div>
                           </div>
                         </div>
@@ -699,25 +735,31 @@ export default function SocioPerfil() {
 
                       {/* Grid de detalles */}
                       <div className="row g-2 mb-3">
-                        <div className="col-6 col-md-3">
+                        <div className="col-6 col-md">
                           <div className="rounded-3 p-2 text-center" style={{ background: "#f0f4f8" }}>
                             <div className="small text-muted mb-1">Monto otorgado</div>
                             <div className="fw-bold" style={{ color: "#2980b9", fontSize: ".95rem" }}>L. {fmt(monto)}</div>
                           </div>
                         </div>
-                        <div className="col-6 col-md-3">
+                        <div className="col-6 col-md">
+                          <div className="rounded-3 p-2 text-center" style={{ background: "#f0f4f8" }}>
+                            <div className="small text-muted mb-1">Tasa</div>
+                            <div className="fw-bold" style={{ color: "#2980b9", fontSize: ".95rem" }}>{fmtTasa(p.tasa_mensual)}</div>
+                          </div>
+                        </div>
+                        <div className="col-6 col-md">
                           <div className="rounded-3 p-2 text-center" style={{ background: "#f0f4f8" }}>
                             <div className="small text-muted mb-1">Plazo</div>
                             <div className="fw-bold" style={{ color: AZUL, fontSize: ".95rem" }}>{p.plazo_meses} meses</div>
                           </div>
                         </div>
-                        <div className="col-6 col-md-3">
+                        <div className="col-6 col-md">
                           <div className="rounded-3 p-2 text-center" style={{ background: "#f0f4f8" }}>
                             <div className="small text-muted mb-1">Cuota mensual</div>
                             <div className="fw-bold" style={{ color: "#065f46", fontSize: ".95rem" }}>L. {fmt(cuotaCalcSocio)}</div>
                           </div>
                         </div>
-                        <div className="col-6 col-md-3">
+                        <div className="col-6 col-md">
                           <div className="rounded-3 p-2 text-center" style={{ background: estaPagado ? "#d1fae5" : "#f0f4f8" }}>
                             <div className="small text-muted mb-1">Saldo restante</div>
                             {estaPagado ? (

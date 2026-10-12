@@ -28,6 +28,10 @@ const limpiar = (valor) => {
       if (!CAMPO_OCULTO.test(k)) salida[k] = limpiar(v);
     }
     if (cuota !== null) salida.cuota_minima = cuota;
+    // Tasa mensual con la que se otorgó el préstamo (el resto del detalle de intereses sigue oculto)
+    if (valor.tasa_interes !== undefined && !isNaN(parseFloat(valor.tasa_interes))) {
+      salida.tasa_mensual = parseFloat((parseFloat(valor.tasa_interes) / 12).toFixed(2));
+    }
     return salida;
   }
   return valor;

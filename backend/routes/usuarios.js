@@ -342,6 +342,11 @@ router.post("/", async (req, res) => {
       });
     }
 
+    // El correo es obligatorio para los socios: ahí reciben sus recibos
+    if ((!rol_id || parseInt(rol_id) === 2) && !String(correo || "").trim()) {
+      return res.status(400).json({ message: "El correo electrónico es obligatorio para los socios." });
+    }
+
     // Validar email
     if (correo && !validarEmail(correo)) {
       return res.status(400).json({ 

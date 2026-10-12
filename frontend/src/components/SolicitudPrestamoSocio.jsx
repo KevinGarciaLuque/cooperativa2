@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import InputMonto from "../ui/InputMonto";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -93,7 +94,6 @@ export default function SolicitudPrestamoSocio({ token, onEnviada }) {
     return (monto * i * Math.pow(1 + i, plazo)) / (Math.pow(1 + i, plazo) - 1);
   }, [param, monto, plazo]);
 
-  const totalAPagar = cuotaEstimada * plazo;
   const relacion = ingreso > 0 && cuotaEstimada > 0 ? (cuotaEstimada / ingreso) * 100 : null;
   const superaCapacidad = cuotaEstimada > 0 && cuotaPosible > 0 && cuotaEstimada > cuotaPosible * 1.001;
 
@@ -148,7 +148,8 @@ export default function SolicitudPrestamoSocio({ token, onEnviada }) {
     }
   };
 
-  const enTramite = mias.some((m) => ["pendiente", "aprobado"].includes(m.estado));
+  // Solo una solicitud en revisión bloquea el formulario: una ya aprobada deja pedir otra
+  const enTramite = mias.some((m) => m.estado === "pendiente");
 
   return (
     <div className="d-flex flex-column gap-3">
@@ -189,16 +190,16 @@ export default function SolicitudPrestamoSocio({ token, onEnviada }) {
 
           {enTramite ? (
             <div className="alert alert-info mb-0">
-              Ya tienes una solicitud en trámite. Podrás enviar otra cuando la cooperativa responda la actual.
+              Tu solicitud está en revisión. Podrás enviar otra cuando la cooperativa responda la actual.
             </div>
           ) : (
             <form onSubmit={enviar}>
               <div className="row g-3">
                 <div className="col-12 col-md-4">
                   <label className="form-label fw-semibold small">¿Cuánto necesitas? (L.) *</label>
-                  <input
-                    type="number" min="1" step="0.01" required className="form-control form-control-lg"
-                    name="monto" value={form.monto} onChange={cambiar} placeholder="0.00"
+                  <InputMonto
+                    required className="form-control form-control-lg" placeholder="0.00"
+                    value={form.monto} onChange={(v) => setForm((f) => ({ ...f, monto: v }))}
                   />
                   {param && <div className="form-text">Máximo {fmt(param.monto_max)}</div>}
                 </div>
@@ -211,9 +212,9 @@ export default function SolicitudPrestamoSocio({ token, onEnviada }) {
                 </div>
                 <div className="col-12 col-md-4">
                   <label className="form-label fw-semibold small">¿Cuánto puedes pagar al mes? (L.) *</label>
-                  <input
-                    type="number" min="1" step="0.01" required className="form-control form-control-lg"
-                    name="cuota_posible" value={form.cuota_posible} onChange={cambiar} placeholder="0.00"
+                  <InputMonto
+                    required className="form-control form-control-lg" placeholder="0.00"
+                    value={form.cuota_posible} onChange={(v) => setForm((f) => ({ ...f, cuota_posible: v }))}
                   />
                 </div>
 
@@ -221,23 +222,18 @@ export default function SolicitudPrestamoSocio({ token, onEnviada }) {
                 {cuotaEstimada > 0 && (
                   <div className="col-12">
                     <div className="p-3" style={{ background: "#f0f7e6", borderRadius: 12, border: "1px solid #cfe5a0" }}>
-                      <div className="row g-2 text-center">
-                        <div className="col-6 col-md-3">
-                          <div className="small text-muted">Cuota estimada</div>
-                          <div className="fw-bold fs-5">{fmt(cuotaEstimada)}</div>
+                      <div className="row g-2 text-center justify-content-center">
+                        <div className="col-6 col-md-4">
+                          <div className="small text-muted">Cuota estimada al mes</div>
+                          <div className="fw-bold fs-4">{fmt(cuotaEstimada)}</div>
                         </div>
-                        <div className="col-6 col-md-3">
+                        <div className="col-6 col-md-4">
                           <div className="small text-muted">Plazo</div>
-                          <div className="fw-bold fs-5">{plazo} meses</div>
+                          <div className="fw-bold fs-4">{plazo} {plazo === 1 ? "mes" : "meses"}</div>
                         </div>
-                        <div className="col-6 col-md-3">
-                          <div className="small text-muted">Total a pagar aprox.</div>
-                          <div className="fw-bold fs-5">{fmt(totalAPagar)}</div>
-                        </div>
-                        <div className="col-6 col-md-3">
-                          <div className="small text-muted">Tasa referencial</div>
-                          <div className="fw-bold fs-5">{param?.tasa_mensual}% mensual</div>
-                        </div>
+                      </div>
+                      <div className="small text-muted text-center mt-2">
+                        Es un cálculo aproximado. La cuota final depende de las condiciones que apruebe la cooperativa.
                       </div>
                       {superaCapacidad && (
                         <div className="alert alert-warning py-2 mt-3 mb-0 small">
@@ -287,9 +283,9 @@ export default function SolicitudPrestamoSocio({ token, onEnviada }) {
                 </div>
                 <div className="col-12 col-md-4">
                   <label className="form-label fw-semibold small">Ingreso mensual aproximado (L.) *</label>
-                  <input
-                    type="number" min="1" step="0.01" required className="form-control"
-                    name="ingreso_mensual" value={form.ingreso_mensual} onChange={cambiar}
+                  <InputMonto
+                    required className="form-control" placeholder="0.00"
+                    value={form.ingreso_mensual} onChange={(v) => setForm((f) => ({ ...f, ingreso_mensual: v }))}
                   />
                 </div>
 

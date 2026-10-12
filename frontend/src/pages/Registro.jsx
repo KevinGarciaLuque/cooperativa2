@@ -63,7 +63,7 @@ export default function Registro() {
         nombre_completo: form.nombre_completo,
         dni: form.dni,
         telefono: form.telefono,
-        correo: form.correo || undefined,
+        correo: form.correo,
         direccion: form.direccion || undefined,
         fecha_nacimiento: form.fecha_nacimiento,
         password: form.password,
@@ -155,8 +155,10 @@ export default function Registro() {
                   input: { type: "date", required: true },
                 })}
                 {campo("Correo electrónico", "correo", {
+                  requerido: true,
                   col: "col-12 col-md-6",
-                  input: { type: "email", maxLength: 100, placeholder: "opcional", autoComplete: "email" },
+                  ayuda: "Aquí recibirás tus recibos.",
+                  input: { type: "email", required: true, maxLength: 100, placeholder: "tucorreo@ejemplo.com", autoComplete: "email" },
                 })}
                 {campo("Dirección", "direccion", {
                   input: { maxLength: 200, placeholder: "Colonia, barrio o aldea y municipio", autoComplete: "street-address" },

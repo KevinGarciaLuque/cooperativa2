@@ -108,13 +108,13 @@ router.post("/prestamo", async (req, res) => {
     await connection.beginTransaction();
 
     const [abiertas] = await connection.query(
-      `SELECT id_prestamo FROM prestamos WHERE id_usuario = ? AND estado IN ('pendiente', 'aprobado') LIMIT 1 FOR UPDATE`,
+      `SELECT id_prestamo FROM prestamos WHERE id_usuario = ? AND estado = 'pendiente' LIMIT 1 FOR UPDATE`,
       [req.usuario.id_usuario]
     );
     if (abiertas.length) {
       await connection.rollback();
       return res.status(409).json({
-        message: "Ya tienes una solicitud en trámite. Espera la respuesta de la cooperativa antes de enviar otra.",
+        message: "Ya tienes una solicitud en revisión. Espera la respuesta de la cooperativa antes de enviar otra.",
       });
     }
 

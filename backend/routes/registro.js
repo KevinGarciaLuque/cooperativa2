@@ -81,8 +81,8 @@ router.post("/", async (req, res) => {
     if (!validarTelefono(String(telefono || ""))) {
       return res.status(400).json({ message: "El teléfono debe tener 8 dígitos." });
     }
-    if (correo && !validarEmail(String(correo))) {
-      return res.status(400).json({ message: "El correo electrónico no es válido." });
+    if (!correo || !validarEmail(String(correo).trim())) {
+      return res.status(400).json({ message: "Escribe un correo electrónico válido: ahí recibirás tus recibos." });
     }
     if (!fecha_nacimiento || !mayorDeEdad(fecha_nacimiento)) {
       return res.status(400).json({ message: "Debes ser mayor de 18 años para registrarte." });

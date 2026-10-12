@@ -131,6 +131,8 @@ test("registro por enlace: el socio queda pendiente y limitado", async () => {
 
   assert.equal((await api("POST", "/registro", datos)).s, 403); // sin código
   assert.equal((await api("POST", "/registro", { ...datos, codigo, password: "abc" })).s, 400);
+  // el correo es obligatorio: ahí recibirá sus recibos
+  assert.equal((await api("POST", "/registro", { ...datos, codigo, correo: "" })).s, 400);
   assert.equal((await api("POST", "/registro", { ...datos, codigo, fecha_nacimiento: "2015-01-01" })).s, 400);
 
   const ok = await api("POST", "/registro", { ...datos, codigo });
@@ -182,6 +184,44 @@ test("aprobación: el socio y el préstamo se aprueban juntos", async () => {
   assert.equal(u.estado, "activo");
   const [cuentas] = await pool.query("SELECT tipo_cuenta FROM cuentas WHERE id_usuario = ?", [ids.nuevo]);
   assert.equal(cuentas.length, 3);
+});
+
+test("tras la aprobación el socio ve su tasa y puede pedir otro préstamo", async () => {
+  const login = await api("POST", "/usuarios/login", { dni: "0801000000010", password: "Clave1234" });
+  const t = login.b.token;
+  assert.equal(login.b.usuario.estado, "activo");
+
+  // ve la tasa mensual con la que se aprobó, pero no el detalle de intereses
+  const lista = await api("GET", "/prestamos", null, t);
+  const p = lista.b.data.find((x) => x.id_prestamo === ids.prestamoNuevo);
+  assert.equal(p.estado, "aprobado");
+  assert.equal(p.tasa_mensual, 10);
+  assert.equal(p.tasa_interes, undefined);
+  assert.equal(p.tasa_original, undefined);
+
+  // una solicitud ya aprobada no bloquea una nueva
+  const otra = await api(
+    "POST", "/solicitudes/prestamo",
+    {
+      monto: 2000, plazo_meses: 4, cuota_posible: 700, proposito: "salud", ocupacion: "empleado",
+      ingreso_mensual: 8000, acepta: true,
+    },
+    t
+  );
+  assert.equal(otra.s, 201);
+  // pero dos en revisión a la vez, no
+  const tercera = await api(
+    "POST", "/solicitudes/prestamo",
+    {
+      monto: 1000, plazo_meses: 2, cuota_posible: 600, proposito: "otro", ocupacion: "empleado",
+      ingreso_mensual: 8000, acepta: true,
+    },
+    t
+  );
+  assert.equal(tercera.s, 409);
+  // se retira para no alterar el resto de las pruebas
+  await pool.query("DELETE FROM solicitudes_prestamo WHERE id_prestamo = ?", [otra.b.id_prestamo]);
+  await pool.query("DELETE FROM prestamos WHERE id_prestamo = ?", [otra.b.id_prestamo]);
 });
 
 test("desembolso → pago total → finiquito", async () => {

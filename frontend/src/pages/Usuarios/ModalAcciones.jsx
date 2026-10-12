@@ -326,10 +326,11 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
               <div className="col-12">
                 <label className="form-label fw-semibold d-flex align-items-center" style={{ color: "#2c3e50" }}>
                   <FaEnvelope className="me-2" style={{ color: "#667eea" }} />
-                  Correo Electrónico
+                  Correo Electrónico {(!form.rol_id || String(form.rol_id) === "2") && <span className="text-danger ms-1">*</span>}
                 </label>
                 <input
                   type="email"
+                  required={!form.rol_id || String(form.rol_id) === "2"}
                   name="correo"
                   className="form-control form-control-lg"
                   value={form.correo}

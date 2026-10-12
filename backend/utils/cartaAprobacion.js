@@ -8,7 +8,8 @@ const pool = require("../db");
 const { calcularCuotaMensual } = require("./calculosPrestamo");
 const { notificarSocio, escaparHtml, correoConfigurado } = require("./notificaciones");
 
-// Estados en los que el préstamo ya fue aprobado alguna vez
+// Estados en los que el préstamo ya fue aprobado alguna vez. Un préstamo registrado
+// directamente (sin pasar por "aprobado") no tiene fecha de aprobación: se usa la de otorgado.
 const ESTADOS_APROBADOS = ["aprobado", "activo", "mora", "pagado"];
 
 const num = (v) => parseFloat(v || 0);
@@ -47,7 +48,7 @@ const leerLogo = async () => {
 // Datos de la carta, o null si el préstamo no existe o nunca fue aprobado
 const datosCarta = async (idPrestamo) => {
   const [rows] = await pool.query(
-    `SELECT p.id_prestamo, p.id_usuario, p.monto, p.plazo_meses, p.tasa_interes, p.estado, p.fecha_aprobacion,
+    `SELECT p.id_prestamo, p.id_usuario, p.monto, p.plazo_meses, p.tasa_interes, p.estado, p.fecha_aprobacion, p.fecha_otorgado,
             u.nombre_completo, u.dni, a.nombre_completo AS aprobado_por
      FROM prestamos p
      INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
@@ -56,7 +57,9 @@ const datosCarta = async (idPrestamo) => {
     [idPrestamo]
   );
   const p = rows[0];
-  if (!p || !p.fecha_aprobacion || !ESTADOS_APROBADOS.includes(p.estado)) return null;
+  if (!p || !ESTADOS_APROBADOS.includes(p.estado)) return null;
+  const fechaAprobacion = p.fecha_aprobacion || (p.estado !== "aprobado" ? p.fecha_otorgado : null);
+  if (!fechaAprobacion) return null;
   const plazo = parseInt(p.plazo_meses) || 0;
   return {
     cooperativa: (await leerConfig("site_name")) || "SmartCoop",
@@ -68,7 +71,7 @@ const datosCarta = async (idPrestamo) => {
     monto: num(p.monto),
     plazo,
     cuota: parseFloat(calcularCuotaMensual(num(p.monto), num(p.tasa_interes), plazo).toFixed(2)),
-    fecha_aprobacion: p.fecha_aprobacion,
+    fecha_aprobacion: fechaAprobacion,
     aprobado_por: p.aprobado_por,
   };
 };

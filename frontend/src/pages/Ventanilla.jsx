@@ -6,6 +6,7 @@ import { useAlerta } from "../context/AlertaContext";
 import DetallePrestamoVentanilla from "./DetallePrestamoVentanilla";
 import EstadoCuentaSocio from "./EstadoCuentaSocio";
 import RecibosSocioModal from "../components/RecibosSocioModal";
+import CartasAprobacionSocio from "../components/CartasAprobacionSocio";
 import {
   FaSearch,
   FaUserCircle,
@@ -18,6 +19,7 @@ import {
   FaExclamationTriangle,
   FaTimes,
   FaIdCard,
+  FaFileSignature,
 } from "react-icons/fa";
 
 const ACCENT = "#a8cd3a";
@@ -48,6 +50,7 @@ export default function Ventanilla() {
   const [detalle, setDetalle] = useState(null); // id del préstamo cuyo detalle se está viendo
   const [verEstadoCuenta, setVerEstadoCuenta] = useState(false);
   const [verRecibos, setVerRecibos] = useState(false);
+  const [verCartas, setVerCartas] = useState(false);
 
   // Búsqueda de socios con retardo para no consultar en cada tecla
   useEffect(() => {
@@ -224,6 +227,13 @@ export default function Ventanilla() {
           onClick: () => setVerRecibos(true),
         },
         {
+          icon: <FaFileSignature />,
+          color: "#16a34a",
+          titulo: "Carta de préstamo aprobado",
+          desc: "Descargar o enviar por WhatsApp o correo",
+          onClick: () => setVerCartas(true),
+        },
+        {
           icon: <FaFileInvoiceDollar />,
           color: "#2c3e50",
           titulo: "Estado de cuenta",
@@ -341,9 +351,32 @@ export default function Ventanilla() {
         <RecibosSocioModal
           idSocio={socio.id_usuario}
           nombreSocio={socio.nombre_completo}
+          telefono={socio.telefono}
           headers={headers}
           onClose={() => setVerRecibos(false)}
         />
+      )}
+
+      {verCartas && socio && (
+        <div
+          className="modal show d-block"
+          style={{ background: "rgba(0,0,0,.6)", zIndex: 5500, position: "fixed", inset: 0, overflowY: "auto" }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content border-0 shadow-lg" style={{ borderRadius: 16 }}>
+              <div className="modal-header border-0 pb-0">
+                <div>
+                  <h5 className="modal-title fw-bold">Carta de préstamo aprobado</h5>
+                  <div className="small text-muted">{socio.nombre_completo}</div>
+                </div>
+                <button type="button" className="btn-close" onClick={() => setVerCartas(false)} />
+              </div>
+              <div className="modal-body">
+                <CartasAprobacionSocio idSocio={socio.id_usuario} telefono={socio.telefono} headers={headers} titulo={false} />
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {!socio && (

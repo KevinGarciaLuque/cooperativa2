@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import ReciboModal from "./ReciboModal";
+import CartasAprobacionSocio from "./CartasAprobacionSocio";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -16,8 +17,9 @@ const TIPOS = {
   desembolso: "Desembolso",
 };
 
-// Lista los recibos emitidos a un socio y permite verlos, imprimirlos o compartirlos de nuevo
-export default function RecibosSocioModal({ idSocio, nombreSocio, headers, onClose }) {
+// Lista los recibos emitidos a un socio y permite verlos, imprimirlos o compartirlos de nuevo.
+// Arriba, las cartas de sus préstamos aprobados.
+export default function RecibosSocioModal({ idSocio, nombreSocio, telefono, headers, onClose }) {
   const [recibos, setRecibos] = useState(null);
   const [error, setError] = useState("");
   const [abierto, setAbierto] = useState(null);
@@ -48,6 +50,10 @@ export default function RecibosSocioModal({ idSocio, nombreSocio, headers, onClo
             <button type="button" className="btn-close" onClick={onClose} />
           </div>
           <div className="modal-body" style={{ maxHeight: "65vh", overflowY: "auto" }}>
+            <div className="p-3 mb-3" style={{ background: "#f0f7e6", borderRadius: 12 }}>
+              <CartasAprobacionSocio idSocio={idSocio} telefono={telefono} headers={headers} />
+            </div>
+            <div className="fw-bold mb-2">Recibos</div>
             {error && <div className="alert alert-danger">{error}</div>}
             {!recibos && !error && (
               <div className="text-center py-4">

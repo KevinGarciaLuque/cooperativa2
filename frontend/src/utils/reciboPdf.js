@@ -30,6 +30,37 @@ const fechaLarga = (f) => {
 export const nombreArchivoRecibo = (recibo) =>
   recibo.tipo === "finiquito" ? `Finiquito-${recibo.numero}.pdf` : `Recibo-${recibo.numero}.pdf`;
 
+// Todos los documentos llevan el logo de SmartCoop (carpeta public)
+let logoCache = null;
+const cargarLogo = async () => {
+  if (logoCache) return logoCache;
+  try {
+    const blob = await (await fetch("/smartcoop.png")).blob();
+    logoCache = await new Promise((ok, mal) => {
+      const lector = new FileReader();
+      lector.onload = () => ok(lector.result);
+      lector.onerror = mal;
+      lector.readAsDataURL(blob);
+    });
+  } catch {
+    logoCache = null;
+  }
+  return logoCache;
+};
+
+// Dibuja el logo centrado arriba y devuelve dónde sigue el contenido
+const ponerLogo = async (doc, ancho, y) => {
+  const logo = await cargarLogo();
+  if (!logo) return y;
+  const lado = 20;
+  try {
+    doc.addImage(logo, "PNG", ancho / 2 - lado / 2, y - 8, lado, lado);
+    return y + lado - 2;
+  } catch {
+    return y;
+  }
+};
+
 const soloFecha = (f) => {
   const d = new Date(f);
   return isNaN(d) ? "" : d.toLocaleDateString("es-HN", { day: "numeric", month: "long", year: "numeric" });
@@ -42,7 +73,7 @@ async function generarFiniquitoPdf(recibo) {
   const ancho = doc.internal.pageSize.getWidth();
   const margen = 16;
   const d = recibo.detalle || {};
-  let y = 20;
+  let y = await ponerLogo(doc, ancho, 14);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
@@ -129,7 +160,7 @@ export async function generarReciboPdf(recibo) {
   const ancho = doc.internal.pageSize.getWidth();
   const margen = 14;
   const d = recibo.detalle || {};
-  let y = 18;
+  let y = await ponerLogo(doc, ancho, 14);
 
   // Encabezado
   doc.setFont("helvetica", "bold");

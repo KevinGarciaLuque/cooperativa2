@@ -9,6 +9,7 @@ const { validarPassword } = require("../utils/passwordPolicy");
 const { leerRegistro } = require("../utils/registroConfig");
 const { notificarAdministradores, escaparHtml } = require("../utils/notificaciones");
 const { parametrosSolicitud, validarSolicitud, insertarSolicitud } = require("../utils/solicitudPrestamo");
+const { subidaIdentidad, mensajeErrorSubida, guardarLado } = require("../utils/identidad");
 
 const validarDNI = (v) => /^\d{13}$/.test(v);
 const validarTelefono = (v) => /^\d{8}$/.test(v);
@@ -50,8 +51,26 @@ router.get("/estado", async (req, res) => {
   }
 });
 
+// Recibe el formulario como multipart: los datos en el campo "datos" (JSON) y las fotos
+// de la identidad en "dni_frente" y "dni_reverso"
+const recibirFormulario = (req, res, next) =>
+  subidaIdentidad.fields([
+    { name: "dni_frente", maxCount: 1 },
+    { name: "dni_reverso", maxCount: 1 },
+  ])(req, res, (err) => {
+    if (err) return res.status(400).json({ message: mensajeErrorSubida(err) });
+    if (typeof req.body?.datos === "string") {
+      try {
+        req.body = JSON.parse(req.body.datos);
+      } catch {
+        return res.status(400).json({ message: "No se pudo leer el formulario." });
+      }
+    }
+    next();
+  });
+
 // POST /api/registro
-router.post("/", async (req, res) => {
+router.post("/", recibirFormulario, async (req, res) => {
   let connection;
   try {
     const {
@@ -96,6 +115,12 @@ router.post("/", async (req, res) => {
     const errorPassword = validarPassword(password);
     if (errorPassword) return res.status(400).json({ message: errorPassword });
 
+    const dniFrente = req.files?.dni_frente?.[0];
+    const dniReverso = req.files?.dni_reverso?.[0];
+    if (!dniFrente || !dniReverso) {
+      return res.status(400).json({ message: "Adjunta las fotos del frente y del reverso de tu identidad." });
+    }
+
     let solicitud = null;
     if (prestamo) {
       const { error, datos } = validarSolicitud(prestamo);
@@ -135,6 +160,9 @@ router.post("/", async (req, res) => {
         rol[0].id_rol,
       ]
     );
+
+    await guardarLado(connection, r.insertId, "frente", dniFrente, r.insertId);
+    await guardarLado(connection, r.insertId, "reverso", dniReverso, r.insertId);
 
     let creada = null;
     if (solicitud) creada = await insertarSolicitud(connection, r.insertId, solicitud);

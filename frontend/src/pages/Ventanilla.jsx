@@ -7,6 +7,7 @@ import DetallePrestamoVentanilla from "./DetallePrestamoVentanilla";
 import EstadoCuentaSocio from "./EstadoCuentaSocio";
 import RecibosSocioModal from "../components/RecibosSocioModal";
 import CartasAprobacionSocio from "../components/CartasAprobacionSocio";
+import FotosIdentidad from "../components/FotosIdentidad";
 import {
   FaSearch,
   FaUserCircle,
@@ -440,6 +441,15 @@ export default function Ventanilla() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Identidad */}
+          <div className="vt-card p-4 mb-4">
+            <h6 className="fw-bold mb-3" style={{ color: AZUL }}>
+              <FaIdCard className="me-2" />
+              Identidad del socio
+            </h6>
+            <FotosIdentidad key={socio.id_usuario} idSocio={socio.id_usuario} headers={headers} />
           </div>
 
           {/* Acciones */}

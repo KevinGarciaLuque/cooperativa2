@@ -3,8 +3,9 @@ import { useConfigSitio } from "../../hooks/useConfigSitio";
 import SolicitudPrestamoSocio from "../../components/SolicitudPrestamoSocio";
 import ReciboModal from "../../components/ReciboModal";
 import { descargarCarta } from "../../utils/cartaAprobacion";
+import FotosIdentidad from "../../components/FotosIdentidad";
 import { comprimirImagen } from "../../utils/imagen";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import {
   FaUserCircle,
@@ -79,6 +80,9 @@ export default function SocioPerfil() {
   const [loading, setLoading]           = useState(true);
   const pendiente = user?.estado === "pendiente";
   const [tab, setTab]                   = useState(pendiente ? "solicitar" : "resumen");
+  const [identidad, setIdentidad]       = useState(null); // { frente, reverso } de las fotos del DNI
+  const headersAuth = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
+  const faltaIdentidad = identidad && (!identidad.frente || !identidad.reverso);
   const [finiquitoDe, setFiniquitoDe]   = useState(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [password, setPassword]         = useState("");
@@ -294,6 +298,7 @@ export default function SocioPerfil() {
   const tabs = pendiente
     ? [
         { key: "solicitar", label: "Solicitar préstamo", icon: <FaHandHoldingUsd /> },
+        { key: "identidad", label: "Mi identidad",       icon: <FaIdCard /> },
         { key: "seguridad", label: "Seguridad",          icon: <FaShieldAlt /> },
       ]
     : [
@@ -301,6 +306,7 @@ export default function SocioPerfil() {
         { key: "prestamos",    label: "Préstamos",           icon: <FaHandHoldingUsd /> },
         { key: "solicitar",    label: "Solicitar préstamo",  icon: <FaClipboardList /> },
         { key: "aportaciones", label: "Aportaciones",        icon: <FaPiggyBank /> },
+        { key: "identidad",    label: "Mi identidad",        icon: <FaIdCard /> },
         { key: "seguridad",    label: "Seguridad",           icon: <FaShieldAlt /> },
       ];
 
@@ -506,6 +512,38 @@ export default function SocioPerfil() {
               </div>
             </div>
           ))}
+
+          {/* Aviso: faltan las fotos de la identidad */}
+          {faltaIdentidad && tab !== "identidad" && (
+            <div className="alert alert-warning d-flex flex-wrap gap-2 align-items-center justify-content-between rounded-4 border-0 shadow-sm">
+              <div>
+                <strong>Falta la foto de tu identidad.</strong>
+                <div className="small">Sube el frente y el reverso de tu tarjeta de identidad para completar tu expediente.</div>
+              </div>
+              <button className="btn btn-sm btn-dark" onClick={() => setTab("identidad")}>
+                Subir mi identidad
+              </button>
+            </div>
+          )}
+
+          {/* TAB: MI IDENTIDAD (siempre montado para saber si faltan fotos) */}
+          <div className={tab === "identidad" ? "card border-0 shadow-sm rounded-4" : "d-none"}>
+            <div className="card-body p-4">
+              <h5 className="fw-bold mb-1">Mi identidad</h5>
+              <p className="text-muted small mb-4">
+                Fotos del frente y del reverso de tu tarjeta de identidad. Solo las ve la cooperativa.
+                {!pendiente && " Una vez revisadas, para cambiarlas comunícate con la cooperativa."}
+              </p>
+              {user?.id_usuario && (
+                <FotosIdentidad
+                  idSocio={user.id_usuario}
+                  headers={headersAuth}
+                  soloFaltantes={!pendiente}
+                  onCambio={setIdentidad}
+                />
+              )}
+            </div>
+          </div>
 
           {/* TAB: SOLICITAR PRÉSTAMO */}
           {tab === "solicitar" && (

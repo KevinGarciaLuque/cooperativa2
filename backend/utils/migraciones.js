@@ -276,6 +276,25 @@ const MIGRACIONES = [
       await conn.query("UPDATE comprobantes_firmados SET revisado_en = subido_en WHERE revisado_en IS NULL");
     },
   },
+  {
+    id: "2026_10_011_documentos_identidad",
+    descripcion: "Fotos del frente y reverso de la identidad del socio (privadas, fuera del almacén público)",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS documentos_identidad (
+          id_documento INT AUTO_INCREMENT PRIMARY KEY,
+          id_usuario INT NOT NULL,
+          lado ENUM('frente','reverso') NOT NULL,
+          mime VARCHAR(80) NOT NULL,
+          tamano INT NOT NULL,
+          contenido MEDIUMBLOB NOT NULL,
+          subido_por INT NULL,
+          subido_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_identidad_lado (id_usuario, lado)
+        )
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

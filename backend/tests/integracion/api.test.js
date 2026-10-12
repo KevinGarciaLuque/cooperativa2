@@ -311,6 +311,10 @@ test("comprobante de entrega firmado: lo sube el socio y lo ve el personal", asy
   const despues = await api("GET", "/solicitudes/resumen", null, ids.tSuper);
   assert.equal(despues.b.comprobantes_por_revisar, 0);
 
+  // revisado por la cooperativa: el socio ya no puede reemplazarlo, el personal sí
+  assert.equal((await enviar(t, "otro.jpg", "image/jpeg", Buffer.from([0xff, 0xd8, 1]))).s, 403);
+  assert.equal((await enviar(ids.tSuper, "corregido.jpg", "image/jpeg", Buffer.from([0xff, 0xd8, 2]))).s, 201);
+
   // ya no aparece entre los desembolsos pendientes de firma
   const pend = await api("GET", "/solicitudes/desembolsos-sin-firma", null, ids.tSuper);
   assert.ok(!pend.b.data.some((d) => d.id_recibo === idRecibo));

@@ -39,7 +39,7 @@ const formatearFecha = (f) => {
 // Muestra un recibo por su id, o lo busca por la operación que lo originó
 // (referenciaTipo + referenciaId). Incluye impresión.
 export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, finiquitoDe, onClose }) {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [recibo, setRecibo] = useState(null);
   const [error, setError] = useState("");
   const [generando, setGenerando] = useState(false);
@@ -229,6 +229,7 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
                   <span style={{ color: "#065f46" }}>
                     <FaCheckCircle className="me-1" />
                     Comprobante firmado recibido el {String(recibo.comprobante_firmado.subido_en).substring(0, 10)}
+                    {recibo.comprobante_firmado.revisado && " · revisado por la cooperativa"}
                   </span>
                 ) : (
                   <span style={{ color: "#92400e" }}>
@@ -242,6 +243,7 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
                     Ver firmado
                   </button>
                 )}
+                {!(user?.rol === "Socio" && recibo.comprobante_firmado?.revisado) && (
                 <button
                   className="btn btn-sm btn-dark"
                   onClick={() => inputArchivo.current?.click()}
@@ -250,6 +252,7 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
                   <FaCamera className="me-1" />
                   {subiendo ? "Subiendo..." : recibo.comprobante_firmado ? "Reemplazar" : "Subir firmado"}
                 </button>
+                )}
                 <input
                   ref={inputArchivo}
                   type="file"

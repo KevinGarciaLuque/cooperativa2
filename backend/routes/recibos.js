@@ -26,7 +26,7 @@ const formatear = (r, cooperativa) => {
     anulado: !!r.anulado,
     socio: r.socio_nombre ? { nombre: r.socio_nombre, dni: r.socio_dni, telefono: r.socio_telefono || null } : null,
     emitido_por: r.emisor_nombre || null,
-    comprobante_firmado: r.firmado_en ? { subido_en: r.firmado_en } : null,
+    comprobante_firmado: r.firmado_en ? { subido_en: r.firmado_en, revisado: !!r.firmado_revisado_en } : null,
     cooperativa,
   };
 };
@@ -42,7 +42,9 @@ const nombreCooperativa = async () => {
 
 const SELECT_RECIBO = `
   SELECT r.*, s.nombre_completo AS socio_nombre, s.dni AS socio_dni, s.telefono AS socio_telefono, e.nombre_completo AS emisor_nombre,
-         (SELECT MAX(c.subido_en) FROM comprobantes_firmados c WHERE c.id_recibo = r.id_recibo) AS firmado_en
+         (SELECT MAX(c.subido_en) FROM comprobantes_firmados c WHERE c.id_recibo = r.id_recibo) AS firmado_en,
+         (SELECT c.revisado_en FROM comprobantes_firmados c WHERE c.id_recibo = r.id_recibo
+            ORDER BY c.id_comprobante DESC LIMIT 1) AS firmado_revisado_en
   FROM recibos r
   LEFT JOIN usuarios s ON r.id_socio = s.id_usuario
   LEFT JOIN usuarios e ON r.emitido_por = e.id_usuario`;
@@ -133,6 +135,19 @@ router.post("/:id/comprobante-firmado", (req, res) => {
         return res.status(400).json({ message: "Solo los comprobantes de desembolso vigentes llevan copia firmada." });
       }
 
+      // Una vez revisado por la cooperativa, el socio ya no puede cambiarlo
+      if (req.usuario.rol === "Socio") {
+        const [[previo]] = await pool.query(
+          `SELECT revisado_en FROM comprobantes_firmados WHERE id_recibo = ? ORDER BY id_comprobante DESC LIMIT 1`,
+          [r.id_recibo]
+        );
+        if (previo && previo.revisado_en) {
+          return res.status(403).json({
+            message: "Este comprobante ya fue revisado por la cooperativa. Comunícate con ella si necesitas cambiarlo.",
+          });
+        }
+      }
+
       await pool.query(
         `INSERT INTO comprobantes_firmados
            (id_recibo, id_socio, nombre_archivo, mime, tamano, contenido, subido_por, subido_por_rol)
@@ -148,6 +163,15 @@ router.post("/:id/comprobante-firmado", (req, res) => {
           req.usuario.rol,
         ]
       );
+
+      // Lo que sube el personal ya viene revisado
+      if (req.usuario.rol !== "Socio") {
+        await pool.query(
+          `UPDATE comprobantes_firmados SET revisado_en = NOW(), revisado_por = ?
+           WHERE id_recibo = ? AND revisado_en IS NULL`,
+          [req.usuario.id_usuario, r.id_recibo]
+        );
+      }
 
       await pool.query(
         `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,

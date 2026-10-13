@@ -150,6 +150,7 @@ async function generarFiniquitoPdf(recibo) {
   doc.setDrawColor(148, 163, 184);
   const mitad = (ancho - margen * 2) / 2;
   ponerFirma(doc, recibo.firma_emisor, margen, y, mitad - 8);
+  ponerFirma(doc, recibo.firma_socio, margen + mitad + 8, y, mitad - 8);
   doc.line(margen, y, margen + mitad - 8, y);
   doc.line(margen + mitad + 8, y, ancho - margen, y);
   doc.setFont("helvetica", "normal");
@@ -252,6 +253,7 @@ export async function generarReciboPdf(recibo) {
   doc.setDrawColor(148, 163, 184);
   const mitad = (ancho - margen * 2) / 2;
   ponerFirma(doc, recibo.firma_emisor, margen, y, mitad - 8);
+  ponerFirma(doc, recibo.firma_socio, margen + mitad + 8, y, mitad - 8);
   doc.line(margen, y, margen + mitad - 8, y);
   doc.line(margen + mitad + 8, y, ancho - margen, y);
   doc.setFont("helvetica", "normal");

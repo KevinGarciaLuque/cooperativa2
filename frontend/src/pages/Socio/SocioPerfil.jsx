@@ -7,6 +7,7 @@ import FotosIdentidad from "../../components/FotosIdentidad";
 import ReportarPagoSocio from "../../components/ReportarPagoSocio";
 import NotificacionesSocio from "../../components/NotificacionesSocio";
 import RecibosSocio from "../../components/RecibosSocio";
+import FirmaDigital from "../../components/FirmaDigital";
 import { comprimirImagen } from "../../utils/imagen";
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
@@ -245,7 +246,7 @@ export default function SocioPerfil() {
           (rec.data.data || [])
             .filter((r) => r.tipo === "desembolso" && !r.anulado)
             .forEach((r) => {
-              mapa[r.referencia_id] = { id_recibo: r.id_recibo, firmado: !!r.comprobante_firmado };
+              mapa[r.referencia_id] = { id_recibo: r.id_recibo, firmado: !!(r.comprobante_firmado || r.firma_digital) };
             });
           setEntregas(mapa);
         } catch {
@@ -559,7 +560,7 @@ export default function SocioPerfil() {
           {tab === "pagar" && <ReportarPagoSocio token={token} />}
 
           {tab === "recibos" && user?.id_usuario && (
-            <RecibosSocio idSocio={user.id_usuario} headers={headersAuth} onVer={setReciboVer} />
+            <RecibosSocio idSocio={user.id_usuario} headers={headersAuth} onVer={setReciboVer} recargar={reciboVer} />
           )}
 
           {/* TAB: SOLICITAR PRÉSTAMO */}
@@ -916,7 +917,7 @@ export default function SocioPerfil() {
                         >
                           {entregas[p.id_prestamo].firmado
                             ? "Comprobante de entrega firmado ✓"
-                            : "Comprobante de entrega: firmar y subir"}
+                            : "Comprobante de entrega: firmar"}
                         </button>
                       )}
                       {estaPagado && (
@@ -1104,6 +1105,15 @@ export default function SocioPerfil() {
                       </button>
                     </div>
                   </div>
+                </div>
+
+                <div className="mt-4 p-4 rounded-4" style={{ border: "1px solid #e2e8f0" }}>
+                  <FirmaDigital
+                    token={token}
+                    descripcion="Con tu firma puedes firmar desde la app tus recibos y el comprobante de entrega de tus préstamos, sin imprimirlos."
+                    mensajeGuardada="Firma guardada. Ya puedes firmar tus recibos desde la app."
+                    confirmarEliminar="¿Eliminar tu firma? Los documentos que ya firmaste la conservan; para firmar otros tendrás que dibujarla de nuevo."
+                  />
                 </div>
               </div>
             </div>

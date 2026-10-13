@@ -1,4 +1,5 @@
-// Firma digital de quien tiene la sesión (solo personal de la cooperativa)
+// Firma digital de quien tiene la sesión. El personal la usa en los documentos que emite
+// o aprueba; el socio, para firmar sus recibos y comprobantes desde la app.
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
@@ -9,13 +10,6 @@ const subida = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 1024 * 1024 },
   fileFilter: (req, file, cb) => (file.mimetype === "image/png" ? cb(null, true) : cb(new Error("FORMATO"))),
-});
-
-router.use((req, res, next) => {
-  if (!req.usuario || req.usuario.rol === "Socio") {
-    return res.status(403).json({ message: "No tienes permiso para realizar esta acción." });
-  }
-  next();
 });
 
 // GET /api/firma/mia → { imagen: dataURL | null }

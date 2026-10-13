@@ -1,7 +1,7 @@
 // "Mis recibos" del socio: pagos de préstamo, aportaciones, desembolsos y constancias.
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { FaReceipt } from "react-icons/fa";
+import { FaCheckCircle, FaReceipt, FaSignature } from "react-icons/fa";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -19,7 +19,8 @@ const fecha = (v) => {
   return isNaN(d) ? "" : d.toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" });
 };
 
-export default function RecibosSocio({ idSocio, headers, onVer }) {
+// recargar: cambia cuando se cierra un recibo, para ver si quedó firmado
+export default function RecibosSocio({ idSocio, headers, onVer, recargar }) {
   const [lista, setLista] = useState(null);
 
   useEffect(() => {
@@ -31,14 +32,15 @@ export default function RecibosSocio({ idSocio, headers, onVer }) {
     return () => {
       activo = false;
     };
-  }, [idSocio, headers]);
+  }, [idSocio, headers, recargar]);
 
   return (
     <div className="card border-0 shadow-sm rounded-4">
       <div className="card-body p-4">
         <h5 className="fw-bold mb-1">Mis recibos</h5>
         <p className="text-muted small mb-3">
-          Todos los recibos que te ha emitido la cooperativa. Tócalos para verlos, descargarlos o compartirlos.
+          Todos los recibos que te ha emitido la cooperativa. Tócalos para verlos, descargarlos, compartirlos o
+          firmarlos.
         </p>
         {lista === null ? (
           <div className="spinner-border spinner-border-sm text-success" />
@@ -69,6 +71,16 @@ export default function RecibosSocio({ idSocio, headers, onVer }) {
                     <span className="d-block fw-semibold">
                       {etiqueta}
                       {r.anulado && <span className="badge bg-secondary ms-2">Anulado</span>}
+                      {!r.anulado && (r.firma_digital || r.comprobante_firmado) && (
+                        <span className="badge rounded-pill ms-2" style={{ background: "#dcfce7", color: "#166534" }}>
+                          <FaCheckCircle className="me-1" />Firmado
+                        </span>
+                      )}
+                      {!r.anulado && r.tipo === "desembolso" && !r.firma_digital && !r.comprobante_firmado && (
+                        <span className="badge rounded-pill ms-2" style={{ background: "#fef3c7", color: "#92400e" }}>
+                          <FaSignature className="me-1" />Por firmar
+                        </span>
+                      )}
                     </span>
                     <span className="d-block small text-muted text-truncate">
                       N.º {r.numero} · {fecha(r.fecha)}

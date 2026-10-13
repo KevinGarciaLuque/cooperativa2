@@ -446,6 +446,7 @@ router.get("/desembolsos-sin-firma", soloPersonal, async (req, res) => {
        WHERE r.tipo = 'desembolso' AND r.anulado = 0
          AND r.fecha >= DATE_SUB(NOW(), INTERVAL 120 DAY)
          AND NOT EXISTS (SELECT 1 FROM comprobantes_firmados c WHERE c.id_recibo = r.id_recibo)
+         AND NOT EXISTS (SELECT 1 FROM firmas_documento fd WHERE fd.id_recibo = r.id_recibo)
        ORDER BY r.fecha DESC LIMIT 100`
     );
     res.json({ success: true, data: rows.map((r) => ({ ...r, monto: num(r.monto) })) });

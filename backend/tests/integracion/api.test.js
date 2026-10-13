@@ -666,9 +666,6 @@ test("firma digital: el personal guarda la suya y sale en sus documentos", async
     return { s: r.status, b: await r.json().catch(() => null) };
   };
 
-  // un socio no tiene firma de la cooperativa
-  assert.equal((await api("GET", "/firma/mia", null, ids.tSocio)).s, 403);
-  assert.equal((await subir(ids.tSocio)).s, 403);
   assert.equal((await subir(ids.tSuper, "image/jpeg")).s, 400);
 
   assert.equal((await api("GET", "/firma/mia", null, ids.tSuper)).b.imagen, null);
@@ -690,6 +687,61 @@ test("firma digital: el personal guarda la suya y sale en sus documentos", async
   assert.equal((await api("DELETE", "/firma/mia", null, ids.tSuper)).s, 200);
   const sin = await api("GET", `/recibos/${rec.id_recibo}`, null, ids.tSuper);
   assert.equal(sin.b.data.firma_emisor, null);
+});
+
+test("firma del socio: firma digitalmente sus recibos o sube la copia firmada", async () => {
+  const subirFirma = async (token) => {
+    const f = new FormData();
+    f.append("firma", new Blob([PNG], { type: "image/png" }), "firma.png");
+    const r = await fetch(`${base}/api/firma/mia`, { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: f });
+    return { s: r.status, b: await r.json().catch(() => null) };
+  };
+  const [ap] = await pool.query(
+    `INSERT INTO recibos (tipo, referencia_tipo, referencia_id, id_socio, monto, metodo, concepto, emitido_por)
+     VALUES ('aportacion', 'aportacion', 0, ?, 100, 'efectivo', 'Aportación', ?)`,
+    [ids.socio, ids.super]
+  );
+  const idRecibo = ap.insertId;
+
+  // sin firma guardada no puede firmar
+  assert.equal((await api("GET", "/firma/mia", null, ids.tSocio)).b.imagen, null);
+  const sinFirma = await api("POST", `/recibos/${idRecibo}/firmar`, {}, ids.tSocio);
+  assert.equal(sinFirma.s, 400);
+  assert.equal(sinFirma.b.sin_firma, true);
+
+  assert.equal((await subirFirma(ids.tSocio)).s, 200);
+  // nadie más firma por él: ni otro socio ni el personal
+  assert.equal((await api("POST", `/recibos/${idRecibo}/firmar`, {}, ids.tSocio2)).s, 403);
+  assert.equal((await api("POST", `/recibos/${idRecibo}/firmar`, {}, ids.tSuper)).s, 403);
+
+  const firmado = await api("POST", `/recibos/${idRecibo}/firmar`, {}, ids.tSocio);
+  assert.equal(firmado.s, 201);
+  assert.match(firmado.b.data.firma_socio, /^data:image\/png;base64,/);
+  assert.ok(firmado.b.data.firma_digital.firmado_en);
+  assert.equal((await api("POST", `/recibos/${idRecibo}/firmar`, {}, ids.tSocio)).s, 409);
+
+  // el documento conserva la firma aunque el socio la borre después
+  assert.equal((await api("DELETE", "/firma/mia", null, ids.tSocio)).s, 200);
+  const visto = await api("GET", `/recibos/${idRecibo}`, null, ids.tSuper);
+  assert.match(visto.b.data.firma_socio, /^data:image\/png;base64,/);
+  const lista = await api("GET", `/recibos/socio/${ids.socio}`, null, ids.tSocio);
+  assert.ok(lista.b.data.find((r) => r.id_recibo === idRecibo).firma_digital);
+
+  // también puede subir la copia firmada a mano de cualquier recibo
+  const fd = new FormData();
+  fd.append("archivo", new Blob([Buffer.from([0xff, 0xd8, 0xff, 0xe0, 9])], { type: "image/jpeg" }), "firmado.jpg");
+  const subida = await fetch(`${base}/api/recibos/${idRecibo}/comprobante-firmado`, {
+    method: "POST", headers: { Authorization: `Bearer ${ids.tSocio}` }, body: fd,
+  });
+  assert.equal(subida.status, 201);
+
+  // un recibo anulado ya no se firma
+  await pool.query("UPDATE recibos SET anulado = 1 WHERE id_recibo = ?", [idRecibo]);
+  await subirFirma(ids.tSocio);
+  await pool.query("DELETE FROM firmas_documento WHERE id_recibo = ?", [idRecibo]);
+  assert.equal((await api("POST", `/recibos/${idRecibo}/firmar`, {}, ids.tSocio)).s, 400);
+  await pool.query("DELETE FROM comprobantes_firmados WHERE id_recibo = ?", [idRecibo]);
+  await pool.query("DELETE FROM recibos WHERE id_recibo = ?", [idRecibo]);
 });
 
 test("recordatorios de pago: texto para WhatsApp, envío manual y automático", async () => {

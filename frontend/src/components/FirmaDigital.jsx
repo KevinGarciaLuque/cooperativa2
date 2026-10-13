@@ -9,7 +9,16 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const ANCHO = 600; // tamaño de la imagen guardada (proporción 3:1)
 const ALTO = 200;
 
-export default function FirmaDigital({ token }) {
+// descripcion / mensajeGuardada: textos para el socio, que firma sus propios recibos.
+// onCambio(imagen): avisa cuando se guarda o se elimina la firma.
+export default function FirmaDigital({
+  token,
+  descripcion = "Tu firma aparecerá en la carta de aprobación, los recibos y las constancias que emitas o apruebes.",
+  mensajeGuardada = "Firma guardada. Aparecerá en los documentos que emitas o apruebes.",
+  confirmarEliminar = "¿Eliminar tu firma? Los documentos saldrán sin firma hasta que guardes una nueva.",
+  onCambio,
+  titulo = true,
+}) {
   const { mostrarAlerta } = useAlerta();
   const lienzo = useRef(null);
   const trazando = useRef(false);
@@ -128,8 +137,9 @@ export default function FirmaDigital({ token }) {
       datos.append("firma", await exportar(), "firma.png");
       const r = await axios.put(`${API_URL}/firma/mia`, datos, { headers });
       setGuardada(r.data.imagen);
+      onCambio?.(r.data.imagen);
       setDibujando(false);
-      mostrarAlerta("Firma guardada. Aparecerá en los documentos que emitas o apruebes.", "success");
+      mostrarAlerta(mensajeGuardada, "success");
     } catch (err) {
       mostrarAlerta(err.response?.data?.message || "No se pudo guardar la firma.", "error");
     } finally {
@@ -138,11 +148,12 @@ export default function FirmaDigital({ token }) {
   };
 
   const eliminar = async () => {
-    if (!window.confirm("¿Eliminar tu firma? Los documentos saldrán sin firma hasta que guardes una nueva.")) return;
+    if (!window.confirm(confirmarEliminar)) return;
     setOcupado(true);
     try {
       await axios.delete(`${API_URL}/firma/mia`, { headers });
       setGuardada(null);
+      onCambio?.(null);
       mostrarAlerta("Firma eliminada.", "success");
     } catch (err) {
       mostrarAlerta(err.response?.data?.message || "No se pudo eliminar la firma.", "error");
@@ -153,13 +164,14 @@ export default function FirmaDigital({ token }) {
 
   return (
     <div>
-      <h6 className="fw-bold mb-1">
-        <FaSignature className="me-2" />
-        Firma digital
-      </h6>
+      {titulo && (
+        <h6 className="fw-bold mb-1">
+          <FaSignature className="me-2" />
+          Firma digital
+        </h6>
+      )}
       <p className="text-muted small mb-3">
-        Tu firma aparecerá en la carta de aprobación, los recibos y las constancias que emitas o apruebes. Puedes
-        firmar con el dedo, con el lápiz de la tablet o con el mouse.
+        {descripcion} Puedes firmar con el dedo, con el lápiz de la tablet o con el mouse.
       </p>
 
       {!dibujando && (

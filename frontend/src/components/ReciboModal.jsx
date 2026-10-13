@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
-import { FaPrint, FaTimes, FaWhatsapp, FaFilePdf, FaCamera, FaCheckCircle } from "react-icons/fa";
+import { FaPrint, FaTimes, FaWhatsapp, FaFilePdf, FaCamera, FaCheckCircle, FaSignature } from "react-icons/fa";
+import FirmaDigital from "./FirmaDigital";
 import { generarReciboPdf, nombreArchivoRecibo } from "../utils/reciboPdf";
 import { comprimirImagen } from "../utils/imagen";
 
@@ -48,6 +49,11 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
   const [version, setVersion] = useState(0);
   const [subiendo, setSubiendo] = useState(false);
   const inputArchivo = useRef(null);
+  const [firmando, setFirmando] = useState(false); // panel para firmar digitalmente abierto
+  const [miFirma, setMiFirma] = useState(undefined); // firma del perfil del socio
+  const [cambiandoFirma, setCambiandoFirma] = useState(false);
+  const [firmandoAhora, setFirmandoAhora] = useState(false);
+  const esSocio = user?.rol === "Socio";
 
   useEffect(() => {
     let activo = true;
@@ -68,6 +74,35 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
   }, [idRecibo, referenciaTipo, referenciaId, finiquitoDe, token, version]);
 
   const d = recibo?.detalle || {};
+  const firmado = !!(recibo?.firma_digital || recibo?.comprobante_firmado);
+  const pideFirma = recibo?.tipo === "desembolso" && !firmado; // el comprobante de entrega debe firmarse
+
+  // Firma del perfil del socio, para mostrarla antes de firmar
+  useEffect(() => {
+    if (!firmando || miFirma !== undefined) return;
+    axios
+      .get(`${API_URL}/firma/mia`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => setMiFirma(r.data.imagen || null))
+      .catch(() => setMiFirma(null));
+  }, [firmando, miFirma, token]);
+
+  const firmar = async () => {
+    setFirmandoAhora(true);
+    setAviso("");
+    try {
+      const r = await axios.post(`${API_URL}/recibos/${recibo.id_recibo}/firmar`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setRecibo(r.data.data);
+      setFirmando(false);
+      setAviso("¡Listo! Firmaste este documento.");
+    } catch (err) {
+      if (err.response?.data?.sin_firma) setMiFirma(null);
+      setAviso(err.response?.data?.message || "No se pudo firmar el documento.");
+    } finally {
+      setFirmandoAhora(false);
+    }
+  };
 
   const subirFirmado = async (e) => {
     const original = e.target.files?.[0];
@@ -216,51 +251,121 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
             </div>
           </div>
 
-          {recibo?.tipo === "desembolso" && !recibo.anulado && (
+          {/* Firma del socio: digital desde la app o copia firmada a mano (foto o PDF) */}
+          {recibo && !recibo.anulado && recibo.tipo !== "finiquito" && (esSocio || recibo.tipo === "desembolso" || firmado) && (
             <div
-              className="recibo-no-print mx-3 mt-2 p-2 rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-2"
+              className="recibo-no-print mx-3 mt-2 p-2 px-3 rounded-3"
               style={{
-                background: recibo.comprobante_firmado ? "#ecfdf5" : "#fffbeb",
-                border: `1px solid ${recibo.comprobante_firmado ? "#a7f3d0" : "#fde68a"}`,
+                background: firmado ? "#ecfdf5" : pideFirma ? "#fffbeb" : "#f8fafc",
+                border: `1px solid ${firmado ? "#a7f3d0" : pideFirma ? "#fde68a" : "#e2e8f0"}`,
               }}
             >
-              <div className="small">
-                {recibo.comprobante_firmado ? (
-                  <span style={{ color: "#065f46" }}>
-                    <FaCheckCircle className="me-1" />
-                    Comprobante firmado recibido el {String(recibo.comprobante_firmado.subido_en).substring(0, 10)}
-                    {recibo.comprobante_firmado.revisado && " · revisado por la cooperativa"}
-                  </span>
-                ) : (
-                  <span style={{ color: "#92400e" }}>
-                    Falta el comprobante firmado por el socio. Fírmalo y sube una foto o el archivo.
-                  </span>
-                )}
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div className="small">
+                  {recibo.firma_digital ? (
+                    <span style={{ color: "#065f46" }}>
+                      <FaCheckCircle className="me-1" />
+                      Firmado digitalmente por el socio el {formatearFecha(recibo.firma_digital.firmado_en)}
+                    </span>
+                  ) : recibo.comprobante_firmado ? (
+                    <span style={{ color: "#065f46" }}>
+                      <FaCheckCircle className="me-1" />
+                      Copia firmada recibida el {String(recibo.comprobante_firmado.subido_en).substring(0, 10)}
+                      {recibo.comprobante_firmado.revisado && " · revisada por la cooperativa"}
+                    </span>
+                  ) : esSocio ? (
+                    <span style={{ color: pideFirma ? "#92400e" : "#475569" }}>
+                      {pideFirma ? "Falta tu firma en este comprobante." : "Puedes firmar este recibo."} Fírmalo desde la app o
+                      imprímelo, fírmalo a mano y sube una foto.
+                    </span>
+                  ) : (
+                    <span style={{ color: "#92400e" }}>
+                      Falta la firma del socio. Puede firmarlo desde su app, o sube aquí la foto del comprobante firmado.
+                    </span>
+                  )}
+                </div>
+                <div className="d-flex flex-wrap gap-2">
+                  {recibo.comprobante_firmado && (
+                    <button className="btn btn-sm btn-outline-success" onClick={verFirmado}>
+                      Ver copia firmada
+                    </button>
+                  )}
+                  {esSocio && !recibo.firma_digital && !recibo.comprobante_firmado && (
+                    <button
+                      className="btn btn-sm fw-semibold"
+                      style={{ background: "#a8cd3a", color: "#1a2a00" }}
+                      onClick={() => setFirmando((f) => !f)}
+                    >
+                      <FaSignature className="me-1" /> Firmar digitalmente
+                    </button>
+                  )}
+                  {!recibo.firma_digital && !(esSocio && recibo.comprobante_firmado?.revisado) && (
+                    <button
+                      className="btn btn-sm btn-dark"
+                      onClick={() => inputArchivo.current?.click()}
+                      disabled={subiendo}
+                    >
+                      <FaCamera className="me-1" />
+                      {subiendo ? "Subiendo..." : recibo.comprobante_firmado ? "Reemplazar copia" : "Subir copia firmada"}
+                    </button>
+                  )}
+                  <input
+                    ref={inputArchivo}
+                    type="file"
+                    accept="image/*,application/pdf"
+                    className="d-none"
+                    onChange={subirFirmado}
+                  />
+                </div>
               </div>
-              <div className="d-flex gap-2">
-                {recibo.comprobante_firmado && (
-                  <button className="btn btn-sm btn-outline-success" onClick={verFirmado}>
-                    Ver firmado
-                  </button>
-                )}
-                {!(user?.rol === "Socio" && recibo.comprobante_firmado?.revisado) && (
-                <button
-                  className="btn btn-sm btn-dark"
-                  onClick={() => inputArchivo.current?.click()}
-                  disabled={subiendo}
-                >
-                  <FaCamera className="me-1" />
-                  {subiendo ? "Subiendo..." : recibo.comprobante_firmado ? "Reemplazar" : "Subir firmado"}
-                </button>
-                )}
-                <input
-                  ref={inputArchivo}
-                  type="file"
-                  accept="image/*,application/pdf"
-                  className="d-none"
-                  onChange={subirFirmado}
-                />
-              </div>
+
+              {firmando && (
+                <div className="mt-3 pt-3 border-top">
+                  {miFirma === undefined ? (
+                    <div className="spinner-border spinner-border-sm text-success" />
+                  ) : cambiandoFirma || !miFirma ? (
+                    <FirmaDigital
+                      token={token}
+                      titulo={false}
+                      descripcion={miFirma ? "Dibuja tu nueva firma." : "Primero dibuja tu firma. Se guarda en tu perfil para firmar tus próximos documentos."}
+                      mensajeGuardada="Firma guardada."
+                      confirmarEliminar="¿Eliminar tu firma? Los documentos que ya firmaste la conservan."
+                      onCambio={(img) => {
+                        setMiFirma(img);
+                        if (img) setCambiandoFirma(false);
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <div className="small text-muted mb-2">Tu firma:</div>
+                      <div className="p-2 mb-2 text-center bg-white" style={{ border: "1px solid #e2e8f0", borderRadius: 10 }}>
+                        <img src={miFirma} alt="Tu firma" style={{ maxWidth: "100%", maxHeight: 80 }} />
+                      </div>
+                      <div className="small mb-2">
+                        Al firmar confirmas que {recibo.tipo === "desembolso" ? "recibiste" : "entregaste"}{" "}
+                        <strong>{fmt(recibo.monto)}</strong> según este documento ({recibo.numero}). La firma queda
+                        guardada en el documento y no se puede quitar.
+                      </div>
+                      <div className="d-flex flex-wrap gap-2">
+                        <button
+                          className="btn btn-sm fw-bold"
+                          style={{ background: "#16a34a", color: "#fff" }}
+                          disabled={firmandoAhora}
+                          onClick={firmar}
+                        >
+                          <FaSignature className="me-1" /> {firmandoAhora ? "Firmando..." : "Firmar con mi firma"}
+                        </button>
+                        <button className="btn btn-sm btn-link" onClick={() => setCambiandoFirma(true)}>
+                          Cambiar mi firma
+                        </button>
+                        <button className="btn btn-sm btn-outline-secondary" onClick={() => setFirmando(false)}>
+                          Cancelar
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -404,6 +509,9 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
                     </div>
                   </div>
                   <div className="col-6">
+                    {recibo.firma_socio && (
+                      <img src={recibo.firma_socio} alt="Firma del socio" style={{ height: 52, maxWidth: "100%", objectFit: "contain", marginBottom: -6 }} />
+                    )}
                     <div style={{ borderTop: "1px solid #94a3b8", paddingTop: 4 }}>
                       {recibo.socio?.nombre || "Socio"}
                       <div>{recibo.tipo === "desembolso" ? "Recibí conforme" : "Entregado por"}</div>

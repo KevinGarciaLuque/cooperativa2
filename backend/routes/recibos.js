@@ -2,9 +2,9 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const multer = require("multer");
-const { notificarAdministradores } = require("../utils/notificaciones");
+const { notificarAdministradores, escaparHtml } = require("../utils/notificaciones");
 const { numeroRecibo, emitirFiniquito } = require("../utils/recibos");
-const { firmaDataUrl } = require("../utils/firmas");
+const { firmaDataUrl, leerFirma } = require("../utils/firmas");
 
 const formatear = (r, cooperativa) => {
   let detalle = null;
@@ -28,14 +28,27 @@ const formatear = (r, cooperativa) => {
     socio: r.socio_nombre ? { nombre: r.socio_nombre, dni: r.socio_dni, telefono: r.socio_telefono || null } : null,
     emitido_por: r.emisor_nombre || null,
     comprobante_firmado: r.firmado_en ? { subido_en: r.firmado_en, revisado: !!r.firmado_revisado_en } : null,
+    firma_digital: r.firmado_digital_en ? { firmado_en: r.firmado_digital_en } : null,
     cooperativa,
   };
 };
 
+// Firma del socio guardada en el documento cuando lo firmó desde la app
+const firmaSocioDataUrl = async (idRecibo) => {
+  try {
+    const [[f]] = await pool.query("SELECT mime, contenido FROM firmas_documento WHERE id_recibo = ?", [idRecibo]);
+    return f ? `data:${f.mime};base64,${Buffer.from(f.contenido).toString("base64")}` : null;
+  } catch {
+    return null;
+  }
+};
+
 // Recibo completo (para verlo o generar su PDF): incluye la firma de quien lo emitió
+// y, si ya lo firmó, la del socio
 const reciboCompleto = async (r) => ({
   ...formatear(r, await nombreCooperativa()),
   firma_emisor: await firmaDataUrl(r.emitido_por),
+  firma_socio: r.firmado_digital_en ? await firmaSocioDataUrl(r.id_recibo) : null,
 });
 
 const nombreCooperativa = async () => {
@@ -51,7 +64,8 @@ const SELECT_RECIBO = `
   SELECT r.*, s.nombre_completo AS socio_nombre, s.dni AS socio_dni, s.telefono AS socio_telefono, e.nombre_completo AS emisor_nombre,
          (SELECT MAX(c.subido_en) FROM comprobantes_firmados c WHERE c.id_recibo = r.id_recibo) AS firmado_en,
          (SELECT c.revisado_en FROM comprobantes_firmados c WHERE c.id_recibo = r.id_recibo
-            ORDER BY c.id_comprobante DESC LIMIT 1) AS firmado_revisado_en
+            ORDER BY c.id_comprobante DESC LIMIT 1) AS firmado_revisado_en,
+         (SELECT fd.firmado_en FROM firmas_documento fd WHERE fd.id_recibo = r.id_recibo) AS firmado_digital_en
   FROM recibos r
   LEFT JOIN usuarios s ON r.id_socio = s.id_usuario
   LEFT JOIN usuarios e ON r.emitido_por = e.id_usuario`;
@@ -138,8 +152,8 @@ router.post("/:id/comprobante-firmado", (req, res) => {
       const [rows] = await pool.query("SELECT * FROM recibos WHERE id_recibo = ?", [req.params.id]);
       if (!rows.length) return res.status(404).json({ message: "Recibo no encontrado" });
       const r = rows[0];
-      if (r.tipo !== "desembolso" || r.anulado) {
-        return res.status(400).json({ message: "Solo los comprobantes de desembolso vigentes llevan copia firmada." });
+      if (r.anulado) {
+        return res.status(400).json({ message: "Este recibo está anulado: ya no se firma." });
       }
 
       // Una vez revisado por la cooperativa, el socio ya no puede cambiarlo
@@ -194,8 +208,8 @@ router.post("/:id/comprobante-firmado", (req, res) => {
         const [[socio]] = await pool.query("SELECT nombre_completo FROM usuarios WHERE id_usuario = ?", [r.id_socio]);
         notificarAdministradores(
           "Comprobante firmado recibido",
-          `<p><strong>${socio?.nombre_completo || "Un socio"}</strong> subió el comprobante firmado de su desembolso ` +
-            `<strong>${numeroRecibo(r.id_recibo, r.tipo)}</strong> (préstamo #${r.referencia_id}).</p>`
+          `<p><strong>${socio?.nombre_completo || "Un socio"}</strong> subió firmado su documento ` +
+            `<strong>${numeroRecibo(r.id_recibo, r.tipo)}</strong>.</p>`
         );
       }
 
@@ -205,6 +219,47 @@ router.post("/:id/comprobante-firmado", (req, res) => {
       res.status(500).json({ message: "No se pudo guardar el comprobante." });
     }
   });
+});
+
+// POST /api/recibos/:id/firmar  → el socio firma su documento con la firma digital de su perfil.
+// Se guarda una copia de la firma en ese momento: si después la cambia, el documento no cambia.
+router.post("/:id/firmar", async (req, res) => {
+  try {
+    if (req.usuario.rol !== "Socio") {
+      return res.status(403).json({ message: "Solo el socio firma sus documentos desde la app." });
+    }
+    const [[r]] = await pool.query("SELECT * FROM recibos WHERE id_recibo = ?", [req.params.id]);
+    if (!r || r.id_socio !== req.usuario.id_usuario) return res.status(404).json({ message: "Recibo no encontrado" });
+    if (r.anulado) return res.status(400).json({ message: "Este recibo está anulado: ya no se firma." });
+
+    const firma = await leerFirma(req.usuario.id_usuario);
+    if (!firma) {
+      return res.status(400).json({ message: "Primero dibuja tu firma.", sin_firma: true });
+    }
+    const [ins] = await pool.query(
+      `INSERT IGNORE INTO firmas_documento (id_recibo, id_usuario, mime, contenido, ip) VALUES (?, ?, ?, ?, ?)`,
+      [r.id_recibo, req.usuario.id_usuario, firma.mime, firma.contenido, String(req.ip || "").substring(0, 60) || null]
+    );
+    if (!ins.affectedRows) return res.status(409).json({ message: "Ya firmaste este documento." });
+
+    await pool.query(
+      `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
+      [r.id_socio, "Documento firmado", `Firmó digitalmente ${numeroRecibo(r.id_recibo, r.tipo)}`]
+    );
+    if (r.tipo === "desembolso") {
+      notificarAdministradores(
+        "Comprobante de desembolso firmado",
+        `<p><strong>${escaparHtml(req.usuario.nombre_completo || "Un socio")}</strong> firmó digitalmente su comprobante de desembolso ` +
+          `<strong>${numeroRecibo(r.id_recibo, r.tipo)}</strong> (préstamo #${r.referencia_id}).</p>`
+      );
+    }
+
+    const [rows] = await pool.query(`${SELECT_RECIBO} WHERE r.id_recibo = ?`, [r.id_recibo]);
+    res.status(201).json({ success: true, message: "Documento firmado.", data: await reciboCompleto(rows[0]) });
+  } catch (error) {
+    console.error("ERROR AL FIRMAR DOCUMENTO:", error);
+    res.status(500).json({ message: "No se pudo firmar el documento." });
+  }
 });
 
 // GET /api/recibos/:id/comprobante-firmado  → el archivo más reciente

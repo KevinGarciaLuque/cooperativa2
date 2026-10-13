@@ -58,6 +58,11 @@ const REGLAS_SOCIO = [
   { metodo: "GET", re: /^\/pagos-reportados\/mios$/, libre: true },
   { metodo: "GET", re: /^\/pagos-reportados\/(\d+)\/comprobante$/, sql: "SELECT id_usuario FROM pagos_reportados WHERE id_reporte = ?", id: 1 },
   { metodo: "PUT", re: /^\/usuarios\/(\d+)\/foto$/, propio: 1 },
+  // Su firma digital (la ruta usa siempre al usuario de la sesión) y firmar sus recibos
+  { metodo: "GET", re: /^\/firma\/mia$/, libre: true },
+  { metodo: "PUT", re: /^\/firma\/mia$/, libre: true },
+  { metodo: "DELETE", re: /^\/firma\/mia$/, libre: true },
+  { metodo: "POST", re: /^\/recibos\/(\d+)\/firmar$/, sql: SQL_RECIBO, id: 1 },
   { metodo: "POST", re: /^\/usuarios\/(\d+)\/cambiar-password$/, propio: 1 },
   { metodo: "GET", re: /^\/(cuentas|aportaciones|prestamos|pagos)$/, forzarUsuario: true },
   { metodo: "GET", re: /^\/(cuentas|aportaciones|prestamos)\/usuario\/(\d+)$/, propio: 2 },

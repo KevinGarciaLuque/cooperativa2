@@ -397,6 +397,23 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_10_017_firmas_documento",
+    descripcion: "Firma digital del socio en sus recibos y comprobantes (copia de la firma al momento de firmar)",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS firmas_documento (
+          id_recibo INT PRIMARY KEY,
+          id_usuario INT NOT NULL,
+          mime VARCHAR(40) NOT NULL,
+          contenido MEDIUMBLOB NOT NULL,
+          ip VARCHAR(60) NULL,
+          firmado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_firma_doc_usuario (id_usuario)
+        )
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

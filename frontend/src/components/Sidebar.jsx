@@ -372,7 +372,7 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
         </div>
 
         {/* Navegación */}
-        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", paddingBottom: 60 }}>
+        <div className="sidebar-scroll" style={{ flex: 1, overflowY: "auto", overflowX: "hidden", paddingBottom: 60 }}>
           {!collapsed && <div className="sidebar-section-label">Menú principal</div>}
           <nav>
             <ul className="nav flex-column" style={{ padding: "4px 0" }}>

@@ -30,8 +30,32 @@ const notificarAdministradores = async (asunto, html) => {
   }
 };
 
-// Correo a un socio. Devuelve { enviado, correo, motivo } para que el personal sepa qué pasó.
-const notificarSocio = async (idUsuario, asunto, html, adjuntos, { conEnlace = true } = {}) => {
+// Texto plano a partir del HTML de un correo (para la notificación dentro de la app)
+const textoDeHtml = (html) =>
+  String(html || "")
+    .replace(/<\/p>|<br\s*\/?>/gi, " ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+
+// Notificación dentro de la app (campanita del socio). Mejor esfuerzo: nunca falla la operación.
+const crearNotificacion = async (idUsuario, { titulo, mensaje, tipo = "aviso", idRecibo = null }) => {
+  try {
+    if (!idUsuario || !titulo) return;
+    await pool.query(
+      "INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, id_recibo) VALUES (?, ?, ?, ?, ?)",
+      [idUsuario, String(tipo).substring(0, 30), String(titulo).substring(0, 150), mensaje ? String(mensaje).substring(0, 600) : null, idRecibo || null]
+    );
+  } catch (error) {
+    console.error("No se pudo guardar la notificación:", error.message);
+  }
+};
+
+// Correo a un socio (y su notificación en la app). Devuelve { enviado, correo, motivo }
+// para que el personal sepa qué pasó con el correo.
+const notificarSocio = async (idUsuario, asunto, html, adjuntos, { conEnlace = true, tipo = "aviso", idRecibo = null } = {}) => {
+  await crearNotificacion(idUsuario, { titulo: asunto, mensaje: textoDeHtml(html), tipo, idRecibo });
   try {
     if (!correoConfigurado()) return { enviado: false, motivo: "El envío de correos no está configurado." };
     const [[u]] = await pool.query("SELECT correo FROM usuarios WHERE id_usuario = ?", [idUsuario]);
@@ -52,4 +76,4 @@ const notificarSocio = async (idUsuario, asunto, html, adjuntos, { conEnlace = t
   }
 };
 
-module.exports = { notificarAdministradores, notificarSocio, correoConfigurado, escaparHtml };
+module.exports = { notificarAdministradores, notificarSocio, crearNotificacion, correoConfigurado, escaparHtml };

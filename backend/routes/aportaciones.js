@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require("../db");
 const { registrarCaja } = require("../utils/caja");
 const { crearRecibo } = require("../utils/recibos");
+const { crearNotificacion } = require("../utils/notificaciones");
 
 // ============================================
 // FUNCIONES AUXILIARES
@@ -289,6 +290,13 @@ router.post("/", async (req, res) => {
     );
 
     await connection.commit();
+
+    crearNotificacion(id_usuario, {
+      titulo: "Aportación registrada",
+      mensaje: `Registramos tu aportación de L. ${montoNum.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} en tu cuenta ${cuentaDestino.tipo_cuenta}. Ya puedes ver tu recibo.`,
+      tipo: "aportacion",
+      idRecibo,
+    });
 
     res.status(201).json({
       success: true,

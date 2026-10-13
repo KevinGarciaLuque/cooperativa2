@@ -4,7 +4,7 @@ const pool = require("../db");
 const { registrarCaja } = require("../utils/caja");
 const { crearRecibo } = require("../utils/recibos");
 const { actualizarEstadosMora } = require("../utils/moraScheduler");
-const { notificarSocio, escaparHtml } = require("../utils/notificaciones");
+const { notificarSocio, crearNotificacion, escaparHtml } = require("../utils/notificaciones");
 const { avisarAprobacion } = require("../utils/cartaAprobacion");
 const {
   calcularCuotaMensual,
@@ -451,6 +451,12 @@ router.post("/:id/desembolsar", async (req, res) => {
     );
 
     await connection.commit();
+    crearNotificacion(p.id_usuario, {
+      titulo: `Préstamo #${req.params.id} desembolsado`,
+      mensaje: `Te entregamos L. ${monto.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} de tu préstamo. Puedes ver el comprobante de entrega.`,
+      tipo: "prestamo",
+      idRecibo,
+    });
     res.json({
       success: true,
       message: "Préstamo desembolsado correctamente.",

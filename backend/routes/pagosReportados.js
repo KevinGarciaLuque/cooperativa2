@@ -6,6 +6,7 @@ const router = express.Router();
 const multer = require("multer");
 const pool = require("../db");
 const { notificarAdministradores, notificarSocio, escaparHtml } = require("../utils/notificaciones");
+const { liquidacionAlDia } = require("../utils/calculosPrestamo");
 
 const METODOS = ["Transferencia", "Deposito", "Pago móvil"];
 const MIMES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
@@ -62,7 +63,7 @@ router.post("/", (req, res) => {
       if (f.dias > 90) return res.status(400).json({ message: "La fecha del pago es de hace más de 90 días." });
 
       const [[p]] = await pool.query(
-        "SELECT id_prestamo, id_usuario, estado FROM prestamos WHERE id_prestamo = ?",
+        "SELECT id_prestamo, id_usuario, estado, saldo_restante, tasa_interes, fecha_otorgado FROM prestamos WHERE id_prestamo = ?",
         [idPrestamo]
       );
       if (!p || p.id_usuario !== req.usuario.id_usuario) {
@@ -71,6 +72,21 @@ router.post("/", (req, res) => {
       if (!["activo", "mora"].includes(p.estado)) {
         return res.status(400).json({ message: "Solo se reportan pagos de préstamos vigentes." });
       }
+      // No se reporta más de lo que cuesta cancelar el préstamo hoy
+      const [[ultimo]] = await pool.query("SELECT MAX(fecha_pago) AS f FROM pagos_prestamo WHERE id_prestamo = ?", [idPrestamo]);
+      const { total } = liquidacionAlDia({
+        saldo: p.saldo_restante,
+        tasaAnual: p.tasa_interes,
+        fechaOtorgado: p.fecha_otorgado,
+        fechaUltimoPago: ultimo?.f || null,
+      });
+      if (monto > total + 0.01) {
+        return res.status(400).json({
+          message: `El monto es mayor a lo que debes. Para cancelar tu préstamo hoy pagas ${fmt(total)}.`,
+          total_para_saldar: total,
+        });
+      }
+
       const [pendiente] = await pool.query(
         "SELECT id_reporte FROM pagos_reportados WHERE id_prestamo = ? AND estado = 'pendiente' LIMIT 1",
         [idPrestamo]
@@ -209,7 +225,9 @@ router.post("/:id(\\d+)/rechazar", soloPersonal, async (req, res) => {
       "Tu pago reportado no se pudo registrar",
       `<p>Revisamos el pago de <strong>${fmt(r.monto)}</strong> que reportaste para tu préstamo #${r.id_prestamo} y no lo pudimos registrar.</p>
        <p><strong>Motivo:</strong> ${escaparHtml(motivo)}</p>
-       <p>Si tienes dudas, comunícate con la cooperativa.</p>`
+       <p>Si tienes dudas, comunícate con la cooperativa.</p>`,
+      undefined,
+      { tipo: "pago_rechazado" }
     );
     res.json({ success: true, message: "Pago reportado rechazado." });
   } catch (error) {

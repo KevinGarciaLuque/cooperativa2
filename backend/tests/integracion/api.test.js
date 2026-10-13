@@ -739,6 +739,9 @@ test("pagos reportados por el socio: reportar, confirmar en Pagos y rechazar", a
   assert.equal((await reportar(ids.tSocio, { ...datos, fecha_pago: "2999-01-01" })).s, 400); // fecha futura
   assert.equal((await reportar(ids.tSocio2, datos)).s, 404); // préstamo ajeno
   assert.equal((await reportar(ids.tSuper, datos)).s, 403); // solo el socio reporta
+  const demas = await reportar(ids.tSocio, { ...datos, monto: 999999 }); // más de lo que debe
+  assert.equal(demas.s, 400);
+  assert.ok(demas.b.total_para_saldar > 5000 && demas.b.total_para_saldar < 5200);
   const ok = await reportar(ids.tSocio, datos);
   assert.equal(ok.s, 201);
   const idReporte = ok.b.id_reporte;
@@ -781,6 +784,33 @@ test("pagos reportados por el socio: reportar, confirmar en Pagos y rechazar", a
   const mios = await api("GET", "/pagos-reportados/mios", null, ids.tSocio);
   assert.equal(mios.b.data.find((r) => r.id_reporte === segundo.b.id_reporte).estado, "rechazado");
   assert.equal(mios.b.data.find((r) => r.id_reporte === idReporte).estado, "confirmado");
+
+  // el socio recibe en su campanita el pago confirmado (con su recibo) y el rechazo
+  let avisos;
+  for (let i = 0; i < 20; i++) {
+    avisos = await api("GET", "/notificaciones", null, ids.tSocio);
+    if (avisos.b.data.some((n) => n.tipo === "pago_rechazado")) break;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  assert.equal(avisos.s, 200);
+  const confirmado = avisos.b.data.find((n) => n.titulo === "Tu pago fue confirmado");
+  assert.ok(confirmado);
+  assert.equal(confirmado.id_recibo, pago.b.id_recibo);
+  assert.equal(confirmado.leida, false);
+  assert.ok(avisos.b.data.some((n) => n.tipo === "pago_rechazado" && /No aparece en el banco/.test(n.mensaje)));
+  assert.ok(avisos.b.sin_leer >= 2);
+  const recibo = await api("GET", `/recibos/${confirmado.id_recibo}`, null, ids.tSocio);
+  assert.equal(recibo.s, 200);
+
+  // cada uno solo ve y marca las suyas
+  const ajenas = await api("GET", "/notificaciones", null, ids.tSocio2);
+  assert.ok(!ajenas.b.data.some((n) => n.id_notificacion === confirmado.id_notificacion));
+  await api("POST", "/notificaciones/leer", { id: confirmado.id_notificacion }, ids.tSocio2);
+  const [[sigue]] = await pool.query("SELECT leida FROM notificaciones WHERE id_notificacion = ?", [confirmado.id_notificacion]);
+  assert.equal(sigue.leida, 0);
+  assert.equal((await api("POST", "/notificaciones/leer", { id: confirmado.id_notificacion }, ids.tSocio)).s, 200);
+  assert.equal((await api("POST", "/notificaciones/leer", {}, ids.tSocio)).s, 200);
+  assert.equal((await api("GET", "/notificaciones", null, ids.tSocio)).b.sin_leer, 0);
 });
 
 test("monitoreo: el estado del servicio responde", async () => {

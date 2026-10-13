@@ -193,6 +193,7 @@ app.use("/api/registro", require("./routes/registro"));
 app.use("/api/solicitudes", require("./routes/solicitudes"));
 app.use("/api/firma", require("./routes/firma"));
 app.use("/api/pagos-reportados", require("./routes/pagosReportados"));
+app.use("/api/notificaciones", require("./routes/notificaciones"));
 app.use("/api/socios", ocultarInteresSocio, require("./routes/socios"));
 
 // Ruta de prueba

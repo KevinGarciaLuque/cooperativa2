@@ -11,6 +11,7 @@ const {
   soloFecha,
   esFechaISO,
   calcularInteresMoratorio,
+  liquidacionAlDia,
 } = require("../../utils/calculosPrestamo");
 const { validarPassword } = require("../../utils/passwordPolicy");
 const { hoyISO } = require("../../utils/fechas");
@@ -130,4 +131,24 @@ test("recordatorios de pago: cuándo toca cada uno", () => {
   assert.match(previo.texto, /Hola Ana/);
   assert.match(previo.texto, /L\. 1,000\.00/);
   assert.match(mensajeRecordatorio(fila(-2, 4), "SmartCoop").texto, /4 día\(s\) de atraso/);
+});
+
+test("cancelar antes del plazo: solo se cobra el interés del tiempo usado", () => {
+  const haceDias = (n) => {
+    const d = new Date(`${hoyISO()}T12:00:00`);
+    d.setDate(d.getDate() - n);
+    return d.toISOString().substring(0, 10);
+  };
+  // 5,000 al 120% anual (10% mensual), último pago hace 10 días: se cobra un mes completo
+  const pronto = liquidacionAlDia({ saldo: 5000, tasaAnual: 120, fechaOtorgado: haceDias(40), fechaUltimoPago: haceDias(10) });
+  assert.equal(pronto.dias, 30);
+  cerca(pronto.interes, 500);
+  assert.equal(pronto.mora, 0);
+  cerca(pronto.total, 5500);
+  // a los 45 días: interés por días reales y, pasados los días de gracia, también mora
+  const tarde = liquidacionAlDia({ saldo: 5000, tasaAnual: 120, fechaOtorgado: haceDias(45), fechaUltimoPago: null });
+  assert.equal(tarde.dias, 45);
+  cerca(tarde.interes, 750);
+  assert.ok(tarde.mora > 0);
+  cerca(tarde.total, 5750 + tarde.mora);
 });

@@ -5,6 +5,8 @@ import ReciboModal from "../../components/ReciboModal";
 import { descargarCarta } from "../../utils/cartaAprobacion";
 import FotosIdentidad from "../../components/FotosIdentidad";
 import ReportarPagoSocio from "../../components/ReportarPagoSocio";
+import NotificacionesSocio from "../../components/NotificacionesSocio";
+import RecibosSocio from "../../components/RecibosSocio";
 import { comprimirImagen } from "../../utils/imagen";
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
@@ -32,6 +34,7 @@ import {
   FaCreditCard,
   FaCamera,
   FaUpload,
+  FaReceipt,
 } from "react-icons/fa";
 
 const VERDE = "#a8cd3a";
@@ -78,6 +81,7 @@ export default function SocioPerfil() {
   const [moras, setMoras] = useState({}); // id_prestamo -> { dias, mora, porDia }
   const [entregas, setEntregas] = useState({}); // id_prestamo -> { id_recibo, firmado }
   const [reciboEntrega, setReciboEntrega] = useState(null);
+  const [reciboVer, setReciboVer] = useState(null); // recibo abierto desde la campanita o "Mis recibos"
   const [loading, setLoading]           = useState(true);
   const pendiente = user?.estado === "pendiente";
   const [tab, setTab]                   = useState(pendiente ? "solicitar" : "resumen");
@@ -306,6 +310,7 @@ export default function SocioPerfil() {
         { key: "resumen",      label: "Resumen",            icon: <FaChartLine /> },
         { key: "prestamos",    label: "Préstamos",           icon: <FaHandHoldingUsd /> },
         { key: "pagar",        label: "Reportar pago",       icon: <FaCreditCard /> },
+        { key: "recibos",      label: "Mis recibos",         icon: <FaReceipt /> },
         { key: "solicitar",    label: "Solicitar préstamo",  icon: <FaClipboardList /> },
         { key: "aportaciones", label: "Aportaciones",        icon: <FaPiggyBank /> },
         { key: "identidad",    label: "Mi identidad",        icon: <FaIdCard /> },
@@ -410,14 +415,17 @@ export default function SocioPerfil() {
                   </span>
                 </div>
               </div>
-              <button
-                className="btn d-flex align-items-center gap-2 fw-semibold"
-                style={{ background: "rgba(255,255,255,0.1)", border: "1.5px solid rgba(255,255,255,0.35)",
-                  color: "#fff", borderRadius: "2rem", padding: ".5rem 1.4rem", backdropFilter: "blur(4px)" }}
-                onClick={logout}
-              >
-                <FaSignOutAlt /> Cerrar sesión
-              </button>
+              <div className="d-flex align-items-center gap-2">
+                <NotificacionesSocio headers={headersAuth} onVerRecibo={setReciboVer} />
+                <button
+                  className="btn d-flex align-items-center gap-2 fw-semibold"
+                  style={{ background: "rgba(255,255,255,0.1)", border: "1.5px solid rgba(255,255,255,0.35)",
+                    color: "#fff", borderRadius: "2rem", padding: ".5rem 1.4rem", backdropFilter: "blur(4px)" }}
+                  onClick={logout}
+                >
+                  <FaSignOutAlt /> Cerrar sesión
+                </button>
+              </div>
             </div>
 
             {/* Estadísticas rápidas */}
@@ -549,6 +557,10 @@ export default function SocioPerfil() {
 
           {/* TAB: REPORTAR PAGO */}
           {tab === "pagar" && <ReportarPagoSocio token={token} />}
+
+          {tab === "recibos" && user?.id_usuario && (
+            <RecibosSocio idSocio={user.id_usuario} headers={headersAuth} onVer={setReciboVer} />
+          )}
 
           {/* TAB: SOLICITAR PRÉSTAMO */}
           {tab === "solicitar" && (
@@ -1100,6 +1112,7 @@ export default function SocioPerfil() {
           {finiquitoDe && (
             <ReciboModal finiquitoDe={finiquitoDe} onClose={() => setFiniquitoDe(null)} />
           )}
+          {reciboVer && <ReciboModal idRecibo={reciboVer} onClose={() => setReciboVer(null)} />}
           {reciboEntrega && (
             <ReciboModal
               idRecibo={reciboEntrega}

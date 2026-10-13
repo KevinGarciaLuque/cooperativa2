@@ -378,6 +378,25 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_10_016_notificaciones",
+    descripcion: "Notificaciones dentro de la app para los socios (campanita)",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS notificaciones (
+          id_notificacion INT AUTO_INCREMENT PRIMARY KEY,
+          id_usuario INT NOT NULL,
+          tipo VARCHAR(30) NOT NULL DEFAULT 'aviso',
+          titulo VARCHAR(150) NOT NULL,
+          mensaje VARCHAR(600) NULL,
+          id_recibo INT NULL,
+          leida TINYINT(1) NOT NULL DEFAULT 0,
+          creada_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_notif_usuario (id_usuario, leida)
+        )
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

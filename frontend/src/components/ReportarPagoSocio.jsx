@@ -2,7 +2,7 @@
 // del comprobante. La cooperativa lo revisa y, al confirmarlo, queda registrado con su recibo.
 import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
-import { FaCamera, FaCheckCircle, FaClock, FaTimesCircle, FaUniversity } from "react-icons/fa";
+import { FaCamera, FaCheckCircle, FaClock, FaExclamationTriangle, FaInfoCircle, FaTimesCircle, FaUniversity } from "react-icons/fa";
 import InputMonto from "../ui/InputMonto";
 import { comprimirImagen } from "../utils/imagen";
 import { hoyLocal } from "../utils/fechas";
@@ -33,7 +33,38 @@ export default function ReportarPagoSocio({ token }) {
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
+  const [cuenta, setCuenta] = useState(null); // cuota y total para cancelar del préstamo elegido
   const entrada = useRef(null);
+
+  // Cuota del mes (con mora si la hay) y lo que cuesta cancelar todo hoy
+  useEffect(() => {
+    setCuenta(null);
+    if (!form.id_prestamo) return;
+    let activo = true;
+    axios
+      .get(`${API_URL}/pagos/prestamo/${form.id_prestamo}/proximo-pago`, { headers })
+      .then((r) => {
+        const pp = r.data.proximo_pago;
+        if (!activo || !pp) return;
+        const c = {
+          cuota: parseFloat(pp.cuota_mensual || 0),
+          mora: parseFloat(pp.interes_moratorio || 0),
+          diasMora: pp.dias_mora || 0,
+          aPagar: parseFloat(pp.total_a_pagar || 0),
+          total: parseFloat(pp.total_para_saldar || 0),
+          saldo: parseFloat(pp.saldo_actual || 0),
+          vence: pp.fecha_vencimiento,
+        };
+        // La cuota a pagar nunca supera lo que cuesta cancelar el préstamo
+        c.aPagar = Math.min(c.aPagar, c.total);
+        setCuenta(c);
+        setForm((f) => (f.id_prestamo === String(form.id_prestamo) && !f.monto ? { ...f, monto: c.aPagar.toFixed(2) } : f));
+      })
+      .catch(() => activo && setCuenta(null));
+    return () => {
+      activo = false;
+    };
+  }, [form.id_prestamo, headers]);
 
   const cargar = () => {
     axios
@@ -42,11 +73,7 @@ export default function ReportarPagoSocio({ token }) {
         const vigentes = (r.data.data || []).filter((p) => ["activo", "mora"].includes((p.estado || "").toLowerCase()));
         setPrestamos(vigentes);
         if (vigentes.length === 1) {
-          setForm((f) => ({
-            ...f,
-            id_prestamo: f.id_prestamo || String(vigentes[0].id_prestamo),
-            monto: f.monto || (vigentes[0].cuota_minima ? String(vigentes[0].cuota_minima) : ""),
-          }));
+          setForm((f) => ({ ...f, id_prestamo: f.id_prestamo || String(vigentes[0].id_prestamo) }));
         }
       })
       .catch(() => setPrestamos([]));
@@ -70,10 +97,27 @@ export default function ReportarPagoSocio({ token }) {
 
   const cambiar = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
-  const elegirPrestamo = (id) => {
-    const p = prestamos.find((x) => String(x.id_prestamo) === id);
-    setForm((f) => ({ ...f, id_prestamo: id, monto: p?.cuota_minima ? String(p.cuota_minima) : f.monto }));
-  };
+  const elegirPrestamo = (id) => setForm((f) => ({ ...f, id_prestamo: id, monto: "" }));
+
+  // Qué pasa con el monto escrito: menos de la cuota, abono extra a capital, cancelación o exceso
+  const monto = parseFloat(form.monto) || 0;
+  const excede = !!cuenta && monto > cuenta.total + 0.01;
+  const aviso = (() => {
+    if (!cuenta || !(monto > 0)) return null;
+    if (excede) {
+      return ["danger", <FaExclamationTriangle key="i" />, <>Es más de lo que debes. Para cancelar tu préstamo hoy pagas <strong>{fmt(cuenta.total)}</strong>.</>];
+    }
+    if (monto >= cuenta.total - 0.01) {
+      return ["success", <FaCheckCircle key="i" />, <>Con este pago <strong>cancelas tu préstamo por completo</strong>.</>];
+    }
+    if (monto > cuenta.aPagar + 0.01) {
+      return ["success", <FaInfoCircle key="i" />, <>Pagas tu cuota y <strong>{fmt(monto - cuenta.aPagar)}</strong> extra que se abonan a tu capital: tu saldo baja más y pagarás menos intereses.</>];
+    }
+    if (monto < cuenta.aPagar - 0.01) {
+      return ["warning", <FaExclamationTriangle key="i" />, <>Es menos que tu cuota ({fmt(cuenta.aPagar)}). Se aplica primero a {cuenta.mora > 0 ? "la mora y " : ""}los intereses, y te quedaría saldo pendiente de este mes.</>];
+    }
+    return null;
+  })();
 
   const elegirArchivo = async (e) => {
     const f = e.target.files?.[0];
@@ -85,6 +129,7 @@ export default function ReportarPagoSocio({ token }) {
     e.preventDefault();
     setError("");
     setExito("");
+    if (excede) return setError(`El monto es mayor a lo que debes. Para cancelar tu préstamo hoy pagas ${fmt(cuenta.total)}.`);
     if (!archivo) return setError("Adjunta la foto o el PDF del comprobante.");
     setEnviando(true);
     try {
@@ -143,6 +188,71 @@ export default function ReportarPagoSocio({ token }) {
                     value={form.monto} onChange={(v) => setForm((f) => ({ ...f, monto: v }))}
                   />
                 </div>
+
+                {form.id_prestamo && (
+                  <div className="col-12">
+                    {!cuenta ? (
+                      <div className="spinner-border spinner-border-sm text-success" />
+                    ) : (
+                      <>
+                        <div className="row g-2">
+                          {[
+                            {
+                              titulo: "Cuota de este mes",
+                              valor: cuenta.aPagar,
+                              detalle:
+                                cuenta.mora > 0
+                                  ? `Incluye ${fmt(cuenta.mora)} de mora (${cuenta.diasMora} día${cuenta.diasMora !== 1 ? "s" : ""})`
+                                  : cuenta.vence
+                                  ? `Vence el ${String(cuenta.vence).substring(0, 10)}`
+                                  : "",
+                              boton: "Pagar mi cuota",
+                            },
+                            {
+                              titulo: "Cancelar todo el préstamo hoy",
+                              valor: cuenta.total,
+                              detalle: `Saldo ${fmt(cuenta.saldo)} + intereses al día de hoy`,
+                              boton: "Pagar el total",
+                            },
+                          ].map((op) => {
+                            const elegida = Math.abs(monto - op.valor) < 0.01;
+                            return (
+                              <div className="col-12 col-sm-6" key={op.titulo}>
+                                <button
+                                  type="button"
+                                  className="w-100 h-100 text-start p-3"
+                                  style={{
+                                    borderRadius: 12,
+                                    border: `1.5px solid ${elegida ? "#16a34a" : "#e2e8f0"}`,
+                                    background: elegida ? "#f0fdf4" : "#fff",
+                                  }}
+                                  onClick={() => setForm((f) => ({ ...f, monto: op.valor.toFixed(2) }))}
+                                >
+                                  <div className="small text-muted">{op.titulo}</div>
+                                  <div className="fw-bold fs-5">{fmt(op.valor)}</div>
+                                  {op.detalle && <div className="small text-muted">{op.detalle}</div>}
+                                  <div className="small fw-semibold mt-1" style={{ color: "#16a34a" }}>
+                                    {elegida ? <><FaCheckCircle className="me-1" />Seleccionado</> : op.boton}
+                                  </div>
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {aviso && (
+                          <div className={`alert alert-${aviso[0]} d-flex gap-2 align-items-start py-2 mt-2 mb-0 small`}>
+                            <span className="mt-1">{aviso[1]}</span>
+                            <span>{aviso[2]}</span>
+                          </div>
+                        )}
+                        <div className="form-text">
+                          Si pagas más que tu cuota, lo extra se abona a tu capital. Si cancelas antes del plazo, solo
+                          pagas los intereses del tiempo que usaste el dinero, no los de los meses que faltaban.
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 <div className="col-12">
                   <label className="form-label fw-semibold small">¿Cómo pagaste? *</label>
@@ -223,7 +333,7 @@ export default function ReportarPagoSocio({ token }) {
                     type="submit"
                     className="btn btn-lg fw-bold"
                     style={{ background: "#a8cd3a", color: "#1a2a00", borderRadius: 12 }}
-                    disabled={enviando || enRevision(form.id_prestamo)}
+                    disabled={enviando || excede || enRevision(form.id_prestamo)}
                   >
                     {enviando ? "Enviando..." : "Reportar pago"}
                   </button>

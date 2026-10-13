@@ -1,21 +1,20 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
-const { notificarSocio } = require("../utils/notificaciones");
+const { notificarSocio, crearNotificacion } = require("../utils/notificaciones");
 const jwt = require("jsonwebtoken");
 const { registrarCaja } = require("../utils/caja");
 const { crearRecibo, emitirFiniquito } = require("../utils/recibos");
 const {
-  DIAS_MES,
   calcularCuotaMensual,
   calcularDiasMora,
   calcularInteresMoratorio,
   soloFecha,
   esFechaISO,
   hoyISO,
-  diasEntre,
   calcularInteresPeriodo,
   diasDeInteres,
+  liquidacionAlDia,
 } = require("../utils/calculosPrestamo");
 
 // ============================================
@@ -453,15 +452,27 @@ router.post("/", async (req, res) => {
 
     await connection.commit();
 
+    // Aviso al socio con su recibo: por correo si reportó el pago desde la app, y siempre en su campanita
+    const lps = (n) => `L. ${n.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const tituloAviso = prestamoLiquidado
+      ? `¡Préstamo #${id_prestamo} cancelado!`
+      : reporte
+      ? "Tu pago fue confirmado"
+      : "Pago registrado";
+    const mensajeAviso =
+      `${reporte ? "Confirmamos el pago" : "Registramos tu pago"} de ${lps(montoPagadoNum)} a tu préstamo #${id_prestamo}. ` +
+      (prestamoLiquidado ? "Tu préstamo quedó totalmente pagado. " : `Tu nuevo saldo es ${lps(nuevoSaldo)}. `) +
+      "Ya puedes ver tu recibo.";
     if (reporte) {
       notificarSocio(
         reporte.id_usuario,
-        "Tu pago fue confirmado",
-        `<p>Confirmamos el pago de <strong>L. ${montoPagadoNum.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</strong> ` +
-          `que reportaste para tu préstamo #${id_prestamo}. Tu nuevo saldo es ` +
-          `<strong>L. ${nuevoSaldo.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</strong>.</p>` +
-          `<p>Puedes ver tu recibo en tu cuenta de socio. ¡Gracias por tu pago!</p>`
+        tituloAviso,
+        `<p>${mensajeAviso}</p><p>¡Gracias por tu pago!</p>`,
+        undefined,
+        { tipo: "pago", idRecibo }
       );
+    } else {
+      crearNotificacion(prestamoData.id_usuario, { titulo: tituloAviso, mensaje: mensajeAviso, tipo: "pago", idRecibo });
     }
 
     res.status(201).json({
@@ -574,9 +585,12 @@ router.get("/prestamo/:id_prestamo/proximo-pago", async (req, res) => {
     );
 
     // Monto para saldar hoy: saldo + interés proporcional por días desde el último pago
-    const fechaBaseLiq = soloFecha(ultimoPago.length > 0 ? ultimoPago[0].fecha_pago : prestamoData.fecha_otorgado);
-    const diasLiq = Math.max(DIAS_MES, diasEntre(fechaBaseLiq, hoyISO()));
-    const interesLiq = calcularInteresPeriodo(prestamoData.saldo_restante, prestamoData.tasa_interes, diasLiq);
+    const liq = liquidacionAlDia({
+      saldo: prestamoData.saldo_restante,
+      tasaAnual: prestamoData.tasa_interes,
+      fechaOtorgado: prestamoData.fecha_otorgado,
+      fechaUltimoPago: ultimoPago.length > 0 ? ultimoPago[0].fecha_pago : null,
+    });
 
     const cuotasPagadas = totalPagos[0].total;
     const cuotasFaltantes = parseInt(prestamoData.plazo_meses) - cuotasPagadas;
@@ -594,9 +608,9 @@ router.get("/prestamo/:id_prestamo/proximo-pago", async (req, res) => {
         cuotas_pagadas: cuotasPagadas,
         cuotas_faltantes: cuotasFaltantes,
         en_mora: diasMora > 0,
-        dias_desde_ultimo_pago: diasLiq,
-        interes_para_saldar: interesLiq,
-        total_para_saldar: parseFloat((parseFloat(prestamoData.saldo_restante) + interesLiq + interesMoratorio).toFixed(2)),
+        dias_desde_ultimo_pago: liq.dias,
+        interes_para_saldar: liq.interes,
+        total_para_saldar: parseFloat((parseFloat(prestamoData.saldo_restante) + liq.interes + interesMoratorio).toFixed(2)),
       },
     });
 

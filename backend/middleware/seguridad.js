@@ -50,6 +50,9 @@ const REGLAS_SOCIO = [
   { metodo: "GET", re: /^\/socios\/(\d+)\/identidad(\/(frente|reverso))?$/, propio: 1, pendiente: true },
   { metodo: "POST", re: /^\/socios\/(\d+)\/identidad\/(frente|reverso)$/, propio: 1, pendiente: true },
   { metodo: "GET", re: /^\/socios\/(\d+)\/estado-cuenta$/, propio: 1 },
+  // Sus notificaciones (la ruta filtra siempre por el usuario de la sesión)
+  { metodo: "GET", re: /^\/notificaciones$/, libre: true, pendiente: true },
+  { metodo: "POST", re: /^\/notificaciones\/leer$/, libre: true, pendiente: true },
   // Pagos por transferencia o depósito que reporta el socio (la ruta verifica que el préstamo sea suyo)
   { metodo: "POST", re: /^\/pagos-reportados$/, libre: true },
   { metodo: "GET", re: /^\/pagos-reportados\/mios$/, libre: true },

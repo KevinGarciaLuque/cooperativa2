@@ -37,22 +37,42 @@ export default function FirmaDigital({
     // eslint-disable-next-line
   }, [token]);
 
-  // Prepara el lienzo con la resolución de la pantalla para que el trazo se vea nítido
+  // En el celular la firma se dibuja a pantalla completa: el recuadro es mucho más grande
+  const [completa, setCompleta] = useState(false);
+  const abrirLienzo = () => {
+    setCompleta(window.matchMedia("(max-width: 767.98px)").matches);
+    setDibujando(true);
+  };
+
+  // Prepara el lienzo con la resolución de la pantalla para que el trazo se vea nítido.
+  // Si cambia el tamaño (por ejemplo, al girar el celular) se prepara de nuevo y se borra.
   useEffect(() => {
     if (!dibujando) return;
-    const c = lienzo.current;
-    const escala = window.devicePixelRatio || 1;
-    const { width } = c.getBoundingClientRect();
-    c.width = width * escala;
-    c.height = (width / 3) * escala;
-    const ctx = c.getContext("2d");
-    ctx.scale(escala, escala);
-    ctx.lineWidth = 2.6;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = "#0f172a";
-    setHayTrazo(false);
-  }, [dibujando]);
+    const preparar = () => {
+      const c = lienzo.current;
+      if (!c) return;
+      const escala = window.devicePixelRatio || 1;
+      const { width, height } = c.getBoundingClientRect();
+      c.width = width * escala;
+      c.height = height * escala;
+      const ctx = c.getContext("2d");
+      ctx.scale(escala, escala);
+      ctx.lineWidth = completa ? 3.2 : 2.6;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "#0f172a";
+      setHayTrazo(false);
+    };
+    preparar();
+    window.addEventListener("resize", preparar);
+    // Con el lienzo a pantalla completa, la página de atrás no se desplaza
+    const desborde = document.body.style.overflow;
+    if (completa) document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("resize", preparar);
+      document.body.style.overflow = desborde;
+    };
+  }, [dibujando, completa]);
 
   const punto = (e) => {
     const r = lienzo.current.getBoundingClientRect();
@@ -186,7 +206,7 @@ export default function FirmaDigital({
             <div className="alert alert-warning py-2 small">Aún no has guardado tu firma.</div>
           )}
           <div className="d-flex flex-wrap gap-2">
-            <button className="btn fw-semibold" style={{ background: "#a8cd3a", color: "#1a2a00" }} onClick={() => setDibujando(true)}>
+            <button className="btn fw-semibold" style={{ background: "#a8cd3a", color: "#1a2a00" }} onClick={abrirLienzo}>
               <FaSignature className="me-1" /> {guardada ? "Cambiar firma" : "Dibujar mi firma"}
             </button>
             {guardada && (
@@ -199,13 +219,29 @@ export default function FirmaDigital({
       )}
 
       {dibujando && (
-        <>
-          <div style={{ position: "relative" }}>
+        <div
+          style={
+            completa
+              ? { position: "fixed", inset: 0, zIndex: 8000, background: "#f8fafc", display: "flex", flexDirection: "column", padding: 16 }
+              : undefined
+          }
+        >
+          {completa && (
+            <div className="mb-2">
+              <div className="fw-bold">
+                <FaSignature className="me-2" />
+                Dibuja tu firma
+              </div>
+              <div className="small text-muted">Usa todo el recuadro. Si giras el celular tendrás aún más espacio.</div>
+            </div>
+          )}
+          <div style={completa ? { position: "relative", flex: 1, minHeight: 0 } : { position: "relative" }}>
             <canvas
               ref={lienzo}
               style={{
+                display: "block",
                 width: "100%",
-                aspectRatio: "3 / 1",
+                height: completa ? "100%" : 220,
                 border: "2px dashed #94a3b8",
                 borderRadius: 12,
                 background: "#fff",
@@ -219,7 +255,7 @@ export default function FirmaDigital({
               onPointerLeave={terminar}
             />
             <div
-              style={{ position: "absolute", left: "8%", right: "8%", bottom: "22%", borderBottom: "1px solid #cbd5e1", pointerEvents: "none" }}
+              style={{ position: "absolute", left: "8%", right: "8%", bottom: completa ? "30%" : "22%", borderBottom: "1px solid #cbd5e1", pointerEvents: "none" }}
             />
             {!hayTrazo && (
               <div className="text-muted small" style={{ position: "absolute", top: 10, left: 14, pointerEvents: "none" }}>
@@ -238,7 +274,7 @@ export default function FirmaDigital({
               Cancelar
             </button>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

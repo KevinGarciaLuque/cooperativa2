@@ -5,6 +5,7 @@ const { aplicarMigraciones } = require("./utils/migraciones");
 const configFinanciera = require("./utils/configFinanciera");
 const { iniciarScheduler } = require("./utils/backupScheduler");
 const { iniciarMoraScheduler } = require("./utils/moraScheduler");
+const { iniciarRecordatoriosScheduler } = require("./utils/recordatorios");
 
 const PORT = process.env.PORT || 5000;
 
@@ -30,6 +31,7 @@ aplicarMigraciones()
     configFinanciera.iniciar();
     iniciarScheduler(); // respaldos automáticos
     iniciarMoraScheduler(); // verificación diaria de mora
+    iniciarRecordatoriosScheduler(); // recordatorios de pago a los socios (8:00)
 
     app.listen(PORT, () => {
       logger.info("servidor_iniciado", { puerto: PORT });

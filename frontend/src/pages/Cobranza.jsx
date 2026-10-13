@@ -3,7 +3,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
-import { FaPhoneAlt, FaClipboardList, FaTimes } from "react-icons/fa";
+import { FaPhoneAlt, FaClipboardList, FaTimes, FaWhatsapp, FaEnvelope } from "react-icons/fa";
 import { DataTable, EmptyState, PageHeader } from "../ui/Componentes";
 
 const AZUL = "#1a2035";
@@ -95,6 +95,39 @@ export default function Cobranza() {
       mostrarAlerta(err.response?.data?.message || "No se pudo registrar la gestión.", "error");
     } finally {
       setGuardando(false);
+    }
+  };
+
+  // Recordatorio por WhatsApp: abre el chat del socio con el mensaje listo y lo anota en Cobranza
+  const recordarWhatsapp = async (f) => {
+    try {
+      const r = await axios.get(`${API_URL}/cobranza/recordatorio/${f.id_prestamo}`, { headers });
+      const { texto, telefono } = r.data.data;
+      const tel = String(telefono || "").replace(/\D/g, "");
+      const numero = tel.length === 8 ? `504${tel}` : tel;
+      window.open(
+        numero ? `https://wa.me/${numero}?text=${encodeURIComponent(texto)}` : `https://wa.me/?text=${encodeURIComponent(texto)}`,
+        "_blank",
+        "noopener"
+      );
+      await axios.post(
+        `${API_URL}/cobranza/gestiones`,
+        { id_prestamo: f.id_prestamo, medio: "mensaje", nota: "Recordatorio de pago enviado por WhatsApp." },
+        { headers }
+      );
+      cargar();
+    } catch (err) {
+      mostrarAlerta(err.response?.data?.message || "No se pudo preparar el recordatorio.", "error");
+    }
+  };
+
+  const recordarCorreo = async (f) => {
+    try {
+      const r = await axios.post(`${API_URL}/cobranza/recordatorio/${f.id_prestamo}`, {}, { headers });
+      mostrarAlerta(r.data.message, "success");
+      cargar();
+    } catch (err) {
+      mostrarAlerta(err.response?.data?.message || "No se pudo enviar el recordatorio.", "error");
     }
   };
 
@@ -241,6 +274,22 @@ export default function Cobranza() {
               titulo: "",
               render: (f) => (
                 <span className="text-nowrap">
+                  <button
+                    className="btn btn-sm me-1"
+                    style={{ background: "#25D366", color: "#fff" }}
+                    title="Enviar recordatorio de pago por WhatsApp"
+                    onClick={() => recordarWhatsapp(f)}
+                  >
+                    <FaWhatsapp />
+                  </button>
+                  <button
+                    className="btn btn-sm btn-outline-secondary me-1"
+                    title={f.correo ? `Enviar recordatorio de pago a ${f.correo}` : "El socio no tiene correo"}
+                    disabled={!f.correo}
+                    onClick={() => recordarCorreo(f)}
+                  >
+                    <FaEnvelope />
+                  </button>
                   <button className="btn btn-sm btn-outline-dark me-1" onClick={() => abrirGestion(f)}>
                     Gestión
                   </button>

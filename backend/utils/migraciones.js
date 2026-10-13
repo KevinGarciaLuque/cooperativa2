@@ -330,6 +330,22 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_10_014_recordatorios_pago",
+    descripcion: "Recordatorios de pago enviados a los socios (evita repetirlos)",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS recordatorios_pago (
+          clave VARCHAR(120) PRIMARY KEY,
+          id_prestamo INT NOT NULL,
+          tipo VARCHAR(20) NOT NULL,
+          medio VARCHAR(20) NOT NULL DEFAULT 'correo',
+          enviado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_recordatorio_prestamo (id_prestamo)
+        )
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

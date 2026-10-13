@@ -132,6 +132,16 @@ router.put("/financiera", verificarToken, soloSuperAdmin, async (req, res) => {
       }
       guardar.push([`fin_${k}`, String(v)]);
     }
+    // Recordatorios de pago
+    const clavesRec = { rec_activo: [0, 1], rec_dias_antes: [0, 15], rec_mora_cada: [0, 30] };
+    for (const [k, [min, max]] of Object.entries(clavesRec)) {
+      if (req.body[k] === undefined || req.body[k] === "") continue;
+      const v = parseInt(req.body[k]);
+      if (isNaN(v) || v < min || v > max) {
+        return res.status(400).json({ message: `El valor de ${k} debe estar entre ${min} y ${max}.` });
+      }
+      guardar.push([`fin_${k}`, String(v)]);
+    }
     const clavesProv = ["prov_al_dia", "prov_1_30", "prov_31_60", "prov_61_90", "prov_90_mas"];
     for (const k of clavesProv) {
       if (req.body[k] === undefined || req.body[k] === "") continue;

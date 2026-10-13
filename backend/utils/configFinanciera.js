@@ -15,6 +15,10 @@ const DEFAULTS = {
   sol_monto_max: 200000,
   sol_plazo_max: 60,
   sol_pct_ingreso_max: 40, // % del ingreso que no conviene superar con la cuota
+  // Recordatorios de pago por correo al socio
+  rec_activo: 1, // 1 = se envían solos cada mañana
+  rec_dias_antes: 3, // días antes del vencimiento para el aviso previo
+  rec_mora_cada: 7, // en mora, repetir cada N días (0 = solo el primer aviso)
 };
 
 let cache = { ...DEFAULTS };

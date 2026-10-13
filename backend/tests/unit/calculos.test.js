@@ -105,3 +105,29 @@ test("nombres con mayúscula inicial", () => {
   assert.equal(formatearNombre("ana-lucía o'neil"), "Ana-Lucía O'Neil");
   assert.equal(formatearNombre(""), "");
 });
+
+test("recordatorios de pago: cuándo toca cada uno", () => {
+  const { recordatorioDelDia, mensajeRecordatorio } = require("../../utils/recordatorios");
+  const c = { rec_dias_antes: 3, rec_mora_cada: 7 };
+  const fila = (dias_para_vencer, dias_mora) => ({
+    id_prestamo: 5, socio: "Ana López", cuota: 1000, mora_generada: dias_mora ? 20 : 0,
+    vencimiento: "2026-11-12", dias_para_vencer, dias_mora,
+  });
+
+  assert.equal(recordatorioDelDia(fila(10, 0), c), null); // falta mucho
+  assert.equal(recordatorioDelDia(fila(3, 0), c).tipo, "previo");
+  assert.equal(recordatorioDelDia(fila(1, 0), c).clave, recordatorioDelDia(fila(3, 0), c).clave); // uno solo por vencimiento
+  assert.equal(recordatorioDelDia(fila(0, 0), c), null); // vence hoy, aún sin mora
+
+  // en mora: el primer día y luego una vez por semana
+  const d1 = recordatorioDelDia(fila(-1, 1), c).clave;
+  assert.equal(recordatorioDelDia(fila(-5, 7), c).clave, d1);
+  assert.notEqual(recordatorioDelDia(fila(-6, 8), c).clave, d1);
+  assert.equal(recordatorioDelDia(fila(-6, 8), { ...c, rec_mora_cada: 0 }).clave, d1); // 0 = solo una vez
+  assert.equal(recordatorioDelDia(fila(3, 0), { ...c, rec_dias_antes: 0 }), null); // aviso previo apagado
+
+  const previo = mensajeRecordatorio(fila(3, 0), "SmartCoop");
+  assert.match(previo.texto, /Hola Ana/);
+  assert.match(previo.texto, /L\. 1,000\.00/);
+  assert.match(mensajeRecordatorio(fila(-2, 4), "SmartCoop").texto, /4 día\(s\) de atraso/);
+});

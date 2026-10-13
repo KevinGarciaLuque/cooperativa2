@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import { useAlerta } from "../../context/AlertaContext";
-import { FaSlidersH } from "react-icons/fa";
+import { FaBell, FaSlidersH } from "react-icons/fa";
 
 const ACCENT = "#a8cd3a";
 const AZUL = "#1a2035";
@@ -17,6 +17,8 @@ export default function ParametrosFinancieros() {
   const [gracia, setGracia] = useState("");
   const [prov, setProv] = useState({ prov_al_dia: "", prov_1_30: "", prov_31_60: "", prov_61_90: "", prov_90_mas: "" });
   const [sol, setSol] = useState({ sol_tasa_mensual: "", sol_monto_max: "", sol_plazo_max: "", sol_pct_ingreso_max: "" });
+  const [rec, setRec] = useState({ rec_activo: true, rec_dias_antes: "3", rec_mora_cada: "7" });
+  const [enviando, setEnviando] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
 
@@ -31,6 +33,11 @@ export default function ParametrosFinancieros() {
           sol_monto_max: String(res.data.data.sol_monto_max),
           sol_plazo_max: String(res.data.data.sol_plazo_max),
           sol_pct_ingreso_max: String(res.data.data.sol_pct_ingreso_max),
+        });
+        setRec({
+          rec_activo: parseInt(res.data.data.rec_activo) === 1,
+          rec_dias_antes: String(res.data.data.rec_dias_antes ?? 3),
+          rec_mora_cada: String(res.data.data.rec_mora_cada ?? 7),
         });
         setProv({
           prov_al_dia: String(res.data.data.prov_al_dia),
@@ -51,7 +58,15 @@ export default function ParametrosFinancieros() {
     try {
       await axios.put(
         `${API_URL}/configuracion/financiera`,
-        { mora_tasa_anual: parseFloat(tasa), mora_dias_gracia: parseInt(gracia), ...prov, ...sol },
+        {
+          mora_tasa_anual: parseFloat(tasa),
+          mora_dias_gracia: parseInt(gracia),
+          ...prov,
+          ...sol,
+          rec_activo: rec.rec_activo ? 1 : 0,
+          rec_dias_antes: rec.rec_dias_antes,
+          rec_mora_cada: rec.rec_mora_cada,
+        },
         { headers }
       );
       mostrarAlerta("Parámetros financieros guardados.", "success");
@@ -59,6 +74,20 @@ export default function ParametrosFinancieros() {
       mostrarAlerta(err.response?.data?.message || "No se pudieron guardar los parámetros.", "error");
     } finally {
       setGuardando(false);
+    }
+  };
+
+  // Envía ya los recordatorios que tocan hoy (no repite los que ya salieron)
+  const enviarAhora = async () => {
+    if (!window.confirm("¿Enviar ahora los recordatorios de pago que tocan hoy? Los que ya se enviaron no se repiten.")) return;
+    setEnviando(true);
+    try {
+      const r = await axios.post(`${API_URL}/cobranza/recordatorios/ejecutar`, {}, { headers });
+      mostrarAlerta(r.data.message, "success");
+    } catch (err) {
+      mostrarAlerta(err.response?.data?.message || "No se pudieron enviar los recordatorios.", "error");
+    } finally {
+      setEnviando(false);
     }
   };
 
@@ -133,6 +162,53 @@ export default function ParametrosFinancieros() {
             </div>
           ))}
         </div>
+
+        <h5 className="fw-bold mt-4 mb-1" style={{ color: AZUL }}>
+          <FaBell className="me-2" />
+          Recordatorios de pago
+        </h5>
+        <p className="text-muted small">
+          Cada mañana a las 8:00 el sistema envía un correo a los socios cuya cuota está por vencer y a los que están en
+          mora. Cada envío queda anotado en Cobranza.
+        </p>
+        <div className="form-check form-switch mb-3">
+          <input
+            id="rec-activo"
+            type="checkbox"
+            className="form-check-input"
+            checked={rec.rec_activo}
+            onChange={(e) => setRec({ ...rec, rec_activo: e.target.checked })}
+            disabled={cargando}
+          />
+          <label htmlFor="rec-activo" className="form-check-label">
+            Envío automático {rec.rec_activo ? "activado" : "desactivado"}
+          </label>
+        </div>
+        <div className="row g-3">
+          <div className="col-12 col-md-6">
+            <label className="form-label fw-semibold small">Avisar antes del vencimiento (días)</label>
+            <input
+              type="number" min="0" max="15" step="1" className="form-control"
+              value={rec.rec_dias_antes}
+              onChange={(e) => setRec({ ...rec, rec_dias_antes: e.target.value })}
+              disabled={cargando}
+            />
+            <div className="form-text">0 = no enviar aviso previo.</div>
+          </div>
+          <div className="col-12 col-md-6">
+            <label className="form-label fw-semibold small">En mora, repetir cada (días)</label>
+            <input
+              type="number" min="0" max="30" step="1" className="form-control"
+              value={rec.rec_mora_cada}
+              onChange={(e) => setRec({ ...rec, rec_mora_cada: e.target.value })}
+              disabled={cargando}
+            />
+            <div className="form-text">0 = solo el primer día de atraso.</div>
+          </div>
+        </div>
+        <button type="button" className="btn btn-outline-dark btn-sm mt-3" disabled={enviando || cargando} onClick={enviarAhora}>
+          <FaBell className="me-1" /> {enviando ? "Enviando..." : "Enviar los recordatorios de hoy ahora"}
+        </button>
 
         <h5 className="fw-bold mt-4 mb-1" style={{ color: AZUL }}>Provisión de cartera</h5>
         <p className="text-muted small">

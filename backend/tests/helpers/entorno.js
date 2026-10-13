@@ -7,6 +7,10 @@ require("dotenv").config({ path: path.join(__dirname, "../../.env") });
 process.env.NODE_ENV = "test";
 process.env.JWT_SECRET = process.env.JWT_SECRET || "secreto-solo-para-pruebas";
 process.env.LOG_LEVEL = "error";
+// Las pruebas nunca envían correos de verdad (vacías, para que el .env no las vuelva a llenar)
+process.env.EMAIL_HOST = "";
+process.env.EMAIL_USER = "";
+process.env.EMAIL_PASS = "";
 
 const base = process.env.TEST_DB_NAME || `${(process.env.DB_NAME || "cooperativa").replace(/_test$/, "")}_test`;
 if (!/_test$/.test(base)) {

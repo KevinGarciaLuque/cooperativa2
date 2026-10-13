@@ -692,6 +692,32 @@ test("firma digital: el personal guarda la suya y sale en sus documentos", async
   assert.equal(sin.b.data.firma_emisor, null);
 });
 
+test("recordatorios de pago: texto para WhatsApp, envío manual y automático", async () => {
+  // un préstamo vigente con 40 días desde que se otorgó (en mora)
+  const [nuevo] = await pool.query(
+    `INSERT INTO prestamos (id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado)
+     VALUES (?, 4000, 24, 6, 4000, 'activo', DATE_SUB(NOW(), INTERVAL 70 DAY))`,
+    [ids.socio2]
+  );
+  const id = nuevo.insertId;
+
+  const txt = await api("GET", `/cobranza/recordatorio/${id}`, null, ids.tSuper);
+  assert.equal(txt.s, 200);
+  assert.equal(txt.b.data.tipo, "mora");
+  assert.match(txt.b.data.texto, /atraso/);
+  assert.equal((await api("GET", `/cobranza/recordatorio/${id}`, null, ids.tSocio)).s, 403);
+
+  // sin servidor de correo lo dice claramente
+  const manual = await api("POST", `/cobranza/recordatorio/${id}`, {}, ids.tSuper);
+  assert.equal(manual.s, 400);
+  assert.match(manual.b.message, /correo/i);
+
+  assert.equal((await api("POST", "/cobranza/recordatorios/ejecutar", {}, ids.tAdmin)).s, 403);
+  assert.equal((await api("POST", "/cobranza/recordatorios/ejecutar", {}, ids.tSuper)).s, 400);
+
+  await pool.query("DELETE FROM prestamos WHERE id_prestamo = ?", [id]);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

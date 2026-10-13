@@ -451,7 +451,7 @@ export default function Ventanilla() {
               <FaIdCard className="me-2" />
               Identidad del socio
             </h6>
-            <FotosIdentidad key={socio.id_usuario} idSocio={socio.id_usuario} headers={headers} />
+            <FotosIdentidad key={socio.id_usuario} idSocio={socio.id_usuario} headers={headers} plegable />
           </div>
 
           {/* Aval y referencias de sus solicitudes */}

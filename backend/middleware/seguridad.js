@@ -32,6 +32,7 @@ const MODULO_POR_PREFIJO = {
   solicitudes: "prestamos",
   contabilidad: "contabilidad",
   recibos: "pagos",
+  "pagos-reportados": "pagos",
   socios: "usuarios",
 };
 
@@ -49,6 +50,10 @@ const REGLAS_SOCIO = [
   { metodo: "GET", re: /^\/socios\/(\d+)\/identidad(\/(frente|reverso))?$/, propio: 1, pendiente: true },
   { metodo: "POST", re: /^\/socios\/(\d+)\/identidad\/(frente|reverso)$/, propio: 1, pendiente: true },
   { metodo: "GET", re: /^\/socios\/(\d+)\/estado-cuenta$/, propio: 1 },
+  // Pagos por transferencia o depósito que reporta el socio (la ruta verifica que el préstamo sea suyo)
+  { metodo: "POST", re: /^\/pagos-reportados$/, libre: true },
+  { metodo: "GET", re: /^\/pagos-reportados\/mios$/, libre: true },
+  { metodo: "GET", re: /^\/pagos-reportados\/(\d+)\/comprobante$/, sql: "SELECT id_usuario FROM pagos_reportados WHERE id_reporte = ?", id: 1 },
   { metodo: "PUT", re: /^\/usuarios\/(\d+)\/foto$/, propio: 1 },
   { metodo: "POST", re: /^\/usuarios\/(\d+)\/cambiar-password$/, propio: 1 },
   { metodo: "GET", re: /^\/(cuentas|aportaciones|prestamos|pagos)$/, forzarUsuario: true },

@@ -121,12 +121,14 @@ router.get("/resumen", soloPersonal, async (req, res) => {
       `SELECT COUNT(DISTINCT id_recibo) AS n FROM comprobantes_firmados
        WHERE subido_por_rol = 'Socio' AND revisado_en IS NULL`
     );
+    const [[pr]] = await pool.query(`SELECT COUNT(*) AS n FROM pagos_reportados WHERE estado = 'pendiente'`);
     res.json({
       success: true,
       socios_pendientes: s.n,
       prestamos_pendientes: p.n,
       comprobantes_por_revisar: c.n,
-      total: s.n + p.n + c.n,
+      pagos_reportados: pr.n,
+      total: s.n + p.n + c.n + pr.n,
     });
   } catch (error) {
     res.status(500).json({ message: "No se pudo obtener el resumen" });

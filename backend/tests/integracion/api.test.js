@@ -718,6 +718,71 @@ test("recordatorios de pago: texto para WhatsApp, envío manual y automático", 
   await pool.query("DELETE FROM prestamos WHERE id_prestamo = ?", [id]);
 });
 
+test("pagos reportados por el socio: reportar, confirmar en Pagos y rechazar", async () => {
+  const [pr] = await pool.query(
+    `INSERT INTO prestamos (id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado)
+     VALUES (?, 5000, 24, 6, 5000, 'activo', DATE_SUB(NOW(), INTERVAL 10 DAY))`,
+    [ids.socio]
+  );
+  const idPrestamo = pr.insertId;
+  const hoy = new Date().toISOString().substring(0, 10);
+  const reportar = async (token, datos, conArchivo = true) => {
+    const f = new FormData();
+    Object.entries(datos).forEach(([k, v]) => f.append(k, String(v)));
+    if (conArchivo) f.append("comprobante", new Blob([PNG], { type: "image/png" }), "comprobante.png");
+    const r = await fetch(`${base}/api/pagos-reportados`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: f });
+    return { s: r.status, b: await r.json().catch(() => null) };
+  };
+  const datos = { id_prestamo: idPrestamo, monto: 900, metodo: "Transferencia", banco: "Banco Atlántida", referencia: "TRX-123", fecha_pago: hoy };
+
+  assert.equal((await reportar(ids.tSocio, datos, false)).s, 400); // sin comprobante
+  assert.equal((await reportar(ids.tSocio, { ...datos, fecha_pago: "2999-01-01" })).s, 400); // fecha futura
+  assert.equal((await reportar(ids.tSocio2, datos)).s, 404); // préstamo ajeno
+  assert.equal((await reportar(ids.tSuper, datos)).s, 403); // solo el socio reporta
+  const ok = await reportar(ids.tSocio, datos);
+  assert.equal(ok.s, 201);
+  const idReporte = ok.b.id_reporte;
+  assert.equal((await reportar(ids.tSocio, datos)).s, 409); // uno en revisión por préstamo
+
+  // el comprobante solo lo ven el dueño y el personal
+  const ver = async (token) =>
+    (await fetch(`${base}/api/pagos-reportados/${idReporte}/comprobante`, { headers: { Authorization: `Bearer ${token}` } })).status;
+  assert.equal(await ver(ids.tSocio), 200);
+  assert.equal(await ver(ids.tSuper), 200);
+  assert.equal(await ver(ids.tSocio2), 403);
+
+  const resumen = await api("GET", "/solicitudes/resumen", null, ids.tSuper);
+  assert.ok(resumen.b.pagos_reportados >= 1);
+  const lista = await api("GET", "/pagos-reportados?estado=pendiente", null, ids.tSuper);
+  assert.ok(lista.b.data.some((r) => r.id_reporte === idReporte));
+  assert.equal((await api("GET", "/pagos-reportados?estado=pendiente", null, ids.tSocio)).s, 403);
+
+  // al registrar el pago en Pagos se confirma el reporte
+  const otro = await api("POST", "/pagos", { id_prestamo: ids.prestamoNuevo, monto_pagado: 900, id_reporte: idReporte }, ids.tSuper);
+  assert.equal(otro.s, 400); // reporte de otro préstamo
+  const pago = await api(
+    "POST", "/pagos",
+    { id_prestamo: idPrestamo, monto_pagado: 900, metodo_pago: "Transferencia", fecha_pago: hoy, id_reporte: idReporte },
+    ids.tSuper
+  );
+  assert.equal(pago.s, 201);
+  const [[conf]] = await pool.query("SELECT estado, id_pago FROM pagos_reportados WHERE id_reporte = ?", [idReporte]);
+  assert.equal(conf.estado, "confirmado");
+  assert.equal(conf.id_pago, pago.b.id_pago);
+
+  // rechazar otro reporte
+  const segundo = await reportar(ids.tSocio, { ...datos, referencia: "TRX-999" });
+  assert.equal(segundo.s, 201);
+  assert.equal((await api("POST", `/pagos-reportados/${segundo.b.id_reporte}/rechazar`, {}, ids.tSuper)).s, 400);
+  assert.equal(
+    (await api("POST", `/pagos-reportados/${segundo.b.id_reporte}/rechazar`, { motivo: "No aparece en el banco" }, ids.tSuper)).s,
+    200
+  );
+  const mios = await api("GET", "/pagos-reportados/mios", null, ids.tSocio);
+  assert.equal(mios.b.data.find((r) => r.id_reporte === segundo.b.id_reporte).estado, "rechazado");
+  assert.equal(mios.b.data.find((r) => r.id_reporte === idReporte).estado, "confirmado");
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

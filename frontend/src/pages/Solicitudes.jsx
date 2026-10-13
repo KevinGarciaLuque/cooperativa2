@@ -10,6 +10,7 @@ import DesembolsoModal from "../components/DesembolsoModal";
 import ReciboModal from "../components/ReciboModal";
 import FotosIdentidad from "../components/FotosIdentidad";
 import AvalReferencias from "../components/AvalReferencias";
+import { verComprobanteReportado } from "../utils/pagosReportados";
 import { useConfigSitio } from "../hooks/useConfigSitio";
 import { OCUPACIONES, PROPOSITOS, fmt } from "../utils/solicitud";
 import { compartirCarta, descargarCarta } from "../utils/cartaAprobacion";
@@ -38,16 +39,19 @@ export default function Solicitudes() {
   const [recibidos, setRecibidos] = useState([]);
   const [enviandoCarta, setEnviandoCarta] = useState(null);
   const [verIdentidad, setVerIdentidad] = useState(null); // { id_usuario, nombre_completo }
+  const [pagosRep, setPagosRep] = useState([]); // pagos que reportaron los socios
 
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      const [s, e, f, rc] = await Promise.all([
+      const [s, e, f, rc, prp] = await Promise.all([
         axios.get(`${API_URL}/solicitudes`, { headers }),
         axios.get(`${API_URL}/solicitudes/enlace`, { headers }),
         axios.get(`${API_URL}/solicitudes/desembolsos-sin-firma`, { headers }).catch(() => ({ data: { data: [] } })),
         axios.get(`${API_URL}/solicitudes/comprobantes-recibidos`, { headers }).catch(() => ({ data: { data: [] } })),
+        axios.get(`${API_URL}/pagos-reportados`, { headers, params: { estado: "pendiente" } }).catch(() => ({ data: { data: [] } })),
       ]);
+      setPagosRep(prp.data.data || []);
       setData(s.data);
       setEnlace(e.data);
       setSinFirma(f.data.data || []);
@@ -192,6 +196,18 @@ export default function Solicitudes() {
     }
   };
 
+  const rechazarPagoReportado = async (r) => {
+    const motivo = window.prompt(`Motivo para no registrar el pago de ${r.nombre_completo} (se le enviará al socio):`);
+    if (motivo === null) return;
+    try {
+      await axios.post(`${API_URL}/pagos-reportados/${r.id_reporte}/rechazar`, { motivo }, { headers });
+      mostrarAlerta("Pago reportado rechazado.", "success");
+      cargar();
+    } catch (err) {
+      mostrarAlerta(err.response?.data?.message || "No se pudo rechazar.", "error");
+    }
+  };
+
   const confirmarDesembolso = async ({ metodo, referencia }) => {
     setDesembolsando(true);
     try {
@@ -227,6 +243,7 @@ export default function Solicitudes() {
         {[
           ["prestamos", `Solicitudes de préstamo${nPrestamos ? ` (${nPrestamos})` : ""}`],
           ["socios", `Nuevos socios${nSocios ? ` (${nSocios})` : ""}`],
+          ["pagos", `Pagos reportados${pagosRep.length ? ` (${pagosRep.length})` : ""}`],
           ["firmas", `Comprobantes firmados${recibidos.length ? ` (${recibidos.length} nuevos)` : ""}`],
           ["enlace", "Enlace de registro"],
         ].map(([k, t]) => (
@@ -461,6 +478,81 @@ export default function Solicitudes() {
       )}
 
       {/* ── Comprobantes de entrega sin firma ── */}
+      {/* ── Pagos reportados por los socios ── */}
+      {tab === "pagos" && (
+        <div className="ui-card">
+          {pagosRep.length === 0 ? (
+            <EmptyState titulo="No hay pagos reportados por revisar" />
+          ) : (
+            <div className="table-responsive">
+              <table className="table align-middle mb-0">
+                <thead>
+                  <tr className="small text-muted">
+                    <th>Socio</th>
+                    <th>Préstamo</th>
+                    <th>Pago</th>
+                    <th>Referencia</th>
+                    <th className="text-end">Monto</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagosRep.map((r) => (
+                    <tr key={r.id_reporte}>
+                      <td>
+                        <div className="fw-semibold">{r.nombre_completo}</div>
+                        <div className="small text-muted">{r.telefono || r.dni}</div>
+                      </td>
+                      <td>
+                        #{r.id_prestamo}
+                        <div className="small text-muted">Saldo {fmt(r.saldo_restante)}</div>
+                      </td>
+                      <td className="small">
+                        {r.metodo} · {String(r.fecha_pago).substring(0, 10)}
+                        {r.banco && <div className="text-muted">{r.banco}</div>}
+                      </td>
+                      <td className="small">
+                        {r.referencia || "—"}
+                        {r.nota && <div className="text-muted">{r.nota}</div>}
+                      </td>
+                      <td className="text-end fw-bold">{fmt(r.monto)}</td>
+                      <td className="text-end text-nowrap">
+                        <button
+                          className="btn btn-sm btn-outline-dark me-1"
+                          onClick={() =>
+                            verComprobanteReportado(r.id_reporte, token).catch(() =>
+                              mostrarAlerta("No se pudo abrir el comprobante.", "error")
+                            )
+                          }
+                        >
+                          Comprobante
+                        </button>
+                        <button
+                          className="btn btn-sm fw-semibold me-1"
+                          style={{ background: ACCENT, color: "#1a2a00" }}
+                          onClick={() =>
+                            navigate(`/pagos?accion=nuevo&socio=${r.id_usuario}&prestamo=${r.id_prestamo}&reporte=${r.id_reporte}`)
+                          }
+                        >
+                          Confirmar y registrar
+                        </button>
+                        <button className="btn btn-sm btn-outline-danger" onClick={() => rechazarPagoReportado(r)}>
+                          Rechazar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="small text-muted p-3">
+            Revisa que el dinero esté en la cuenta de la cooperativa. "Confirmar y registrar" abre Pagos con los datos del
+            socio; al guardar, el pago queda registrado con su recibo y el socio recibe un aviso.
+          </div>
+        </div>
+      )}
+
       {tab === "firmas" && recibidos.length > 0 && (
         <div className="ui-card p-3 mb-3" style={{ border: "1.5px solid #a7f3d0" }}>
           <div className="fw-bold mb-2" style={{ color: "#065f46" }}>

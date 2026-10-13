@@ -19,6 +19,8 @@ export default function ModalPago({
   onSubmit,
   handleInput,
   tipoInicial = "",
+  reporte = null, // pago reportado por el socio: el monto queda fijo
+  onVerComprobante,
 }) {
   // ── Hooks SIEMPRE antes del early return (regla de React) ────────────
   const [fechaReferencia, setFechaReferencia] = useState("");
@@ -110,7 +112,7 @@ export default function ModalPago({
 
   // Auto-relleno de monto: Cuota Fija (se dispara al cambiar tipo o préstamo)
   useEffect(() => {
-    if (editPago || !prestamoSeleccionado || tipoPago !== "cuota_fija") return;
+    if (editPago || reporte || !prestamoSeleccionado || tipoPago !== "cuota_fija") return;
     const valor = parseFloat(((prestamoSeleccionado.cuota_mensual || 0) + moraAplicable).toFixed(2));
     const raw = String(valor);
     const parts = raw.split(".");
@@ -122,7 +124,7 @@ export default function ModalPago({
 
   // Auto-relleno y recálculo: Desglose Total (se actualiza al cambiar período o fecha)
   useEffect(() => {
-    if (editPago || !prestamoSeleccionado || tipoPago !== "desglose") return;
+    if (editPago || reporte || !prestamoSeleccionado || tipoPago !== "desglose") return;
     const ref = fechaReferencia ? new Date(fechaReferencia + "T00:00:00") : null;
     const fechaPagoDate = form.fecha ? new Date(form.fecha + "T00:00:00") : null;
     const dias = (ref && fechaPagoDate)
@@ -230,6 +232,23 @@ export default function ModalPago({
 
           {/* ── Body: 2 columnas ── */}
           <div className="modal-body p-0" style={{ background: "#f8fafc" }}>
+            {reporte && (
+              <div className="m-3 mb-0 p-3 small" style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 12 }}>
+                <div className="fw-bold mb-1" style={{ color: "#065f46" }}>Pago reportado por el socio</div>
+                L. {fmt(reporte.monto)} por {String(reporte.metodo).toLowerCase()}
+                {reporte.banco ? ` · ${reporte.banco}` : ""}
+                {reporte.referencia ? ` · Ref. ${reporte.referencia}` : ""} · {String(reporte.fecha_pago).substring(0, 10)}
+                {onVerComprobante && (
+                  <button type="button" className="btn btn-link btn-sm p-0 ms-2 align-baseline" onClick={onVerComprobante}>
+                    Ver comprobante
+                  </button>
+                )}
+                <div className="text-muted mt-1">
+                  Revisa que el depósito esté en la cuenta. Al registrar el pago, el reporte queda confirmado y el socio
+                  recibe su recibo.
+                </div>
+              </div>
+            )}
             <div className="row g-0">
 
               {/* Columna izquierda — formulario */}

@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { notificarSocio } = require("../utils/notificaciones");
 const jwt = require("jsonwebtoken");
 const { registrarCaja } = require("../utils/caja");
 const { crearRecibo, emitirFiniquito } = require("../utils/recibos");
@@ -177,7 +178,23 @@ router.post("/", async (req, res) => {
 
   try {
     await connection.beginTransaction();
-    const { id_prestamo, monto_pagado, metodo_pago, condonar_mora, tipo_pago, fecha_pago, fecha_referencia } = req.body;
+    const { id_prestamo, monto_pagado, metodo_pago, condonar_mora, tipo_pago, fecha_pago, fecha_referencia, id_reporte } = req.body;
+
+    // Pago reportado por el socio desde su panel: se confirma junto con este registro
+    let reporte = null;
+    if (id_reporte) {
+      const [[r]] = await connection.query(
+        "SELECT id_reporte, id_prestamo, id_usuario, estado FROM pagos_reportados WHERE id_reporte = ? FOR UPDATE",
+        [id_reporte]
+      );
+      if (!r || r.id_prestamo !== parseInt(id_prestamo)) {
+        return fail(400, { message: "El pago reportado no corresponde a este préstamo." });
+      }
+      if (r.estado !== "pendiente") {
+        return fail(400, { message: "Ese pago reportado ya fue revisado." });
+      }
+      reporte = r;
+    }
 
     // Validaciones
     if (!id_prestamo || !monto_pagado) {
@@ -426,7 +443,26 @@ router.post("/", async (req, res) => {
       [prestamoData.id_usuario, "Registro de pago de préstamo", detalleBitacora]
     );
 
+    if (reporte) {
+      await connection.query(
+        `UPDATE pagos_reportados SET estado = 'confirmado', id_pago = ?, revisado_por = ?, revisado_en = NOW()
+         WHERE id_reporte = ?`,
+        [nuevoPagoId, req.usuario?.id_usuario || null, reporte.id_reporte]
+      );
+    }
+
     await connection.commit();
+
+    if (reporte) {
+      notificarSocio(
+        reporte.id_usuario,
+        "Tu pago fue confirmado",
+        `<p>Confirmamos el pago de <strong>L. ${montoPagadoNum.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</strong> ` +
+          `que reportaste para tu préstamo #${id_prestamo}. Tu nuevo saldo es ` +
+          `<strong>L. ${nuevoSaldo.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</strong>.</p>` +
+          `<p>Puedes ver tu recibo en tu cuenta de socio. ¡Gracias por tu pago!</p>`
+      );
+    }
 
     res.status(201).json({
       success: true,

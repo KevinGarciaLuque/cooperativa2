@@ -4,6 +4,7 @@ import SolicitudPrestamoSocio from "../../components/SolicitudPrestamoSocio";
 import ReciboModal from "../../components/ReciboModal";
 import { descargarCarta } from "../../utils/cartaAprobacion";
 import FotosIdentidad from "../../components/FotosIdentidad";
+import ReportarPagoSocio from "../../components/ReportarPagoSocio";
 import { comprimirImagen } from "../../utils/imagen";
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
@@ -304,6 +305,7 @@ export default function SocioPerfil() {
     : [
         { key: "resumen",      label: "Resumen",            icon: <FaChartLine /> },
         { key: "prestamos",    label: "Préstamos",           icon: <FaHandHoldingUsd /> },
+        { key: "pagar",        label: "Reportar pago",       icon: <FaCreditCard /> },
         { key: "solicitar",    label: "Solicitar préstamo",  icon: <FaClipboardList /> },
         { key: "aportaciones", label: "Aportaciones",        icon: <FaPiggyBank /> },
         { key: "identidad",    label: "Mi identidad",        icon: <FaIdCard /> },
@@ -544,6 +546,9 @@ export default function SocioPerfil() {
               )}
             </div>
           </div>
+
+          {/* TAB: REPORTAR PAGO */}
+          {tab === "pagar" && <ReportarPagoSocio token={token} />}
 
           {/* TAB: SOLICITAR PRÉSTAMO */}
           {tab === "solicitar" && (

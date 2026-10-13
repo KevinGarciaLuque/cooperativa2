@@ -346,6 +346,38 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_10_015_pagos_reportados",
+    descripcion: "Pagos por transferencia o depósito que reporta el socio con su comprobante",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS pagos_reportados (
+          id_reporte INT AUTO_INCREMENT PRIMARY KEY,
+          id_prestamo INT NOT NULL,
+          id_usuario INT NOT NULL,
+          monto DECIMAL(12,2) NOT NULL,
+          metodo VARCHAR(30) NOT NULL,
+          banco VARCHAR(60) NULL,
+          referencia VARCHAR(60) NULL,
+          fecha_pago DATE NOT NULL,
+          nota VARCHAR(300) NULL,
+          nombre_archivo VARCHAR(150) NOT NULL,
+          mime VARCHAR(80) NOT NULL,
+          tamano INT NOT NULL,
+          contenido MEDIUMBLOB NOT NULL,
+          estado ENUM('pendiente','confirmado','rechazado') NOT NULL DEFAULT 'pendiente',
+          motivo_rechazo VARCHAR(255) NULL,
+          id_pago INT NULL,
+          revisado_por INT NULL,
+          revisado_en DATETIME NULL,
+          creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_reporte_estado (estado),
+          INDEX idx_reporte_usuario (id_usuario),
+          INDEX idx_reporte_prestamo (id_prestamo)
+        )
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

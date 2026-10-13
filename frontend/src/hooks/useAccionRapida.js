@@ -19,6 +19,7 @@ export default function useAccionRapida(listo, onAccion) {
       socio: params.get("socio"),
       prestamo: params.get("prestamo"),
       tipo: params.get("tipo"),
+      reporte: params.get("reporte"),
       q: params.get("q") || "",
     });
     setParams({}, { replace: true });

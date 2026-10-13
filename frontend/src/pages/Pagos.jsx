@@ -1,5 +1,6 @@
 import { hoyLocal } from "../utils/fechas";
 import { useEffect, useState } from "react";
+import { verComprobanteReportado } from "../utils/pagosReportados";
 import useAccionRapida from "../hooks/useAccionRapida";
 import ReciboModal from "../components/ReciboModal";
 import axios from "axios";
@@ -28,6 +29,7 @@ export default function Pagos() {
   const [editPago, setEditPago] = useState(null);
   const [reciboNuevo, setReciboNuevo] = useState(null); // id del recibo recién emitido
   const [tipoInicial, setTipoInicial] = useState(""); // tipo de pago sugerido desde la Ventanilla
+  const [reporte, setReporte] = useState(null); // pago reportado por el socio que se está confirmando
   const [form, setForm] = useState({
     id_prestamo: "",
     monto: "",
@@ -102,9 +104,34 @@ export default function Pagos() {
   });
 
   // Acciones rápidas que llegan desde la Ventanilla
-  useAccionRapida(!loading, ({ accion, prestamo, tipo, q }) => {
+  useAccionRapida(!loading, async ({ accion, prestamo, tipo, q, reporte: idReporte }) => {
     if (accion === "ver") {
       setFiltro(q);
+    } else if (accion === "nuevo" && idReporte) {
+      // Confirmar un pago que reportó el socio: el formulario llega con sus datos
+      try {
+        const r = await axios.get(`${API_URL}/pagos-reportados/${idReporte}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const rep = r.data.data;
+        if (rep.estado !== "pendiente") {
+          mostrarAlerta("Ese pago reportado ya fue revisado.", "error");
+          return;
+        }
+        setEditPago(null);
+        setTipoInicial("");
+        setReporte(rep);
+        setForm({
+          id_prestamo: rep.id_prestamo,
+          monto: String(rep.monto),
+          metodo_pago: rep.metodo,
+          fecha: String(rep.fecha_pago).substring(0, 10),
+          descripcion: "",
+        });
+        setShowModal(true);
+      } catch {
+        mostrarAlerta("No se pudo cargar el pago reportado.", "error");
+      }
     } else if (accion === "nuevo") {
       openCrearModal();
       if (prestamo) setForm((f) => ({ ...f, id_prestamo: prestamo }));
@@ -114,6 +141,7 @@ export default function Pagos() {
 
   const openCrearModal = () => {
     setEditPago(null);
+    setReporte(null);
     setTipoInicial("");
     setForm({
       id_prestamo: "",
@@ -173,6 +201,7 @@ export default function Pagos() {
         fecha_pago: form.fecha || undefined,
         fecha_referencia: form.fecha_referencia || undefined,
         condonar_mora: form.condonar_mora ? true : undefined,
+        id_reporte: !editPago && reporte ? reporte.id_reporte : undefined,
       };
       if (editPago) {
         await axios.put(`${API_URL}/pagos/${editPago.id_pago}`, payload, {
@@ -194,6 +223,7 @@ export default function Pagos() {
         descripcion: "",
       });
       setEditPago(null);
+      setReporte(null);
       setShowModal(false);
       fetchData();
     } catch (err) {
@@ -626,10 +656,15 @@ export default function Pagos() {
           prestamos={prestamos}
           usuarios={usuarios}
           pagos={pagos}
-          onClose={() => setShowModal(false)}
+          onClose={() => {
+            setShowModal(false);
+            setReporte(null);
+          }}
           onSubmit={handleSubmit}
           handleInput={handleInput}
           tipoInicial={tipoInicial}
+          reporte={reporte}
+          onVerComprobante={reporte ? () => verComprobanteReportado(reporte.id_reporte, token) : undefined}
         />
       )}
     </div>

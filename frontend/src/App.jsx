@@ -5,6 +5,7 @@ import { AlertaProvider } from "./context/AlertaContext"; // <--- Importa tu pro
 import Rutas from "./routes/Rutas";
 import { useConfigSitio } from "./hooks/useConfigSitio";
 import { useEffect } from "react";
+import AvisoVersion from "./components/AvisoVersion";
 
 function TituloDinamico() {
   const { config } = useConfigSitio();
@@ -20,6 +21,7 @@ export default function App() {
       <AlertaProvider>
         <Router>
           <TituloDinamico />
+          <AvisoVersion />
           <Rutas />
         </Router>
       </AlertaProvider>

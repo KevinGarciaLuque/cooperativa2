@@ -1,6 +1,6 @@
 // Service worker mínimo: permite instalar la app y abrirla aunque no haya conexión.
 // Nunca guarda respuestas de la API: los datos financieros siempre vienen del servidor.
-const CACHE = "cooperativa-shell-v1";
+const CACHE = "cooperativa-shell-v2";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/"])).then(() => self.skipWaiting()));
@@ -21,6 +21,8 @@ self.addEventListener("fetch", (event) => {
 
   if (req.method !== "GET" || url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api") || url.pathname.startsWith("/uploads")) return;
+  // El número de versión siempre se pide al servidor (así se detectan las publicaciones nuevas)
+  if (url.pathname === "/version.json" || url.pathname === "/sw.js") return;
 
   // Navegación: red primero; sin conexión, se muestra la app guardada
   if (req.mode === "navigate") {

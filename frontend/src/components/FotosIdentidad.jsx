@@ -1,10 +1,11 @@
 // Fotos del frente y reverso de la identidad (DNI). Se usa en el perfil del socio,
 // en la ficha de Ventanilla y en Solicitudes. Las fotos se piden con la sesión
 // (no son públicas) y se reducen en el celular antes de subirlas.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { FaCamera, FaIdCard } from "react-icons/fa";
 import { comprimirImagen } from "../utils/imagen";
+import CamaraIdentidad from "./CamaraIdentidad";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const LADOS = [
@@ -14,7 +15,7 @@ const LADOS = [
 
 // Selector de una foto con vista previa (para formularios que la envían después)
 export function CampoFotoIdentidad({ etiqueta, archivo, onChange }) {
-  const entrada = useRef(null);
+  const [camara, setCamara] = useState(false);
   const [vista, setVista] = useState(null);
 
   useEffect(() => {
@@ -24,10 +25,9 @@ export function CampoFotoIdentidad({ etiqueta, archivo, onChange }) {
     return () => URL.revokeObjectURL(url);
   }, [archivo]);
 
-  const elegir = async (e) => {
-    const f = e.target.files?.[0];
-    e.target.value = "";
-    if (f) onChange(await comprimirImagen(f));
+  const elegir = async (f) => {
+    setCamara(false);
+    onChange(await comprimirImagen(f));
   };
 
   return (
@@ -45,7 +45,7 @@ export function CampoFotoIdentidad({ etiqueta, archivo, onChange }) {
           background: vista ? `center / cover no-repeat url(${vista})` : "#f8fafc",
           color: "#64748b",
         }}
-        onClick={() => entrada.current?.click()}
+        onClick={() => setCamara(true)}
       >
         {!vista && (
           <>
@@ -55,11 +55,11 @@ export function CampoFotoIdentidad({ etiqueta, archivo, onChange }) {
         )}
       </button>
       {archivo && (
-        <button type="button" className="btn btn-link btn-sm px-0" onClick={() => entrada.current?.click()}>
+        <button type="button" className="btn btn-link btn-sm px-0" onClick={() => setCamara(true)}>
           Cambiar foto
         </button>
       )}
-      <input ref={entrada} type="file" accept="image/*" className="d-none" onChange={elegir} />
+      <CamaraIdentidad abierta={camara} titulo={etiqueta} onCaptura={elegir} onCerrar={() => setCamara(false)} />
     </div>
   );
 }
@@ -71,7 +71,7 @@ export default function FotosIdentidad({ idSocio, headers, puedeSubir = true, so
   const [vistas, setVistas] = useState({});
   const [subiendo, setSubiendo] = useState(null);
   const [error, setError] = useState("");
-  const entradas = { frente: useRef(null), reverso: useRef(null) };
+  const [camara, setCamara] = useState(null); // lado que se está fotografiando
 
   const cargar = useCallback(async () => {
     try {
@@ -106,10 +106,8 @@ export default function FotosIdentidad({ idSocio, headers, puedeSubir = true, so
 
   useEffect(() => () => Object.values(vistas).forEach((u) => URL.revokeObjectURL(u)), [vistas]);
 
-  const subir = async (lado, e) => {
-    const f = e.target.files?.[0];
-    e.target.value = "";
-    if (!f) return;
+  const subir = async (lado, f) => {
+    setCamara(null);
     setError("");
     setSubiendo(lado);
     try {
@@ -157,24 +155,27 @@ export default function FotosIdentidad({ idSocio, headers, puedeSubir = true, so
                 </div>
               )}
               {permitido && (
-                <>
-                  <button
+                <button
                     type="button"
                     className="btn btn-sm btn-outline-dark mt-2"
                     disabled={!!subiendo}
-                    onClick={() => entradas[lado].current?.click()}
+                    onClick={() => setCamara(lado)}
                   >
                     <FaCamera className="me-1" />
                     {subiendo === lado ? "Subiendo..." : tiene ? "Cambiar foto" : "Subir foto"}
-                  </button>
-                  <input ref={entradas[lado]} type="file" accept="image/*" className="d-none" onChange={(e) => subir(lado, e)} />
-                </>
+                </button>
               )}
             </div>
           );
         })}
       </div>
       {error && <div className="alert alert-danger py-2 mt-3 mb-0 small">{error}</div>}
+      <CamaraIdentidad
+        abierta={!!camara}
+        titulo={LADOS.find(([l]) => l === camara)?.[1]}
+        onCaptura={(f) => subir(camara, f)}
+        onCerrar={() => setCamara(null)}
+      />
     </div>
   );
 }

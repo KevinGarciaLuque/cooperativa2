@@ -865,6 +865,62 @@ test("pagos reportados por el socio: reportar, confirmar en Pagos y rechazar", a
   assert.equal((await api("GET", "/notificaciones", null, ids.tSocio)).b.sin_leer, 0);
 });
 
+test("políticas: borrador, publicación, aceptación del socio y nuevas versiones", async () => {
+  // los borradores iniciales no se muestran hasta publicarlos
+  assert.equal((await api("GET", "/politicas/publicas")).b.data.length, 0);
+  const lista = await api("GET", "/politicas", null, ids.tSuper);
+  assert.equal(lista.s, 200);
+  assert.ok(lista.b.data.length >= 3);
+  assert.equal((await api("GET", "/politicas", null, ids.tAdmin)).s, 403);
+  assert.equal((await api("GET", "/politicas", null, ids.tSocio)).s, 403);
+  const reglamento = lista.b.data.find((p) => /Reglamento/.test(p.titulo));
+  assert.equal(reglamento.version, 0);
+
+  // solo el Super Administrador edita y publica
+  assert.equal((await api("POST", `/politicas/${reglamento.id_politica}/publicar`, {}, ids.tAdmin)).s, 403);
+  const pub = await api("POST", `/politicas/${reglamento.id_politica}/publicar`, {}, ids.tSuper);
+  assert.equal(pub.s, 200);
+  assert.equal(pub.b.version, 1);
+  assert.equal(pub.b.pide_aceptacion, true);
+
+  // publicada: se ve sin sesión, con los parámetros llenos
+  const publicas = await api("GET", "/politicas/publicas");
+  assert.equal(publicas.b.data.length, 1);
+  assert.match(publicas.b.data[0].contenido, /\d+% anual/);
+  assert.ok(!/\{mora_tasa_anual\}/.test(publicas.b.data[0].contenido));
+
+  // el socio la tiene pendiente y le llega el aviso
+  const mias = await api("GET", "/politicas/mias", null, ids.tSocio);
+  assert.equal(mias.b.pendientes, 1);
+  const avisos = await api("GET", "/notificaciones", null, ids.tSocio);
+  assert.ok(avisos.b.data.some((n) => /Nueva política/.test(n.titulo)));
+  const acepto = await api("POST", "/politicas/aceptar", {}, ids.tSocio);
+  assert.equal(acepto.s, 200);
+  assert.equal(acepto.b.pendientes, 0);
+
+  // un cambio menor no pide aceptarla otra vez; uno importante sí
+  const editar = await api("PUT", `/politicas/${reglamento.id_politica}`, { titulo: reglamento.titulo, contenido: reglamento.contenido + "\n- Nuevo punto." }, ids.tSuper);
+  assert.equal(editar.s, 200);
+  assert.equal((await api("GET", "/politicas/publicas")).b.data[0].contenido.includes("Nuevo punto"), false); // el borrador no se publica solo
+  await api("POST", `/politicas/${reglamento.id_politica}/publicar`, { pedir_aceptacion: false }, ids.tSuper);
+  assert.equal((await api("GET", "/politicas/mias", null, ids.tSocio)).b.pendientes, 0);
+  await api("POST", `/politicas/${reglamento.id_politica}/publicar`, { pedir_aceptacion: true }, ids.tSuper);
+  assert.equal((await api("GET", "/politicas/mias", null, ids.tSocio)).b.pendientes, 1);
+
+  // el personal ve qué aceptó el socio; la lista de aceptaciones es del Super Administrador
+  const ficha = await api("GET", `/politicas/socio/${ids.socio}`, null, ids.tAdmin);
+  assert.equal(ficha.s, 200);
+  assert.equal(ficha.b.data[0].version_aceptada, 1);
+  assert.equal((await api("GET", `/politicas/socio/${ids.socio}`, null, ids.tSocio2)).s, 403);
+  const acep = await api("GET", `/politicas/${reglamento.id_politica}/aceptaciones`, null, ids.tSuper);
+  assert.equal(acep.s, 200);
+  assert.ok(acep.b.data.some((r) => r.id_usuario === ids.socio && !r.aceptada));
+
+  // retirarla la oculta
+  assert.equal((await api("DELETE", `/politicas/${reglamento.id_politica}`, null, ids.tSuper)).s, 200);
+  assert.equal((await api("GET", "/politicas/publicas")).b.data.length, 0);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

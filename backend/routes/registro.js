@@ -8,6 +8,7 @@ const pool = require("../db");
 const { validarPassword } = require("../utils/passwordPolicy");
 const { leerRegistro } = require("../utils/registroConfig");
 const { notificarAdministradores, escaparHtml } = require("../utils/notificaciones");
+const { aceptar: aceptarPoliticas } = require("../utils/politicas");
 const { parametrosSolicitud, validarSolicitud, insertarSolicitud } = require("../utils/solicitudPrestamo");
 const { subidaIdentidad, mensajeErrorSubida, guardarLado } = require("../utils/identidad");
 const { formatearNombre } = require("../utils/nombres");
@@ -161,6 +162,9 @@ router.post("/", recibirFormulario, async (req, res) => {
         rol[0].id_rol,
       ]
     );
+
+    // Al registrarse acepta las políticas publicadas (el formulario lo pide)
+    await aceptarPoliticas(r.insertId, req.ip, null, connection);
 
     await guardarLado(connection, r.insertId, "frente", dniFrente, r.insertId);
     await guardarLado(connection, r.insertId, "reverso", dniReverso, r.insertId);

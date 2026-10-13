@@ -10,6 +10,7 @@ const PUBLICAS = [
   { metodo: "GET", re: /^\/configuracion$/ }, // logo y nombre para la pantalla de login
   { metodo: "GET", re: /^\/registro\/estado$/ },
   { metodo: "POST", re: /^\/registro$/ },
+  { metodo: "GET", re: /^\/politicas\/publicas$/ }, // se leen antes de registrarse
 ];
 
 // Primer segmento de la ruta → módulo de permisos (los mismos del menú)
@@ -53,6 +54,9 @@ const REGLAS_SOCIO = [
   // Sus notificaciones (la ruta filtra siempre por el usuario de la sesión)
   { metodo: "GET", re: /^\/notificaciones$/, libre: true, pendiente: true },
   { metodo: "POST", re: /^\/notificaciones\/leer$/, libre: true, pendiente: true },
+  // Políticas de la cooperativa: leerlas y aceptarlas (la ruta usa al usuario de la sesión)
+  { metodo: "GET", re: /^\/politicas\/mias$/, libre: true, pendiente: true },
+  { metodo: "POST", re: /^\/politicas\/aceptar$/, libre: true, pendiente: true },
   // Pagos por transferencia o depósito que reporta el socio (la ruta verifica que el préstamo sea suyo)
   { metodo: "POST", re: /^\/pagos-reportados$/, libre: true },
   { metodo: "GET", re: /^\/pagos-reportados\/mios$/, libre: true },

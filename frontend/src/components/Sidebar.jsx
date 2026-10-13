@@ -26,6 +26,7 @@ import {
   FaConciergeBell,
   FaCashRegister,
   FaSlidersH,
+  FaBook,
   FaPhoneAlt,
   FaBalanceScale,
   FaInbox,
@@ -67,6 +68,7 @@ const TODOS_MODULOS = [
 const menuSuperAdmin = [
   ...TODOS_MODULOS,
   { to: "/parametros-financieros", icon: <FaSlidersH />, label: "Parámetros" },
+  { to: "/politicas", icon: <FaBook />, label: "Políticas" },
   { to: "/superadmin", icon: <FaShieldAlt />, label: "Control de Accesos" },
 ];
 

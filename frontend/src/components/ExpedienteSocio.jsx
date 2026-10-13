@@ -2,7 +2,7 @@
 // su información laboral (de la última solicitud) y las fotos de su identidad.
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { FaBriefcase, FaIdCard, FaUser } from "react-icons/fa";
+import { FaBook, FaBriefcase, FaCheckCircle, FaIdCard, FaUser } from "react-icons/fa";
 import FotosIdentidad from "./FotosIdentidad";
 import { OCUPACIONES, fmt } from "../utils/solicitud";
 
@@ -49,6 +49,7 @@ function Seccion({ icono, titulo, children }) {
 export default function ExpedienteSocio({ idSocio, headers }) {
   const [datos, setDatos] = useState(null);
   const [laboral, setLaboral] = useState(undefined); // undefined = cargando, null = sin solicitudes
+  const [politicas, setPoliticas] = useState(null);
 
   useEffect(() => {
     let activo = true;
@@ -60,6 +61,10 @@ export default function ExpedienteSocio({ idSocio, headers }) {
       .get(`${API_URL}/solicitudes/socio/${idSocio}`, { headers })
       .then((r) => activo && setLaboral((r.data.data || [])[0] || null))
       .catch(() => activo && setLaboral(null));
+    axios
+      .get(`${API_URL}/politicas/socio/${idSocio}`, { headers })
+      .then((r) => activo && setPoliticas(r.data.data || []))
+      .catch(() => activo && setPoliticas([]));
     return () => {
       activo = false;
     };
@@ -104,6 +109,28 @@ export default function ExpedienteSocio({ idSocio, headers }) {
           </div>
         )}
       </Seccion>
+
+      {politicas?.length > 0 && (
+        <Seccion icono={<FaBook />} titulo="Políticas aceptadas">
+          <div className="d-flex flex-column gap-1">
+            {politicas.map((p) => (
+              <div key={p.id_politica} className="d-flex flex-wrap justify-content-between gap-2 small py-1 border-bottom">
+                <span className="fw-semibold">{p.titulo}</span>
+                {p.aceptada ? (
+                  <span className="text-success">
+                    <FaCheckCircle className="me-1" />
+                    Versión {p.version_aceptada} · {fecha(p.aceptada_en)}
+                  </span>
+                ) : (
+                  <span className="text-warning fw-semibold">
+                    {p.version_aceptada ? `Aceptó la versión ${p.version_aceptada}; falta la nueva` : "Pendiente de aceptar"}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </Seccion>
+      )}
 
       <Seccion icono={<FaIdCard />} titulo="Identidad (DNI)">
         <FotosIdentidad idSocio={idSocio} headers={headers} />

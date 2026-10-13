@@ -28,6 +28,7 @@ const Contabilidad = lazy(() => import("../pages/Contabilidad"));
 const Registro = lazy(() => import("../pages/Registro"));
 const Solicitudes = lazy(() => import("../pages/Solicitudes"));
 const ParametrosFinancieros = lazy(() => import("../pages/SuperAdmin/ParametrosFinancieros"));
+const Politicas = lazy(() => import("../pages/SuperAdmin/Politicas"));
 // Vistas de usuario socio
 const SocioPerfil = lazy(() => import("../pages/Socio/SocioPerfil"));
 // Vista para restablecimiento por token
@@ -128,6 +129,14 @@ export default function Rutas() {
             element={
               <PrivateRoute>
                 <ParametrosFinancieros />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/politicas"
+            element={
+              <PrivateRoute>
+                <Politicas />
               </PrivateRoute>
             }
           />

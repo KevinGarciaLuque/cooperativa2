@@ -8,6 +8,7 @@ import ReportarPagoSocio from "../../components/ReportarPagoSocio";
 import NotificacionesSocio from "../../components/NotificacionesSocio";
 import RecibosSocio from "../../components/RecibosSocio";
 import FirmaDigital from "../../components/FirmaDigital";
+import PoliticasSocio, { AceptarPoliticas } from "../../components/PoliticasSocio";
 import { comprimirImagen } from "../../utils/imagen";
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
@@ -36,6 +37,7 @@ import {
   FaCamera,
   FaUpload,
   FaReceipt,
+  FaBook,
 } from "react-icons/fa";
 
 const VERDE = "#a8cd3a";
@@ -82,7 +84,8 @@ export default function SocioPerfil() {
   const [moras, setMoras] = useState({}); // id_prestamo -> { dias, mora, porDia }
   const [entregas, setEntregas] = useState({}); // id_prestamo -> { id_recibo, firmado }
   const [reciboEntrega, setReciboEntrega] = useState(null);
-  const [reciboVer, setReciboVer] = useState(null); // recibo abierto desde la campanita o "Mis recibos"
+  const [reciboVer, setReciboVer] = useState(null);
+  const [politicasVersion, setPoliticasVersion] = useState(0); // recarga la pestaña al aceptar // recibo abierto desde la campanita o "Mis recibos"
   const [loading, setLoading]           = useState(true);
   const pendiente = user?.estado === "pendiente";
   const [tab, setTab]                   = useState(pendiente ? "solicitar" : "resumen");
@@ -305,6 +308,7 @@ export default function SocioPerfil() {
     ? [
         { key: "solicitar", label: "Solicitar préstamo", icon: <FaHandHoldingUsd /> },
         { key: "identidad", label: "Mi identidad",       icon: <FaIdCard /> },
+        { key: "politicas", label: "Políticas",          icon: <FaBook /> },
         { key: "seguridad", label: "Seguridad",          icon: <FaShieldAlt /> },
       ]
     : [
@@ -315,6 +319,7 @@ export default function SocioPerfil() {
         { key: "solicitar",    label: "Solicitar préstamo",  icon: <FaClipboardList /> },
         { key: "aportaciones", label: "Aportaciones",        icon: <FaPiggyBank /> },
         { key: "identidad",    label: "Mi identidad",        icon: <FaIdCard /> },
+        { key: "politicas",    label: "Políticas",           icon: <FaBook /> },
         { key: "seguridad",    label: "Seguridad",           icon: <FaShieldAlt /> },
       ];
 
@@ -558,6 +563,8 @@ export default function SocioPerfil() {
 
           {/* TAB: REPORTAR PAGO */}
           {tab === "pagar" && <ReportarPagoSocio token={token} />}
+
+          {tab === "politicas" && <PoliticasSocio headers={headersAuth} version={politicasVersion} />}
 
           {tab === "recibos" && user?.id_usuario && (
             <RecibosSocio idSocio={user.id_usuario} headers={headersAuth} onVer={setReciboVer} recargar={reciboVer} />
@@ -1122,6 +1129,11 @@ export default function SocioPerfil() {
           {finiquitoDe && (
             <ReciboModal finiquitoDe={finiquitoDe} onClose={() => setFiniquitoDe(null)} />
           )}
+          <AceptarPoliticas
+            headers={headersAuth}
+            onLogout={logout}
+            onAceptadas={() => setPoliticasVersion((v) => v + 1)}
+          />
           {reciboVer && <ReciboModal idRecibo={reciboVer} onClose={() => setReciboVer(null)} />}
           {reciboEntrega && (
             <ReciboModal

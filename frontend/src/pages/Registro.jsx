@@ -7,6 +7,7 @@ import { CamposMonto, CamposIngresos, AvisoRelacion } from "../components/Campos
 import { SOLICITUD_VACIA, fmt, solicitudDesde, simular } from "../utils/solicitud";
 import { CampoFotoIdentidad } from "../components/FotosIdentidad";
 import { formatearNombre } from "../utils/nombres";
+import { VerPoliticasPublicas } from "../components/PoliticasSocio";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const AZUL = "#1a2035";
@@ -23,6 +24,8 @@ export default function Registro() {
 
   const [estado, setEstado] = useState(null); // { cooperativa, habilitado, valido, parametros }
   const [paso, setPaso] = useState(1);
+  const [hayPoliticas, setHayPoliticas] = useState(false);
+  const [verPoliticas, setVerPoliticas] = useState(false);
   const [quierePrestamo, setQuierePrestamo] = useState(true);
   const [solicitud, setSolicitud] = useState(SOLICITUD_VACIA);
   const [dni, setDni] = useState({ frente: null, reverso: null }); // fotos de la identidad
@@ -40,6 +43,14 @@ export default function Registro() {
   });
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
+
+  // Si la cooperativa publicó sus políticas, se aceptan al registrarse
+  useEffect(() => {
+    axios
+      .get(`${API_URL}/politicas/publicas`)
+      .then((r) => setHayPoliticas((r.data.data || []).length > 0))
+      .catch(() => setHayPoliticas(false));
+  }, []);
 
   useEffect(() => {
     axios
@@ -166,8 +177,25 @@ export default function Registro() {
         <label htmlFor="acepta" className="form-check-label small">
           Declaro que los datos son verdaderos y autorizo a la cooperativa a verificarlos y usarlos para gestionar mi
           membresía{quierePrestamo ? " y mi solicitud de préstamo" : ""}.
+          {hayPoliticas && (
+            <>
+              {" "}También acepto las{" "}
+              <button
+                type="button"
+                className="btn btn-link btn-sm p-0 align-baseline"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setVerPoliticas(true);
+                }}
+              >
+                políticas de la cooperativa
+              </button>
+              .
+            </>
+          )}
         </label>
       </div>
+      {verPoliticas && <VerPoliticasPublicas onCerrar={() => setVerPoliticas(false)} />}
     </div>
   );
 

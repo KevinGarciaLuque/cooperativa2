@@ -414,6 +414,57 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_10_018_politicas",
+    descripcion: "Políticas de la cooperativa con versiones y aceptación de los socios (borradores iniciales sin publicar)",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS politicas (
+          id_politica INT AUTO_INCREMENT PRIMARY KEY,
+          clave VARCHAR(40) NULL UNIQUE,
+          titulo VARCHAR(150) NOT NULL,
+          contenido MEDIUMTEXT NOT NULL,
+          obligatoria TINYINT(1) NOT NULL DEFAULT 1,
+          activa TINYINT(1) NOT NULL DEFAULT 1,
+          orden INT NOT NULL DEFAULT 0,
+          version INT NOT NULL DEFAULT 0,
+          version_requerida INT NOT NULL DEFAULT 0,
+          actualizado_por INT NULL,
+          actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+      `);
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS politicas_versiones (
+          id_politica INT NOT NULL,
+          version INT NOT NULL,
+          titulo VARCHAR(150) NOT NULL,
+          contenido MEDIUMTEXT NOT NULL,
+          publicada_por INT NULL,
+          publicada_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (id_politica, version)
+        )
+      `);
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS politicas_aceptaciones (
+          id_aceptacion INT AUTO_INCREMENT PRIMARY KEY,
+          id_politica INT NOT NULL,
+          id_usuario INT NOT NULL,
+          version INT NOT NULL,
+          ip VARCHAR(60) NULL,
+          aceptada_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_aceptacion (id_politica, id_usuario, version),
+          INDEX idx_aceptacion_usuario (id_usuario)
+        )
+      `);
+      const { BORRADORES } = require("./politicas");
+      for (const [i, b] of BORRADORES.entries()) {
+        await conn.query(
+          "INSERT IGNORE INTO politicas (clave, titulo, contenido, orden) VALUES (?, ?, ?, ?)",
+          [b.clave, b.titulo, b.contenido, i + 1]
+        );
+      }
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

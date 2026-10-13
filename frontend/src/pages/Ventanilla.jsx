@@ -7,7 +7,7 @@ import DetallePrestamoVentanilla from "./DetallePrestamoVentanilla";
 import EstadoCuentaSocio from "./EstadoCuentaSocio";
 import RecibosSocioModal from "../components/RecibosSocioModal";
 import CartasAprobacionSocio from "../components/CartasAprobacionSocio";
-import FotosIdentidad from "../components/FotosIdentidad";
+import ExpedienteSocio from "../components/ExpedienteSocio";
 import SolicitudesSocioFicha from "../components/SolicitudesSocioFicha";
 import {
   FaSearch,
@@ -23,6 +23,7 @@ import {
   FaIdCard,
   FaFileSignature,
   FaUserShield,
+  FaFolderOpen,
 } from "react-icons/fa";
 
 const ACCENT = "#a8cd3a";
@@ -54,6 +55,7 @@ export default function Ventanilla() {
   const [verEstadoCuenta, setVerEstadoCuenta] = useState(false);
   const [verRecibos, setVerRecibos] = useState(false);
   const [verCartas, setVerCartas] = useState(false);
+  const [pestana, setPestana] = useState("expediente");
 
   // Búsqueda de socios con retardo para no consultar en cada tecla
   useEffect(() => {
@@ -88,6 +90,7 @@ export default function Ventanilla() {
     }
     setDetalle(null);
     setVerEstadoCuenta(false);
+    setPestana("expediente");
     setSocio(u);
     setBusqueda("");
     setResultados([]);
@@ -188,8 +191,9 @@ export default function Ventanilla() {
             if (resumen.vigentes.length === 1) {
               irNuevo("/pagos", { prestamo: resumen.vigentes[0].id_prestamo });
             } else {
+              setPestana("prestamos");
               document
-                .getElementById("ventanilla-prestamos")
+                .getElementById("ventanilla-pestanas")
                 ?.scrollIntoView({ behavior: "smooth" });
             }
           },
@@ -253,6 +257,13 @@ export default function Ventanilla() {
       ]
     : [];
 
+  const pestanas = [
+    { clave: "expediente", titulo: "Expediente", icono: <FaFolderOpen /> },
+    { clave: "aval", titulo: "Aval y referencias", icono: <FaUserShield /> },
+    { clave: "prestamos", titulo: "Préstamos", icono: <FaHandHoldingUsd />, cuenta: resumen?.vigentes.length },
+    { clave: "cuentas", titulo: "Cuentas y aportaciones", icono: <FaPiggyBank /> },
+  ];
+
   if (socio && verEstadoCuenta) {
     return (
       <EstadoCuentaSocio
@@ -289,6 +300,11 @@ export default function Ventanilla() {
         .vt-action:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 18px #0000001a; border-color: ${ACCENT}; }
         .vt-action:disabled { opacity: .5; cursor: not-allowed; }
         .vt-kpi { border-radius: .9rem; padding: .85rem 1rem; background: #f6f8fb; }
+        .vt-tabs { overflow-x: auto; scrollbar-width: none; }
+        .vt-tab { display: flex; align-items: center; gap: .45rem; white-space: nowrap; border: 0; background: none;
+          padding: .95rem 1rem; color: #64748b; font-weight: 600; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+        .vt-tab:hover { color: ${AZUL}; }
+        .vt-tab.activa { color: ${AZUL}; border-bottom-color: ${ACCENT}; }
       `}</style>
 
       <div className="mb-3">
@@ -445,57 +461,40 @@ export default function Ventanilla() {
             )}
           </div>
 
-          {/* Identidad */}
-          <div className="vt-card p-4 mb-4">
-            <h6 className="fw-bold mb-3" style={{ color: AZUL }}>
-              <FaIdCard className="me-2" />
-              Identidad del socio
-            </h6>
-            <FotosIdentidad key={socio.id_usuario} idSocio={socio.id_usuario} headers={headers} plegable />
-          </div>
-
-          {/* Aval y referencias de sus solicitudes */}
-          <div className="vt-card p-4 mb-4">
-            <h6 className="fw-bold mb-3" style={{ color: AZUL }}>
-              <FaUserShield className="me-2" />
-              Aval y referencias
-            </h6>
-            <SolicitudesSocioFicha key={socio.id_usuario} idSocio={socio.id_usuario} headers={headers} />
-          </div>
-
-          {/* Acciones */}
-          <h5 className="fw-bold mb-3" style={{ color: AZUL }}>¿Qué desea hacer el socio?</h5>
-          <div className="row g-3 mb-4">
-            {acciones.map((a) => (
-              <div className="col-12 col-md-6 col-xl-4" key={a.titulo}>
-                <button className="vt-action" onClick={a.onClick} disabled={a.deshabilitado || cargandoFicha}>
-                  <div className="d-flex align-items-center gap-3">
-                    <div
-                      className="d-flex align-items-center justify-content-center"
-                      style={{ width: 46, height: 46, borderRadius: ".8rem", background: `${a.color}1a`, color: a.color, fontSize: 20 }}
-                    >
-                      {a.icon}
-                    </div>
-                    <div>
-                      <div className="fw-bold" style={{ color: AZUL }}>{a.titulo}</div>
-                      <div className="small text-muted">{a.desc}</div>
-                    </div>
-                  </div>
+          {/* Pestañas con la información del socio */}
+          <div id="ventanilla-pestanas" className="vt-card mb-4 overflow-hidden">
+            <div className="vt-tabs d-flex border-bottom px-2">
+              {pestanas.map((t) => (
+                <button
+                  key={t.clave}
+                  type="button"
+                  className={`vt-tab ${pestana === t.clave ? "activa" : ""}`}
+                  onClick={() => setPestana(t.clave)}
+                >
+                  {t.icono}
+                  <span>{t.titulo}</span>
+                  {t.cuenta > 0 && <span className="badge rounded-pill bg-light text-dark border ms-1">{t.cuenta}</span>}
                 </button>
-              </div>
-            ))}
-          </div>
-
-          {/* Préstamos vigentes */}
-          {resumen && resumen.vigentes.length > 0 && (
-            <div id="ventanilla-prestamos">
-              <h5 className="fw-bold mb-3" style={{ color: AZUL }}>Préstamos vigentes</h5>
-              <div className="row g-3">
+              ))}
+            </div>
+            <div className="p-4">
+              {pestana === "expediente" && (
+                <ExpedienteSocio key={socio.id_usuario} idSocio={socio.id_usuario} headers={headers} />
+              )}
+              {pestana === "aval" && (
+                <SolicitudesSocioFicha key={socio.id_usuario} idSocio={socio.id_usuario} headers={headers} />
+              )}
+              {pestana === "prestamos" && (!resumen ? (
+                <div className="spinner-border spinner-border-sm text-success" />
+              ) : resumen.vigentes.length === 0 ? (
+                <div className="small text-muted">El socio no tiene préstamos vigentes.</div>
+              ) : (
+                <div className="row g-3">
                 {resumen.vigentes.map((p) => {
                   const prox = ficha.proximos[p.id_prestamo];
                   return (
                     <div className="col-12 col-xl-6" key={p.id_prestamo}>
-                      <div className="vt-card p-3">
+                      <div className="border rounded-4 p-3 h-100">
                         <div className="d-flex justify-content-between align-items-start mb-2">
                           <div>
                             <div className="fw-bold">Préstamo #{p.id_prestamo} · L. {fmt(p.monto)}</div>
@@ -563,8 +562,89 @@ export default function Ventanilla() {
                   );
                 })}
               </div>
+              ))}
+              {pestana === "cuentas" && (!ficha ? (
+                <div className="spinner-border spinner-border-sm text-success" />
+              ) : (
+                <div className="row g-4">
+                  <div className="col-12 col-lg-6">
+                    <h6 className="fw-bold mb-3" style={{ color: AZUL }}>Cuentas</h6>
+                    {ficha.cuentas.length === 0 ? (
+                      <div className="small text-muted">El socio no tiene cuentas abiertas.</div>
+                    ) : (
+                      <div className="d-flex flex-column gap-2">
+                        {ficha.cuentas.map((c) => (
+                          <div key={c.id_cuenta} className="vt-kpi d-flex justify-content-between align-items-center">
+                            <div>
+                              <div className="fw-semibold">{c.tipo_cuenta}</div>
+                              <div className="small text-muted">
+                                {c.estado}{c.fecha_apertura ? ` · desde ${String(c.fecha_apertura).substring(0, 10)}` : ""}
+                              </div>
+                            </div>
+                            <div className="fw-bold">L. {fmt(c.saldo_actual)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="col-12 col-lg-6">
+                    <h6 className="fw-bold mb-3" style={{ color: AZUL }}>Últimas aportaciones</h6>
+                    {ficha.aportaciones.length === 0 ? (
+                      <div className="small text-muted">El socio no ha hecho aportaciones.</div>
+                    ) : (
+                      <div className="table-responsive">
+                        <table className="table table-sm align-middle mb-0">
+                          <thead>
+                            <tr className="small text-muted">
+                              <th>Fecha</th>
+                              <th>Tipo</th>
+                              <th className="text-end">Monto</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[...ficha.aportaciones]
+                              .sort((x, y) => String(y.fecha).localeCompare(String(x.fecha)))
+                              .slice(0, 8)
+                              .map((a) => (
+                                <tr key={a.id_aportacion}>
+                                  <td className="small">{String(a.fecha || "").substring(0, 10)}</td>
+                                  <td className="small text-capitalize">{a.tipo_aportacion || "—"}</td>
+                                  <td className="text-end fw-semibold">L. {fmt(a.monto)}</td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
+
+          {/* Acciones */}
+          <h5 className="fw-bold mb-3" style={{ color: AZUL }}>¿Qué desea hacer el socio?</h5>
+          <div className="row g-3 mb-4">
+            {acciones.map((a) => (
+              <div className="col-12 col-md-6 col-xl-4" key={a.titulo}>
+                <button className="vt-action" onClick={a.onClick} disabled={a.deshabilitado || cargandoFicha}>
+                  <div className="d-flex align-items-center gap-3">
+                    <div
+                      className="d-flex align-items-center justify-content-center"
+                      style={{ width: 46, height: 46, borderRadius: ".8rem", background: `${a.color}1a`, color: a.color, fontSize: 20 }}
+                    >
+                      {a.icon}
+                    </div>
+                    <div>
+                      <div className="fw-bold" style={{ color: AZUL }}>{a.titulo}</div>
+                      <div className="small text-muted">{a.desc}</div>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            ))}
+          </div>
+
         </>
       )}
     </div>

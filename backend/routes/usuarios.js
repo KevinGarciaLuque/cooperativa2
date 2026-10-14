@@ -35,10 +35,7 @@ const validarDNI = (dni) => {
 };
 
 // Validar teléfono hondureño (8 dígitos)
-const validarTelefono = (telefono) => {
-  const telefonoRegex = /^\d{8}$/;
-  return telefonoRegex.test(telefono);
-};
+const { validarTelefono } = require("../utils/telefono");
 
 // Validar email
 const validarEmail = (email) => {

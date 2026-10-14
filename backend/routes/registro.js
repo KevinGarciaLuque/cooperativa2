@@ -14,7 +14,7 @@ const { subidaIdentidad, mensajeErrorSubida, guardarLado } = require("../utils/i
 const { formatearNombre } = require("../utils/nombres");
 
 const validarDNI = (v) => /^\d{13}$/.test(v);
-const validarTelefono = (v) => /^\d{8}$/.test(v);
+const { validarTelefono, limpiarTelefono } = require("../utils/telefono");
 const validarEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 const mayorDeEdad = (fecha) => {
   const f = new Date(fecha);
@@ -105,8 +105,11 @@ router.post("/", recibirFormulario, async (req, res) => {
     if (!validarDNI(String(dni || ""))) {
       return res.status(400).json({ message: "La identidad debe tener 13 dígitos, sin guiones." });
     }
-    if (!validarTelefono(String(telefono || ""))) {
-      return res.status(400).json({ message: "El teléfono debe tener 8 dígitos." });
+    const tel = limpiarTelefono(telefono);
+    if (!validarTelefono(tel)) {
+      return res.status(400).json({
+        message: tel.startsWith("+") ? "Revisa el número de teléfono y el código del país." : "El teléfono debe tener 8 dígitos.",
+      });
     }
     if (!correo || !validarEmail(String(correo).trim())) {
       return res.status(400).json({ message: "Escribe un correo electrónico válido: ahí recibirás tus recibos." });
@@ -154,7 +157,7 @@ router.post("/", recibirFormulario, async (req, res) => {
       [
         nombre,
         dni,
-        telefono,
+        tel,
         correo ? String(correo).trim() : null,
         direccion ? String(direccion).trim().substring(0, 200) : null,
         fecha_nacimiento,

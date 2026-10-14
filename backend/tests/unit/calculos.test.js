@@ -152,3 +152,13 @@ test("cancelar antes del plazo: solo se cobra el interés del tiempo usado", () 
   assert.ok(tarde.mora > 0);
   cerca(tarde.total, 5750 + tarde.mora);
 });
+
+test("teléfono: Honduras con 8 dígitos u otro país con su código", () => {
+  const { validarTelefono, limpiarTelefono } = require("../../utils/telefono");
+  assert.ok(validarTelefono("98765432"));
+  assert.ok(validarTelefono(limpiarTelefono("+1 305-555-1234")));
+  assert.equal(limpiarTelefono("+1 305-555-1234"), "+13055551234");
+  assert.ok(!validarTelefono("9876543"));
+  assert.ok(!validarTelefono("+12"));
+  assert.ok(!validarTelefono("305555123499"));
+});

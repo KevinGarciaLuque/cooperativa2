@@ -1,5 +1,6 @@
 // Campos de la solicitud de préstamo. Los usan el panel del socio y el enlace de registro,
 // para que ambos pidan exactamente lo mismo.
+import { FaInfoCircle } from "react-icons/fa";
 import InputMonto from "../ui/InputMonto";
 import { OCUPACIONES, PROPOSITOS, fmt, simular } from "../utils/solicitud";
 import { formatearNombre } from "../utils/nombres";
@@ -48,8 +49,15 @@ export function CamposMonto({ param, form, setForm }) {
                 <div className="fw-bold fs-4">{sim.plazo} {sim.plazo === 1 ? "mes" : "meses"}</div>
               </div>
             </div>
-            <div className="small text-muted text-center mt-2">
-              Es un cálculo aproximado. La cuota final depende de las condiciones que apruebe la cooperativa.
+            <div
+              className="d-flex align-items-start gap-2 mt-3 px-3 py-2 small"
+              style={{ background: "#fff4d6", border: "1px solid #f5c451", borderLeft: "4px solid #e0a106", borderRadius: 10, color: "#6b4a00" }}
+            >
+              <FaInfoCircle className="flex-shrink-0" style={{ marginTop: 3, color: "#e0a106" }} />
+              <div>
+                <strong>Este es un cálculo aproximado.</strong> La cuota final dependerá de la{" "}
+                <strong>tasa de interés que apruebe la cooperativa</strong>.
+              </div>
             </div>
             <AvisoRelacion sim={sim} />
           </div>

@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { FaHandHoldingUsd, FaCheckCircle, FaExclamationTriangle, FaArrowLeft, FaChevronDown } from "react-icons/fa";
+import { FaHandHoldingUsd, FaCheckCircle, FaExclamationTriangle, FaArrowLeft } from "react-icons/fa";
 import { CamposMonto, CamposIngresos, AvisoRelacion } from "../components/CamposSolicitud";
 import { SOLICITUD_VACIA, fmt, solicitudDesde, simular } from "../utils/solicitud";
 import { CampoFotoIdentidad } from "../components/FotosIdentidad";
 import { formatearNombre } from "../utils/nombres";
 import { VerPoliticasPublicas } from "../components/PoliticasSocio";
-import { PAISES_TEL, PAIS_PREDETERMINADO, telefonoCompleto } from "../utils/paises";
+import { PAIS_PREDETERMINADO, ayudaTelefono, telefonoCompleto } from "../utils/paises";
+import SelectorPaisTel from "../components/SelectorPaisTel";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const AZUL = "#1a2035";
@@ -65,7 +66,7 @@ export default function Registro() {
     const { name, value, type, checked } = e.target;
     let v = type === "checkbox" ? checked : value;
     if (name === "dni") v = value.replace(/\D/g, "").slice(0, 13);
-    if (name === "telefono") v = value.replace(/\D/g, "").slice(0, paisTel.digitos);
+    if (name === "telefono") v = value.replace(/\D/g, "").slice(0, paisTel.maximo);
     setForm((f) => ({ ...f, [name]: v }));
   };
 
@@ -341,31 +342,13 @@ export default function Registro() {
                         Teléfono (WhatsApp) <span className="text-danger">*</span>
                       </label>
                       <div className="input-group input-group-lg">
-                        {/* Se ve la bandera y el código; al tocarlo se abre la lista con los nombres */}
-                        <span
-                          className="input-group-text position-relative bg-white"
-                          style={{ borderRadius: "10px 0 0 10px", gap: 6, paddingRight: 10 }}
-                        >
-                          <span>{paisTel.bandera}</span>
-                          <span className="fw-semibold">+{paisTel.codigo}</span>
-                          <FaChevronDown size={11} className="text-muted" />
-                          <select
-                            aria-label="País del teléfono"
-                            value={paisTel.clave}
-                            style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", width: "100%" }}
-                            onChange={(e) => {
-                              const p = PAISES_TEL.find((x) => x.clave === e.target.value) || PAIS_PREDETERMINADO;
-                              setPaisTel(p);
-                              setForm((f) => ({ ...f, telefono: f.telefono.slice(0, p.digitos) }));
-                            }}
-                          >
-                            {PAISES_TEL.map((p) => (
-                              <option key={p.clave} value={p.clave}>
-                                {p.bandera} {p.nombre} (+{p.codigo})
-                              </option>
-                            ))}
-                          </select>
-                        </span>
+                        <SelectorPaisTel
+                          pais={paisTel}
+                          onChange={(p) => {
+                            setPaisTel(p);
+                            setForm((f) => ({ ...f, telefono: f.telefono.slice(0, p.maximo) }));
+                          }}
+                        />
                         <input
                           className="form-control"
                           style={{ borderRadius: "0 10px 10px 0" }}
@@ -375,12 +358,12 @@ export default function Registro() {
                           required
                           inputMode="numeric"
                           autoComplete="tel-national"
-                          placeholder={paisTel.ejemplo}
-                          minLength={paisTel.digitos}
+                          placeholder={paisTel.codigo === "504" ? "98765432" : "Número de teléfono"}
+                          minLength={paisTel.minimo}
                         />
                       </div>
                       <div className="form-text">
-                        {paisTel.codigo === "504" ? "8 dígitos." : `${paisTel.digitos} dígitos, sin el código del país.`}
+                        {ayudaTelefono(paisTel)}
                       </div>
                     </div>
                     {campo("Fecha de nacimiento", "fecha_nacimiento", {

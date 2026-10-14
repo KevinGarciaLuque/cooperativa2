@@ -320,11 +320,11 @@ test("tras la aprobación el socio ve su tasa y puede pedir otro préstamo", asy
   assert.equal(p.tasa_interes, undefined);
   assert.equal(p.tasa_original, undefined);
 
-  // una solicitud ya aprobada no bloquea una nueva
+  // una solicitud ya aprobada no bloquea una nueva (y "cuánto puede pagar" ya no es obligatorio)
   const otra = await api(
     "POST", "/solicitudes/prestamo",
     {
-      monto: 2000, plazo_meses: 4, cuota_posible: 700, proposito: "salud", ocupacion: "empleado",
+      monto: 2000, plazo_meses: 4, proposito: "salud", ocupacion: "empleado",
       ingreso_mensual: 8000, acepta: true, referencias: AVAL,
     },
     t

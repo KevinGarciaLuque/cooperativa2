@@ -25,7 +25,6 @@ export const OCUPACIONES = {
 export const SOLICITUD_VACIA = {
   monto: "",
   plazo_meses: "",
-  cuota_posible: "",
   proposito: "",
   descripcion: "",
   ocupacion: "",
@@ -43,7 +42,6 @@ export const SOLICITUD_VACIA = {
 export const solicitudDesde = (form, acepta) => ({
   monto: parseFloat(form.monto) || 0,
   plazo_meses: parseInt(form.plazo_meses) || 0,
-  cuota_posible: parseFloat(form.cuota_posible) || 0,
   proposito: form.proposito,
   descripcion: form.descripcion,
   ocupacion: form.ocupacion,
@@ -71,33 +69,17 @@ const cuotaDe = (monto, plazo, tasaMensual) => {
   return (monto * i * Math.pow(1 + i, plazo)) / (Math.pow(1 + i, plazo) - 1);
 };
 
-// Menor número de meses con el que la cuota cabe en lo que la persona puede pagar al mes
-// (null si ni con el plazo máximo alcanza)
-export const plazoParaCuota = (param, monto, cuotaPosible) => {
-  if (!param || !(monto > 0) || !(cuotaPosible > 0)) return null;
-  for (let n = 1; n <= (param.plazo_max || 60); n++) {
-    if (cuotaDe(monto, n, param.tasa_mensual) <= cuotaPosible) return n;
-  }
-  return null;
-};
-
 export const simular = (param, form) => {
   const monto = parseFloat(form.monto) || 0;
   const plazo = parseInt(form.plazo_meses) || 0;
-  const cuotaPosible = parseFloat(form.cuota_posible) || 0;
   const ingreso = parseFloat(form.ingreso_mensual) || 0;
   const cuotaEstimada = param && monto > 0 && plazo > 0 ? cuotaDe(monto, plazo, param.tasa_mensual) : 0;
-  const superaCapacidad = cuotaEstimada > 0 && cuotaPosible > 0 && cuotaEstimada > cuotaPosible * 1.001;
 
-  const plazoSugerido = superaCapacidad ? plazoParaCuota(param, monto, cuotaPosible) : null;
 
   const relacion = ingreso > 0 && cuotaEstimada > 0 ? (cuotaEstimada / ingreso) * 100 : null;
   return {
     plazo,
-    cuotaPosible,
     cuotaEstimada,
-    superaCapacidad,
-    plazoSugerido,
     relacion,
     relacionAlta: relacion !== null && relacion > (param?.pct_ingreso_max || 40),
   };

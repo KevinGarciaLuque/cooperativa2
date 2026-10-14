@@ -1,7 +1,7 @@
 // Campos de la solicitud de préstamo. Los usan el panel del socio y el enlace de registro,
 // para que ambos pidan exactamente lo mismo.
 import InputMonto from "../ui/InputMonto";
-import { OCUPACIONES, PROPOSITOS, fmt, plazoParaCuota, simular } from "../utils/solicitud";
+import { OCUPACIONES, PROPOSITOS, fmt, simular } from "../utils/solicitud";
 import { formatearNombre } from "../utils/nombres";
 
 export const AvisoRelacion = ({ sim }) =>
@@ -12,51 +12,27 @@ export const AvisoRelacion = ({ sim }) =>
     </div>
   ) : null;
 
-// ¿Cuánto, en cuánto tiempo y cuánto puede pagar? + cuota estimada
+// ¿Cuánto y en cuánto tiempo? + cuota estimada
 export function CamposMonto({ param, form, setForm }) {
   const sim = simular(param, form);
   const poner = (campo) => (v) => setForm((f) => ({ ...f, [campo]: v }));
-  // Al escribir cuánto puede pagar al mes (o cambiar el monto con esa cuota ya puesta), los
-  // meses se calculan solos. Si después cambia los meses a mano, se respeta lo que escriba.
-  const ponerYCalcularPlazo = (campo) => (v) =>
-    setForm((f) => {
-      const nuevo = { ...f, [campo]: v };
-      const plazo = plazoParaCuota(param, parseFloat(nuevo.monto), parseFloat(nuevo.cuota_posible));
-      return plazo ? { ...nuevo, plazo_meses: String(plazo) } : nuevo;
-    });
-  const sinPlazoPosible =
-    parseFloat(form.monto) > 0 && parseFloat(form.cuota_posible) > 0 && param &&
-    !plazoParaCuota(param, parseFloat(form.monto), parseFloat(form.cuota_posible));
 
   return (
     <div className="row g-3">
-      <div className="col-12 col-md-4">
+      <div className="col-12 col-md-6">
         <label className="form-label fw-semibold small">¿Cuánto necesitas? (L.) *</label>
         <InputMonto
           required className="form-control form-control-lg" placeholder="0.00"
-          value={form.monto} onChange={ponerYCalcularPlazo("monto")}
+          value={form.monto} onChange={poner("monto")}
         />
         {param && <div className="form-text">Máximo {fmt(param.monto_max)}</div>}
       </div>
-      <div className="col-12 col-md-4">
+      <div className="col-12 col-md-6">
         <label className="form-label fw-semibold small">¿En cuántos meses lo pagarás? *</label>
         <input
           type="number" min="1" max={param?.plazo_max || 60} step="1" required className="form-control form-control-lg"
           value={form.plazo_meses} onChange={(e) => poner("plazo_meses")(e.target.value)} placeholder="Ej: 6"
         />
-        <div className="form-text">Se calcula solo con lo que puedes pagar al mes.</div>
-      </div>
-      <div className="col-12 col-md-4">
-        <label className="form-label fw-semibold small">¿Cuánto puedes pagar al mes? (L.) *</label>
-        <InputMonto
-          required className="form-control form-control-lg" placeholder="0.00"
-          value={form.cuota_posible} onChange={ponerYCalcularPlazo("cuota_posible")}
-        />
-        {sinPlazoPosible && (
-          <div className="form-text text-danger">
-            Con esa cuota no se alcanza a pagar ni en {param.plazo_max} meses. Sube la cuota o baja el monto.
-          </div>
-        )}
       </div>
 
       {sim.cuotaEstimada > 0 && (
@@ -75,12 +51,6 @@ export function CamposMonto({ param, form, setForm }) {
             <div className="small text-muted text-center mt-2">
               Es un cálculo aproximado. La cuota final depende de las condiciones que apruebe la cooperativa.
             </div>
-            {sim.superaCapacidad && (
-              <div className="alert alert-warning py-2 mt-3 mb-0 small">
-                La cuota estimada ({fmt(sim.cuotaEstimada)}) es mayor a lo que dices poder pagar ({fmt(sim.cuotaPosible)}).
-                {sim.plazoSugerido && <> Con <strong>{sim.plazoSugerido} meses</strong> la cuota se ajusta a tu capacidad.</>}
-              </div>
-            )}
             <AvisoRelacion sim={sim} />
           </div>
         </div>

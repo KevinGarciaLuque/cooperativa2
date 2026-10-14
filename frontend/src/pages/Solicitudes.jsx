@@ -353,10 +353,12 @@ export default function Solicitudes() {
                           <div className="small text-muted">Cuota estimada</div>
                           <div className="fw-bold">{fmt(p.cuota_estimada)}</div>
                         </div>
-                        <div className="col-4">
-                          <div className="small text-muted">Puede pagar</div>
-                          <div className="fw-bold">{fmt(p.cuota_posible)}</div>
-                        </div>
+                        {p.cuota_posible > 0 && (
+                          <div className="col-4">
+                            <div className="small text-muted">Puede pagar</div>
+                            <div className="fw-bold">{fmt(p.cuota_posible)}</div>
+                          </div>
+                        )}
                         <div className="col-4">
                           <div className="small text-muted">Ingreso mensual</div>
                           <div className="fw-bold">{fmt(p.ingreso_mensual)}</div>

@@ -28,7 +28,8 @@ const validarSolicitud = (b = {}) => {
   const c = config.obtener();
   const monto = num(b.monto);
   const plazo = parseInt(b.plazo_meses);
-  const cuotaPosible = num(b.cuota_posible);
+  // Ya no se pregunta en el formulario; si viene (formularios anteriores) se guarda, si no queda en 0
+  const cuotaPosible = num(b.cuota_posible) > 0 ? num(b.cuota_posible) : 0;
   const ingreso = num(b.ingreso_mensual);
 
   if (!(monto > 0) || monto > c.sol_monto_max) {
@@ -37,7 +38,6 @@ const validarSolicitud = (b = {}) => {
   if (!Number.isInteger(plazo) || plazo < 1 || plazo > c.sol_plazo_max) {
     return { error: `El plazo debe estar entre 1 y ${c.sol_plazo_max} meses.` };
   }
-  if (!(cuotaPosible > 0)) return { error: "Indica cuánto puedes pagar al mes." };
   if (!PROPOSITOS.includes(b.proposito)) return { error: "Selecciona el destino del préstamo." };
   if (!OCUPACIONES.includes(b.ocupacion)) return { error: "Selecciona tu fuente de ingresos." };
   if (!(ingreso > 0)) return { error: "Indica tu ingreso mensual aproximado." };

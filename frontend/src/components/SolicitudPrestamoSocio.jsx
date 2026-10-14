@@ -53,7 +53,7 @@ export default function SolicitudPrestamoSocio({ token, onEnviada }) {
     try {
       const r = await axios.post(`${API_URL}/solicitudes/prestamo`, solicitudDesde(form, acepta), { headers });
       setExito(r.data.message);
-      setForm((f) => ({ ...f, monto: "", plazo_meses: "", cuota_posible: "", descripcion: "" }));
+      setForm((f) => ({ ...f, monto: "", plazo_meses: "", descripcion: "" }));
       setAcepta(false);
       cargarMias();
       if (onEnviada) onEnviada();

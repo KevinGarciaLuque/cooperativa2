@@ -1,7 +1,7 @@
 // Campos de la solicitud de préstamo. Los usan el panel del socio y el enlace de registro,
 // para que ambos pidan exactamente lo mismo.
 import InputMonto from "../ui/InputMonto";
-import { OCUPACIONES, PROPOSITOS, fmt, simular } from "../utils/solicitud";
+import { OCUPACIONES, PROPOSITOS, fmt, plazoParaCuota, simular } from "../utils/solicitud";
 import { formatearNombre } from "../utils/nombres";
 
 export const AvisoRelacion = ({ sim }) =>
@@ -16,6 +16,17 @@ export const AvisoRelacion = ({ sim }) =>
 export function CamposMonto({ param, form, setForm }) {
   const sim = simular(param, form);
   const poner = (campo) => (v) => setForm((f) => ({ ...f, [campo]: v }));
+  // Al escribir cuánto puede pagar al mes (o cambiar el monto con esa cuota ya puesta), los
+  // meses se calculan solos. Si después cambia los meses a mano, se respeta lo que escriba.
+  const ponerYCalcularPlazo = (campo) => (v) =>
+    setForm((f) => {
+      const nuevo = { ...f, [campo]: v };
+      const plazo = plazoParaCuota(param, parseFloat(nuevo.monto), parseFloat(nuevo.cuota_posible));
+      return plazo ? { ...nuevo, plazo_meses: String(plazo) } : nuevo;
+    });
+  const sinPlazoPosible =
+    parseFloat(form.monto) > 0 && parseFloat(form.cuota_posible) > 0 && param &&
+    !plazoParaCuota(param, parseFloat(form.monto), parseFloat(form.cuota_posible));
 
   return (
     <div className="row g-3">
@@ -23,7 +34,7 @@ export function CamposMonto({ param, form, setForm }) {
         <label className="form-label fw-semibold small">¿Cuánto necesitas? (L.) *</label>
         <InputMonto
           required className="form-control form-control-lg" placeholder="0.00"
-          value={form.monto} onChange={poner("monto")}
+          value={form.monto} onChange={ponerYCalcularPlazo("monto")}
         />
         {param && <div className="form-text">Máximo {fmt(param.monto_max)}</div>}
       </div>
@@ -33,13 +44,19 @@ export function CamposMonto({ param, form, setForm }) {
           type="number" min="1" max={param?.plazo_max || 60} step="1" required className="form-control form-control-lg"
           value={form.plazo_meses} onChange={(e) => poner("plazo_meses")(e.target.value)} placeholder="Ej: 6"
         />
+        <div className="form-text">Se calcula solo con lo que puedes pagar al mes.</div>
       </div>
       <div className="col-12 col-md-4">
         <label className="form-label fw-semibold small">¿Cuánto puedes pagar al mes? (L.) *</label>
         <InputMonto
           required className="form-control form-control-lg" placeholder="0.00"
-          value={form.cuota_posible} onChange={poner("cuota_posible")}
+          value={form.cuota_posible} onChange={ponerYCalcularPlazo("cuota_posible")}
         />
+        {sinPlazoPosible && (
+          <div className="form-text text-danger">
+            Con esa cuota no se alcanza a pagar ni en {param.plazo_max} meses. Sube la cuota o baja el monto.
+          </div>
+        )}
       </div>
 
       {sim.cuotaEstimada > 0 && (

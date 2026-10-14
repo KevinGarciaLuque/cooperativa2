@@ -71,6 +71,16 @@ const cuotaDe = (monto, plazo, tasaMensual) => {
   return (monto * i * Math.pow(1 + i, plazo)) / (Math.pow(1 + i, plazo) - 1);
 };
 
+// Menor número de meses con el que la cuota cabe en lo que la persona puede pagar al mes
+// (null si ni con el plazo máximo alcanza)
+export const plazoParaCuota = (param, monto, cuotaPosible) => {
+  if (!param || !(monto > 0) || !(cuotaPosible > 0)) return null;
+  for (let n = 1; n <= (param.plazo_max || 60); n++) {
+    if (cuotaDe(monto, n, param.tasa_mensual) <= cuotaPosible) return n;
+  }
+  return null;
+};
+
 export const simular = (param, form) => {
   const monto = parseFloat(form.monto) || 0;
   const plazo = parseInt(form.plazo_meses) || 0;
@@ -79,16 +89,7 @@ export const simular = (param, form) => {
   const cuotaEstimada = param && monto > 0 && plazo > 0 ? cuotaDe(monto, plazo, param.tasa_mensual) : 0;
   const superaCapacidad = cuotaEstimada > 0 && cuotaPosible > 0 && cuotaEstimada > cuotaPosible * 1.001;
 
-  // Plazo mínimo para que la cuota entre en lo que la persona dice poder pagar
-  let plazoSugerido = null;
-  if (superaCapacidad) {
-    for (let n = 1; n <= param.plazo_max; n++) {
-      if (cuotaDe(monto, n, param.tasa_mensual) <= cuotaPosible) {
-        plazoSugerido = n;
-        break;
-      }
-    }
-  }
+  const plazoSugerido = superaCapacidad ? plazoParaCuota(param, monto, cuotaPosible) : null;
 
   const relacion = ingreso > 0 && cuotaEstimada > 0 ? (cuotaEstimada / ingreso) * 100 : null;
   return {

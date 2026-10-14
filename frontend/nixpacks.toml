@@ -1,0 +1,5 @@
+# Railway (Nixpacks): Caddy sirve SIEMPRE la carpeta compilada /app/dist con nuestro Caddyfile.
+# El Caddyfile de Nixpacks usa la variable NIXPACKS_SPA_OUTPUT_DIR; si llega vacía, publica el
+# código fuente (index.html con /src/main.jsx) y la página queda en blanco.
+[start]
+cmd = "exec caddy run --config /app/Caddyfile --adapter caddyfile 2>&1"

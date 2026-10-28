@@ -291,6 +291,12 @@ export default function Prestamos() {
         icon: FaCheckCircle,
         label: "Aprobado",
       },
+      consolidado: {
+        color: "#7c3aed",
+        bg: "rgba(124, 58, 237, 0.1)",
+        icon: FaCheckCircle,
+        label: "Consolidado",
+      },
       activo: {
         color: "#27ae60",
         bg: "rgba(39, 174, 96, 0.1)",

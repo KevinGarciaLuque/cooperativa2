@@ -465,6 +465,53 @@ const MIGRACIONES = [
       }
     },
   },
+  {
+    id: "2026_10_019_consolidaciones",
+    descripcion: "Consolidación de préstamos",
+    async up(conn) {
+      const [[col]] = await conn.query(
+        `SELECT COLUMN_TYPE AS tipo FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'prestamos' AND COLUMN_NAME = 'estado'`
+      );
+      if (col && !col.tipo.includes("'consolidado'")) {
+        await conn.query(
+          `ALTER TABLE prestamos MODIFY estado ENUM('pendiente','aprobado','activo','pagado','mora','rechazado','consolidado') NOT NULL DEFAULT 'pendiente'`
+        );
+      }
+      const agregar = async (nombre, definicion) => {
+        const [[e]] = await conn.query(
+          `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'prestamos' AND COLUMN_NAME = ?`,
+          [nombre]
+        );
+        if (!e.n) await conn.query(`ALTER TABLE prestamos ADD COLUMN ${nombre} ${definicion}`);
+      };
+      await agregar("consolidado_en", "DATETIME NULL");
+      await agregar("consolidado_en_prestamo", "INT NULL");
+
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS consolidaciones (
+          id_consolidacion INT AUTO_INCREMENT PRIMARY KEY,
+          id_usuario INT NOT NULL,
+          id_prestamo_nuevo INT NOT NULL,
+          prestamos_origen TEXT NOT NULL,
+          capital DECIMAL(12,2) NOT NULL,
+          interes_capitalizado DECIMAL(12,2) NOT NULL DEFAULT 0,
+          mora_capitalizada DECIMAL(12,2) NOT NULL DEFAULT 0,
+          mora_condonada DECIMAL(12,2) NOT NULL DEFAULT 0,
+          monto_adicional DECIMAL(12,2) NOT NULL DEFAULT 0,
+          monto_nuevo DECIMAL(12,2) NOT NULL,
+          tasa_mensual DECIMAL(6,3) NOT NULL,
+          plazo_meses INT NOT NULL,
+          motivo VARCHAR(255) NULL,
+          creada_por INT NULL,
+          creada_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_consolidacion_usuario (id_usuario),
+          INDEX idx_consolidacion_fecha (creada_en)
+        )
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

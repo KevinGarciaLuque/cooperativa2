@@ -19,6 +19,7 @@ const TIPOS = {
   pago_prestamo: "Recibo de pago de préstamo",
   aportacion: "Recibo de aportación",
   desembolso: "Comprobante de desembolso",
+  consolidacion: "Convenio de consolidación de préstamos",
   finiquito: "Constancia de cancelación de préstamo",
 };
 
@@ -75,7 +76,9 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
 
   const d = recibo?.detalle || {};
   const firmado = !!(recibo?.firma_digital || recibo?.comprobante_firmado);
-  const pideFirma = recibo?.tipo === "desembolso" && !firmado; // el comprobante de entrega debe firmarse
+  // El comprobante de entrega y el convenio de consolidación deben firmarse
+  const esEntrega = recibo?.tipo === "desembolso" || recibo?.tipo === "consolidacion";
+  const pideFirma = esEntrega && !firmado;
 
   // Firma del perfil del socio, para mostrarla antes de firmar
   useEffect(() => {
@@ -252,7 +255,7 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
           </div>
 
           {/* Firma del socio: digital desde la app o copia firmada a mano (foto o PDF) */}
-          {recibo && !recibo.anulado && recibo.tipo !== "finiquito" && (esSocio || recibo.tipo === "desembolso" || firmado) && (
+          {recibo && !recibo.anulado && recibo.tipo !== "finiquito" && (esSocio || esEntrega || firmado) && (
             <div
               className="recibo-no-print mx-3 mt-2 p-2 px-3 rounded-3"
               style={{
@@ -342,7 +345,7 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
                         <img src={miFirma} alt="Tu firma" style={{ maxWidth: "100%", maxHeight: 80 }} />
                       </div>
                       <div className="small mb-2">
-                        Al firmar confirmas que {recibo.tipo === "desembolso" ? "recibiste" : "entregaste"}{" "}
+                        Al firmar confirmas que {recibo.tipo === "desembolso" ? "recibiste" : recibo.tipo === "consolidacion" ? "aceptas el préstamo consolidado de" : "entregaste"}{" "}
                         <strong>{fmt(recibo.monto)}</strong> según este documento ({recibo.numero}). La firma queda
                         guardada en el documento y no se puede quitar.
                       </div>
@@ -470,6 +473,50 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
                       </div>
                     </>
                   )}
+                  {recibo.tipo === "consolidacion" && (
+                    <>
+                      <div className="d-flex justify-content-between py-1 border-bottom">
+                        <span className="text-muted">Préstamos consolidados</span>
+                        <span className="text-end">{(d.prestamos || []).map((p) => `#${p.id_prestamo}`).join(", ")}</span>
+                      </div>
+                      <div className="d-flex justify-content-between py-1 border-bottom">
+                        <span className="text-muted">Capital que se debía</span>
+                        <span>{fmt(d.capital)}</span>
+                      </div>
+                      <div className="d-flex justify-content-between py-1 border-bottom">
+                        <span className="text-muted">Interés acumulado sumado</span>
+                        <span>{fmt(d.interes_capitalizado)}</span>
+                      </div>
+                      {parseFloat(d.mora_capitalizada) > 0 && (
+                        <div className="d-flex justify-content-between py-1 border-bottom">
+                          <span className="text-muted">Mora sumada</span>
+                          <span>{fmt(d.mora_capitalizada)}</span>
+                        </div>
+                      )}
+                      {parseFloat(d.adicional) > 0 && (
+                        <div className="d-flex justify-content-between py-1 border-bottom">
+                          <span className="text-muted">Dinero adicional entregado</span>
+                          <span>{fmt(d.adicional)}</span>
+                        </div>
+                      )}
+                      <div className="d-flex justify-content-between py-1 border-bottom">
+                        <span className="text-muted">Plazo</span>
+                        <span>{d.plazo_meses} meses</span>
+                      </div>
+                      <div className="d-flex justify-content-between py-1 border-bottom">
+                        <span className="text-muted">Tasa mensual</span>
+                        <span>{parseFloat(d.tasa_mensual)}%</span>
+                      </div>
+                      <div className="d-flex justify-content-between py-1 border-bottom">
+                        <span className="text-muted">Cuota mensual</span>
+                        <span className="fw-semibold">{fmt(d.cuota)}</span>
+                      </div>
+                      <div className="d-flex justify-content-between py-1 border-bottom">
+                        <span className="text-muted">Primer vencimiento</span>
+                        <span>{d.primer_vencimiento}</span>
+                      </div>
+                    </>
+                  )}
                   {recibo.tipo === "desembolso" && (
                     <>
                       {d.plazo_meses != null && (
@@ -493,7 +540,7 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
                   style={{ background: "#f1f5f9", borderRadius: 10 }}
                 >
                   <span className="fw-semibold">
-                    {recibo.tipo === "desembolso" ? "Monto entregado" : recibo.tipo === "finiquito" ? "Monto del préstamo" : "Monto recibido"}
+                    {recibo.tipo === "desembolso" ? "Monto entregado" : recibo.tipo === "consolidacion" ? "Préstamo consolidado" : recibo.tipo === "finiquito" ? "Monto del préstamo" : "Monto recibido"}
                   </span>
                   <span className="fw-bold fs-4">{fmt(recibo.monto)}</span>
                 </div>
@@ -505,7 +552,7 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
                     )}
                     <div style={{ borderTop: "1px solid #94a3b8", paddingTop: 4 }}>
                       {recibo.emitido_por || "Cajero"}
-                      <div>Recibido por</div>
+                      <div>{recibo.tipo === "consolidacion" ? "Por la cooperativa" : "Recibido por"}</div>
                     </div>
                   </div>
                   <div className="col-6">
@@ -514,7 +561,7 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
                     )}
                     <div style={{ borderTop: "1px solid #94a3b8", paddingTop: 4 }}>
                       {recibo.socio?.nombre || "Socio"}
-                      <div>{recibo.tipo === "desembolso" ? "Recibí conforme" : "Entregado por"}</div>
+                      <div>{recibo.tipo === "desembolso" ? "Recibí conforme" : recibo.tipo === "consolidacion" ? "Acepto las condiciones" : "Entregado por"}</div>
                     </div>
                   </div>
                 </div>

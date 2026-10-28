@@ -15,6 +15,7 @@ const TIPOS = {
   pago_prestamo: "Pago de préstamo",
   aportacion: "Aportación",
   desembolso: "Desembolso",
+  consolidacion: "Consolidación",
 };
 
 // Lista los recibos emitidos a un socio y permite verlos, imprimirlos o compartirlos de nuevo.

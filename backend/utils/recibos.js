@@ -26,7 +26,8 @@ const crearRecibo = async (conn, r) => {
 };
 
 // Los finiquitos llevan prefijo propio (F-) para distinguirlos de los recibos de dinero
-const numeroRecibo = (id, tipo) => `${tipo === "finiquito" ? "F" : "R"}-${String(id).padStart(6, "0")}`;
+const PREFIJOS = { finiquito: "F", consolidacion: "C" };
+const numeroRecibo = (id, tipo) => `${PREFIJOS[tipo] || "R"}-${String(id).padStart(6, "0")}`;
 
 // Emite la constancia de cancelación (finiquito) de un préstamo ya pagado.
 // Si ya existe una vigente, devuelve esa. Devuelve null si el préstamo no está pagado.

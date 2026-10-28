@@ -225,6 +225,12 @@ router.post("/", async (req, res) => {
 
     const prestamoData = prestamo[0];
 
+    if (prestamoData.estado === 'consolidado') {
+      return fail(400, {
+        message: `Este préstamo fue consolidado en el préstamo #${prestamoData.consolidado_en_prestamo}. Registra el pago en el préstamo nuevo.`,
+      });
+    }
+
     if (prestamoData.estado === 'pagado') {
       return fail(400, { 
         message: "El préstamo ya está completamente pagado" 

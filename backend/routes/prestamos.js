@@ -878,6 +878,11 @@ router.put("/:id", async (req, res) => {
     }
     const actual = existing[0];
 
+    if (actual.estado === "consolidado") {
+      await connection.rollback();
+      return res.status(409).json({ message: "Este préstamo fue consolidado en otro y ya no se puede editar." });
+    }
+
     const [[{ cantidad_pagos }]] = await connection.query(
       `SELECT COUNT(*) AS cantidad_pagos FROM pagos_prestamo WHERE id_prestamo = ?`,
       [id]
@@ -989,6 +994,11 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json({ message: "Préstamo no encontrado" });
     }
     const p = existing[0];
+
+    if (p.estado === "consolidado") {
+      await connection.rollback();
+      return res.status(409).json({ message: "Este préstamo fue consolidado: forma parte del historial y no se puede eliminar." });
+    }
 
     // Nunca se borra el historial de pagos: primero hay que anularlos uno a uno (con motivo)
     const [[{ cantidad_pagos }]] = await connection.query(

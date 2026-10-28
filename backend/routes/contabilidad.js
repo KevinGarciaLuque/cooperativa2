@@ -91,7 +91,19 @@ const estadoResultados = async (desde, hasta) => {
     total: redondear(a.total),
   }));
   const totalOtros = redondear(otros.reduce((s, a) => s + a.total, 0));
-  const totalIngresos = redondear(interes + mora + totalOtros);
+  // Interés y mora que se sumaron al capital al consolidar: se reconocen como ingreso ese mes
+  let capitalizados = 0;
+  try {
+    const [[cap]] = await pool.query(
+      `SELECT IFNULL(SUM(interes_capitalizado + mora_capitalizada), 0) AS total
+       FROM consolidaciones WHERE creada_en >= ? AND creada_en < ?`,
+      [desde, hasta]
+    );
+    capitalizados = redondear(cap.total);
+  } catch {
+    capitalizados = 0; // la tabla aún no existe
+  }
+  const totalIngresos = redondear(interes + mora + capitalizados + totalOtros);
 
   const detalleGastos = gastos.map((g) => ({
     categoria: g.categoria,
@@ -106,6 +118,7 @@ const estadoResultados = async (desde, hasta) => {
     ingresos: {
       intereses_prestamos: interes,
       mora,
+      intereses_capitalizados: capitalizados,
       otros,
       total_otros: totalOtros,
       total: totalIngresos,
@@ -485,6 +498,7 @@ router.get("/exportar/estado-resultados", async (req, res) => {
     seccion("INGRESOS");
     ws.addRow(["Intereses de préstamos", r.ingresos.intereses_prestamos]);
     ws.addRow(["Mora cobrada", r.ingresos.mora]);
+    ws.addRow(["Intereses capitalizados (consolidaciones)", r.ingresos.intereses_capitalizados]);
     r.ingresos.otros.forEach((o) => ws.addRow([o.etiqueta, o.total]));
     ws.addRow(["Total ingresos", r.ingresos.total]).font = { bold: true };
     ws.addRow([]);

@@ -127,6 +127,30 @@ test("seguridad: las respuestas nunca incluyen la contraseña", async () => {
   assert.ok(!JSON.stringify(r.b).includes('"password"'));
 });
 
+test("lista de socios (Ventanilla): solo socios, con filtros y paginación", async () => {
+  const todos = await api("GET", "/usuarios?rol=Socio&orden=nombre&limit=1&page=1", null, ids.tSuper);
+  assert.equal(todos.s, 200);
+  assert.equal(todos.b.data.length, 1);
+  assert.equal(todos.b.data[0].rol, "Socio");
+  assert.ok(todos.b.pagination.total >= 2);
+  assert.ok(todos.b.pagination.totalPages >= 2);
+  assert.ok("prestamos_vigentes" in todos.b.data[0] && "saldo_prestamos" in todos.b.data[0]);
+
+  // ordenados por nombre
+  const dos = await api("GET", "/usuarios?rol=Socio&orden=nombre&limit=50", null, ids.tSuper);
+  const nombres = dos.b.data.map((u) => u.nombre_completo);
+  assert.deepEqual(nombres, [...nombres].sort((a, b) => a.localeCompare(b, "es")));
+  assert.ok(dos.b.data.every((u) => u.rol === "Socio"));
+
+  // filtros rápidos
+  for (const f of ["con_prestamo", "en_mora", "sin_prestamo"]) {
+    assert.equal((await api("GET", `/usuarios?rol=Socio&filtro=${f}`, null, ids.tSuper)).s, 200);
+  }
+  // búsqueda por nombre
+  const buscar = await api("GET", "/usuarios?rol=Socio&search=Uno%20Prueba", null, ids.tSuper);
+  assert.equal(buscar.b.data.length, 1);
+});
+
 test("seguridad: el socio solo ve lo suyo", async () => {
   assert.equal((await api("GET", "/usuarios", null, ids.tSocio)).s, 403);
   assert.equal((await api("GET", `/usuarios/${ids.socio}`, null, ids.tSocio)).s, 200);
@@ -777,7 +801,7 @@ test("pagos reportados por el socio: reportar, confirmar en Pagos y rechazar", a
     [ids.socio]
   );
   const idPrestamo = pr.insertId;
-  const hoy = new Date().toISOString().substring(0, 10);
+  const hoy = require("../../utils/fechas").hoyISO(); // la fecha de hoy según la zona de la cooperativa
   const reportar = async (token, datos, conArchivo = true) => {
     const f = new FormData();
     Object.entries(datos).forEach(([k, v]) => f.append(k, String(v)));
@@ -919,6 +943,100 @@ test("políticas: borrador, publicación, aceptación del socio y nuevas version
   // retirarla la oculta
   assert.equal((await api("DELETE", `/politicas/${reglamento.id_politica}`, null, ids.tSuper)).s, 200);
   assert.equal((await api("GET", "/politicas/publicas")).b.data.length, 0);
+});
+
+test("consolidación: junta préstamos vigentes en uno nuevo, solo el Super Administrador", async () => {
+  const hash = await bcrypt.hash("Clave1234", 4);
+  const [u] = await pool.query(
+    `INSERT INTO usuarios (nombre_completo, dni, telefono, correo, password, rol_id, estado, fecha_registro)
+     VALUES ('Socio Consolida Prueba', '0801000000077', '98765432', 'consolida@prueba.hn', ?, 2, 'activo', NOW())`,
+    [hash]
+  );
+  const idSocio = u.insertId;
+  const prestamo = async (monto, plazo, dias) =>
+    (
+      await pool.query(
+        `INSERT INTO prestamos (id_usuario, monto, tasa_interes, tipo_tasa, tasa_original, plazo_meses, saldo_restante, estado, fecha_otorgado)
+         VALUES (?, ?, 120, 'nominal_mensual', 10, ?, ?, 'activo', DATE_SUB(NOW(), INTERVAL ? DAY))`,
+        [idSocio, monto, plazo, monto, dias]
+      )
+    )[0].insertId;
+  const l1 = await prestamo(5000, 6, 10); // un mes de interés (500), sin mora
+  const l2 = await prestamo(3000, 3, 50); // 50 días de interés (500) y 20 días de mora
+
+  const q = `id_usuario=${idSocio}&ids=${l1},${l2}&tasa_mensual=12&plazo_meses=12&adicional=1000`;
+
+  // permisos: solo el Super Administrador
+  assert.equal((await api("GET", `/consolidaciones/simular?${q}`, null, ids.tAdmin)).s, 403);
+  assert.equal((await api("GET", `/consolidaciones/simular?${q}`, null, ids.tSocio)).s, 403);
+
+  // validaciones
+  assert.equal((await api("GET", `/consolidaciones/simular?id_usuario=${idSocio}&ids=${l1}&tasa_mensual=12&plazo_meses=12`, null, ids.tSuper)).s, 400);
+  const ajeno = await prestamo(1000, 2, 5);
+  await pool.query("UPDATE prestamos SET id_usuario = ? WHERE id_prestamo = ?", [ids.socio2, ajeno]);
+  assert.equal((await api("GET", `/consolidaciones/simular?id_usuario=${idSocio}&ids=${l1},${ajeno}&tasa_mensual=12&plazo_meses=12`, null, ids.tSuper)).s, 400);
+
+  // simulación: capital + interés + mora + adicional
+  const sim = await api("GET", `/consolidaciones/simular?${q}`, null, ids.tSuper);
+  assert.equal(sim.s, 200);
+  cerca(sim.b.data.capital, 8000);
+  cerca(sim.b.data.interes_capitalizado, 1000, 0.5);
+  assert.ok(sim.b.data.mora_capitalizada > 35 && sim.b.data.mora_capitalizada < 45);
+  cerca(sim.b.data.monto_nuevo, 8000 + 1000 + sim.b.data.mora_capitalizada + 1000, 0.5);
+  assert.ok(sim.b.data.cuota_nueva > 0 && sim.b.data.total_a_pagar > sim.b.data.monto_nuevo);
+
+  // omitir la mora la saca del monto nuevo
+  const sinMora = await api("GET", `/consolidaciones/simular?${q}&omitir_mora=1`, null, ids.tSuper);
+  assert.equal(sinMora.b.data.mora_capitalizada, 0);
+  assert.ok(sinMora.b.data.mora_condonada > 35);
+
+  // confirmar exige motivo
+  const cuerpo = { id_usuario: idSocio, ids: [l1, l2], tasa_mensual: 12, plazo_meses: 12, adicional: 1000, metodo_adicional: "efectivo" };
+  assert.equal((await api("POST", "/consolidaciones", { ...cuerpo, motivo: "x" }, ids.tSuper)).s, 400);
+  assert.equal((await api("POST", "/consolidaciones", { ...cuerpo, motivo: "Prueba automática" }, ids.tAdmin)).s, 403);
+
+  const ok = await api("POST", "/consolidaciones", { ...cuerpo, motivo: "Prueba automática de consolidación" }, ids.tSuper);
+  assert.equal(ok.s, 201);
+  const nuevoId = ok.b.id_prestamo_nuevo;
+
+  const [[n]] = await pool.query("SELECT * FROM prestamos WHERE id_prestamo = ?", [nuevoId]);
+  assert.equal(n.estado, "activo");
+  assert.equal(parseFloat(n.tasa_original), 12);
+  assert.equal(n.plazo_meses, 12);
+  cerca(parseFloat(n.monto), ok.b.data.monto_nuevo);
+  cerca(parseFloat(n.saldo_restante), ok.b.data.monto_nuevo);
+
+  // los anteriores quedan consolidados, con saldo 0 y apuntando al nuevo
+  const [viejos] = await pool.query("SELECT estado, saldo_restante, consolidado_en_prestamo FROM prestamos WHERE id_prestamo IN (?, ?)", [l1, l2]);
+  assert.ok(viejos.every((v) => v.estado === "consolidado" && parseFloat(v.saldo_restante) === 0 && v.consolidado_en_prestamo === nuevoId));
+
+  // caja: solo sale el monto adicional
+  const [caja] = await pool.query("SELECT tipo, monto FROM caja_movimientos WHERE referencia_tipo = 'prestamo' AND referencia_id = ?", [nuevoId]);
+  assert.equal(caja.length, 1);
+  assert.equal(caja[0].tipo, "egreso");
+  cerca(parseFloat(caja[0].monto), 1000);
+
+  // convenio con numeración propia
+  const [[rec]] = await pool.query("SELECT id_recibo, tipo FROM recibos WHERE referencia_tipo = 'prestamo' AND referencia_id = ?", [nuevoId]);
+  assert.equal(rec.tipo, "consolidacion");
+  const convenio = await api("GET", `/recibos/${rec.id_recibo}`, null, ids.tSuper);
+  assert.match(convenio.b.data.numero, /^C-\d{6}$/);
+  assert.equal(convenio.b.data.detalle.prestamos.length, 2);
+
+  // un préstamo consolidado ya no se paga, edita ni elimina; no se vuelve a consolidar
+  assert.equal((await api("POST", "/pagos", { id_prestamo: l1, monto_pagado: 100 }, ids.tSuper)).s, 400);
+  assert.equal((await api("PUT", `/prestamos/${l1}`, { estado: "activo" }, ids.tSuper)).s, 409);
+  assert.equal((await api("DELETE", `/prestamos/${l1}`, null, ids.tSuper)).s, 409);
+  assert.equal((await api("GET", `/consolidaciones/simular?id_usuario=${idSocio}&ids=${l1},${l2}&tasa_mensual=12&plazo_meses=12`, null, ids.tSuper)).s, 400);
+
+  // el préstamo nuevo sí se paga con normalidad
+  assert.equal((await api("POST", "/pagos", { id_prestamo: nuevoId, monto_pagado: 500, tipo_pago: "libre" }, ids.tSuper)).s, 201);
+
+  // el interés y la mora capitalizados cuentan como ingreso del mes
+  const { anioMesActual } = require("../../utils/fechas");
+  const { anio, mes } = anioMesActual();
+  const res = await api("GET", `/contabilidad/estado-resultados?anio=${anio}&mes=${mes}`, null, ids.tSuper);
+  assert.ok(res.b.data.ingresos.intereses_capitalizados > 1000);
 });
 
 test("monitoreo: el estado del servicio responde", async () => {

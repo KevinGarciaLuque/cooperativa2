@@ -11,6 +11,7 @@ const TIPOS = {
   pago_prestamo: "Recibo de pago de préstamo",
   aportacion: "Recibo de aportación",
   desembolso: "Comprobante de desembolso",
+  consolidacion: "Convenio de consolidación de préstamos",
   finiquito: "Constancia de cancelación de préstamo",
 };
 
@@ -207,7 +208,9 @@ export async function generarReciboPdf(recibo) {
     filas.push(["Identidad", recibo.socio.dni || "—"]);
   }
   filas.push(["Concepto", recibo.concepto || "—"]);
-  filas.push(["Forma de pago", METODOS[recibo.metodo] || recibo.metodo || "—"]);
+  if (recibo.tipo !== "consolidacion" || recibo.metodo) {
+    filas.push(["Forma de pago", METODOS[recibo.metodo] || recibo.metodo || "—"]);
+  }
 
   if (recibo.tipo === "pago_prestamo") {
     filas.push(["Abono a capital", fmt(d.capital)]);
@@ -216,6 +219,16 @@ export async function generarReciboPdf(recibo) {
     filas.push(["Saldo del préstamo", d.liquidado ? "Liquidado" : fmt(d.saldo_nuevo)]);
   } else if (recibo.tipo === "aportacion" && d.saldo_nuevo != null) {
     filas.push([`Saldo de la cuenta ${d.cuenta || ""}`.trim(), fmt(d.saldo_nuevo)]);
+  } else if (recibo.tipo === "consolidacion") {
+    filas.push(["Préstamos consolidados", (d.prestamos || []).map((p) => `#${p.id_prestamo}`).join(", ")]);
+    filas.push(["Capital que se debía", fmt(d.capital)]);
+    filas.push(["Interés acumulado sumado", fmt(d.interes_capitalizado)]);
+    if (parseFloat(d.mora_capitalizada) > 0) filas.push(["Mora sumada", fmt(d.mora_capitalizada)]);
+    if (parseFloat(d.adicional) > 0) filas.push(["Dinero adicional entregado", fmt(d.adicional)]);
+    filas.push(["Plazo", `${d.plazo_meses} meses`]);
+    filas.push(["Tasa mensual", `${parseFloat(d.tasa_mensual)}%`]);
+    filas.push(["Cuota mensual", fmt(d.cuota)]);
+    filas.push(["Primer vencimiento", String(d.primer_vencimiento || "")]);
   } else if (recibo.tipo === "desembolso") {
     if (d.plazo_meses != null) {
       filas.push(["Plazo", parseInt(d.plazo_meses) === 0 ? "Indefinido" : `${d.plazo_meses} meses`]);
@@ -243,7 +256,11 @@ export async function generarReciboPdf(recibo) {
   doc.roundedRect(margen, y, ancho - margen * 2, 16, 3, 3, "F");
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text(recibo.tipo === "desembolso" ? "Monto entregado" : "Monto recibido", margen + 4, y + 10);
+  doc.text(
+    recibo.tipo === "desembolso" ? "Monto entregado" : recibo.tipo === "consolidacion" ? "Préstamo consolidado" : "Monto recibido",
+    margen + 4,
+    y + 10
+  );
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
   doc.text(fmt(recibo.monto), ancho - margen - 4, y + 10.5, { align: "right" });
@@ -260,9 +277,14 @@ export async function generarReciboPdf(recibo) {
   doc.setFontSize(8);
   doc.setTextColor(100);
   doc.text(recibo.emitido_por || "Cajero", margen + (mitad - 8) / 2, y + 4, { align: "center" });
-  doc.text("Recibido por", margen + (mitad - 8) / 2, y + 8, { align: "center" });
+  doc.text(recibo.tipo === "consolidacion" ? "Por la cooperativa" : "Recibido por", margen + (mitad - 8) / 2, y + 8, { align: "center" });
   doc.text(recibo.socio?.nombre || "Socio", margen + mitad + 8 + (mitad - 8) / 2, y + 4, { align: "center" });
-  doc.text(recibo.tipo === "desembolso" ? "Recibí conforme" : "Entregado por", margen + mitad + 8 + (mitad - 8) / 2, y + 8, { align: "center" });
+  doc.text(
+    recibo.tipo === "desembolso" ? "Recibí conforme" : recibo.tipo === "consolidacion" ? "Acepto las condiciones" : "Entregado por",
+    margen + mitad + 8 + (mitad - 8) / 2,
+    y + 8,
+    { align: "center" }
+  );
 
   return doc.output("blob");
 }

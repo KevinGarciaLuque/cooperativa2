@@ -8,6 +8,9 @@ import EstadoCuentaSocio from "./EstadoCuentaSocio";
 import RecibosSocioModal from "../components/RecibosSocioModal";
 import CartasAprobacionSocio from "../components/CartasAprobacionSocio";
 import ExpedienteSocio from "../components/ExpedienteSocio";
+import ConsolidarPrestamos from "../components/ConsolidarPrestamos";
+import ReciboModal from "../components/ReciboModal";
+import { Paginacion, EmptyState, TablaSkeleton } from "../ui/Componentes";
 import SolicitudesSocioFicha from "../components/SolicitudesSocioFicha";
 import {
   FaSearch,
@@ -40,14 +43,19 @@ const ESTADOS_VIGENTES = ["activo", "mora"];
 const esVigente = (p) => ESTADOS_VIGENTES.includes((p.estado || "").toLowerCase());
 
 export default function Ventanilla() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const esSuperAdmin = user?.rol === "Super Administrador";
   const { mostrarAlerta } = useAlerta();
   const navigate = useNavigate();
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   const [busqueda, setBusqueda] = useState("");
-  const [resultados, setResultados] = useState([]);
-  const [buscando, setBuscando] = useState(false);
+  // Lista de socios (paginada desde el servidor)
+  const [lista, setLista] = useState([]);
+  const [totalLista, setTotalLista] = useState(0);
+  const [paginaLista, setPaginaLista] = useState(1);
+  const [filtroLista, setFiltroLista] = useState("");
+  const [cargandoLista, setCargandoLista] = useState(true);
   const [socio, setSocio] = useState(null);
   const [ficha, setFicha] = useState(null); // { prestamos, cuentas, aportaciones, proximos }
   const [cargandoFicha, setCargandoFicha] = useState(false);
@@ -56,31 +64,50 @@ export default function Ventanilla() {
   const [verRecibos, setVerRecibos] = useState(false);
   const [verCartas, setVerCartas] = useState(false);
   const [pestana, setPestana] = useState("expediente");
+  const [consolidando, setConsolidando] = useState(false);
+  const [reciboConvenio, setReciboConvenio] = useState(null);
 
-  // Búsqueda de socios con retardo para no consultar en cada tecla
+  const TAM_LISTA = 12;
+
+  // Cada cambio de búsqueda o filtro vuelve a la primera página
   useEffect(() => {
-    const texto = busqueda.trim();
-    if (texto.length < 2) {
-      setResultados([]);
-      return;
-    }
+    setPaginaLista(1);
+  }, [busqueda, filtroLista]);
+
+  // Lista de socios: se consulta con retardo para no pedir datos en cada tecla
+  useEffect(() => {
+    if (socio) return;
+    let activo = true;
     const t = setTimeout(async () => {
-      setBuscando(true);
+      setCargandoLista(true);
       try {
         const res = await axios.get(`${API_URL}/usuarios`, {
           headers,
-          params: { search: texto, limit: 8 },
+          params: {
+            rol: "Socio",
+            search: busqueda.trim() || undefined,
+            filtro: filtroLista || undefined,
+            orden: "nombre",
+            page: paginaLista,
+            limit: TAM_LISTA,
+          },
         });
-        const lista = res.data.data || [];
-        setResultados(lista.filter((u) => u.rol === "Socio"));
+        if (!activo) return;
+        setLista(res.data.data || []);
+        setTotalLista(res.data.pagination?.total || 0);
       } catch {
-        setResultados([]);
+        if (!activo) return;
+        setLista([]);
+        setTotalLista(0);
       } finally {
-        setBuscando(false);
+        if (activo) setCargandoLista(false);
       }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [busqueda, headers]);
+    }, busqueda ? 300 : 0);
+    return () => {
+      activo = false;
+      clearTimeout(t);
+    };
+  }, [busqueda, filtroLista, paginaLista, socio, headers]);
 
   const cargarFicha = async (u) => {
     try {
@@ -93,7 +120,6 @@ export default function Ventanilla() {
     setPestana("expediente");
     setSocio(u);
     setBusqueda("");
-    setResultados([]);
     setFicha(null);
     setCargandoFicha(true);
     try {
@@ -309,7 +335,7 @@ export default function Ventanilla() {
 
       <div className="mb-3">
         <h3 className="fw-bold mb-0" style={{ color: AZUL }}>Ventanilla</h3>
-        <span className="text-muted">Busque al socio y elija qué operación realizará.</span>
+        <span className="text-muted">Elija un socio de la lista, o búsquelo, para atenderlo.</span>
       </div>
 
       {/* Buscador */}
@@ -321,9 +347,13 @@ export default function Ventanilla() {
           <input
             type="text"
             className="form-control border-start-0"
-            placeholder="Buscar socio por nombre, identidad o correo..."
+            placeholder="Buscar por nombre, identidad o correo..."
             value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
+            onChange={(e) => {
+              setBusqueda(e.target.value);
+              // Si se está viendo la ficha de un socio, escribir vuelve a la lista con esa búsqueda
+              if (socio && e.target.value.trim()) limpiar();
+            }}
             autoFocus
           />
           {socio && (
@@ -333,38 +363,24 @@ export default function Ventanilla() {
           )}
         </div>
 
-        {busqueda.trim().length >= 2 && (
-          <div className="mt-2 border rounded-3 overflow-hidden">
-            {buscando ? (
-              <div className="p-3 text-muted small">Buscando...</div>
-            ) : resultados.length === 0 ? (
-              <div className="p-3 text-muted small">No se encontraron socios.</div>
-            ) : (
-              resultados.map((u) => (
-                <div
-                  key={u.id_usuario}
-                  className="vt-result d-flex align-items-center gap-3 p-3 border-bottom"
-                  onClick={() => cargarFicha(u)}
-                >
-                  <FaUserCircle size={28} color="#9aa5b1" />
-                  <div className="flex-grow-1">
-                    <div className="fw-semibold">{u.nombre_completo}</div>
-                    <div className="small text-muted">
-                      <FaIdCard className="me-1" />
-                      {u.dni || "Sin identidad"}
-                    </div>
-                  </div>
-                  {u.prestamos_activos > 0 && (
-                    <span className="badge bg-light text-dark border">
-                      {u.prestamos_activos} préstamo(s)
-                    </span>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        )}
       </div>
+
+      {consolidando && socio && resumen && (
+        <ConsolidarPrestamos
+          socio={socio}
+          prestamos={resumen.vigentes}
+          headers={headers}
+          onClose={() => setConsolidando(false)}
+          onListo={(r) => {
+            setConsolidando(false);
+            setReciboConvenio(r.id_recibo);
+            mostrarAlerta("Préstamos consolidados correctamente.", "success");
+            cargarFicha(socio);
+          }}
+        />
+      )}
+
+      {reciboConvenio && <ReciboModal idRecibo={reciboConvenio} onClose={() => setReciboConvenio(null)} />}
 
       {verRecibos && socio && (
         <RecibosSocioModal
@@ -399,9 +415,119 @@ export default function Ventanilla() {
       )}
 
       {!socio && (
-        <div className="text-center text-muted py-5">
-          <FaUserCircle size={56} style={{ opacity: 0.25 }} />
-          <p className="mt-3 mb-0">Escriba al menos 2 letras para buscar un socio.</p>
+        <div className="vt-card mb-4">
+          <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 p-3 border-bottom">
+            <div className="fw-bold" style={{ color: AZUL }}>
+              Socios <span className="text-muted fw-normal">({totalLista})</span>
+            </div>
+            <div className="d-flex flex-wrap gap-2">
+              {[
+                ["", "Todos"],
+                ["con_prestamo", "Con préstamo"],
+                ["en_mora", "En mora"],
+                ["sin_prestamo", "Sin préstamo"],
+              ].map(([valor, etiqueta]) => (
+                <button
+                  key={valor || "todos"}
+                  className="btn btn-sm"
+                  onClick={() => setFiltroLista(valor)}
+                  style={{
+                    background: filtroLista === valor ? AZUL : "#fff",
+                    color: filtroLista === valor ? "#fff" : AZUL,
+                    border: `1.5px solid ${AZUL}`,
+                    borderRadius: 20,
+                    fontWeight: 600,
+                  }}
+                >
+                  {etiqueta}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {cargandoLista && lista.length === 0 ? (
+            <TablaSkeleton filas={6} columnas={4} />
+          ) : lista.length === 0 ? (
+            <EmptyState
+              icono={<FaUserCircle />}
+              titulo="No se encontraron socios"
+              descripcion={busqueda ? "Prueba con otro nombre o número de identidad." : "Todavía no hay socios con este filtro."}
+            />
+          ) : (
+            <div className="table-responsive" style={{ opacity: cargandoLista ? 0.5 : 1, transition: "opacity .15s" }}>
+              <table className="table table-hover align-middle mb-0">
+                <thead>
+                  <tr className="small text-muted text-uppercase">
+                    <th>Socio</th>
+                    <th>Teléfono</th>
+                    <th className="text-center">Préstamos</th>
+                    <th className="text-end">Saldo de préstamos</th>
+                    <th>Estado</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lista.map((u) => {
+                    const enMora = parseInt(u.prestamos_en_mora) > 0;
+                    const estado = (u.estado || "").toLowerCase();
+                    return (
+                      <tr key={u.id_usuario} className="vt-result" onClick={() => cargarFicha(u)}>
+                        <td>
+                          <div className="d-flex align-items-center gap-2">
+                            <FaUserCircle size={30} color="#9aa5b1" />
+                            <div>
+                              <div className="fw-semibold">{u.nombre_completo}</div>
+                              <div className="small text-muted">
+                                <FaIdCard className="me-1" />
+                                {u.dni || "Sin identidad"}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="small">{u.telefono || "—"}</td>
+                        <td className="text-center">
+                          {parseInt(u.prestamos_vigentes) > 0 ? (
+                            <span className="badge bg-light text-dark border">{u.prestamos_vigentes}</span>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </td>
+                        <td className="text-end fw-semibold">
+                          {parseFloat(u.saldo_prestamos) > 0 ? `L. ${fmt(u.saldo_prestamos)}` : <span className="text-muted fw-normal">—</span>}
+                        </td>
+                        <td>
+                          {enMora ? (
+                            <span className="badge rounded-pill" style={{ background: "#fee2e2", color: "#991b1b" }}>
+                              En mora
+                            </span>
+                          ) : estado === "pendiente" ? (
+                            <span className="badge rounded-pill" style={{ background: "#fef3c7", color: "#92400e" }}>
+                              Pendiente
+                            </span>
+                          ) : estado === "activo" ? (
+                            <span className="badge rounded-pill" style={{ background: "#d1fae5", color: "#065f46" }}>
+                              {parseInt(u.prestamos_vigentes) > 0 ? "Al día" : "Activo"}
+                            </span>
+                          ) : (
+                            <span className="badge rounded-pill bg-secondary">{u.estado}</span>
+                          )}
+                        </td>
+                        <td className="text-end text-muted">›</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <Paginacion
+            total={totalLista}
+            pagina={paginaLista}
+            tam={TAM_LISTA}
+            onCambiar={setPaginaLista}
+            etiqueta="socios"
+          />
         </div>
       )}
 
@@ -490,6 +616,26 @@ export default function Ventanilla() {
                 <div className="small text-muted">El socio no tiene préstamos vigentes.</div>
               ) : (
                 <div className="row g-3">
+                {esSuperAdmin && resumen.vigentes.length >= 2 && (
+                  <div className="col-12">
+                    <div
+                      className="d-flex flex-wrap justify-content-between align-items-center gap-2 p-3 rounded-4"
+                      style={{ background: "#f0f7e6", border: "1px solid #cfe5a0" }}
+                    >
+                      <div className="small">
+                        <strong>Este socio tiene {resumen.vigentes.length} préstamos vigentes.</strong> Puedes juntarlos en
+                        uno solo, con otra tasa y otro plazo.
+                      </div>
+                      <button
+                        className="btn fw-semibold"
+                        style={{ background: ACCENT, color: "#1a2a00" }}
+                        onClick={() => setConsolidando(true)}
+                      >
+                        Consolidar préstamos
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {resumen.vigentes.map((p) => {
                   const prox = ficha.proximos[p.id_prestamo];
                   return (

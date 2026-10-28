@@ -30,6 +30,7 @@ const MODULO_POR_PREFIJO = {
   dashboard: "dashboard",
   caja: "caja",
   cobranza: "cobranza",
+  consolidaciones: "prestamos",
   solicitudes: "prestamos",
   contabilidad: "contabilidad",
   recibos: "pagos",

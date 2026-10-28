@@ -188,6 +188,7 @@ app.use("/api/configuracion", require("./routes/configuracion"));
 app.use("/api/caja", require("./routes/caja"));
 app.use("/api/recibos", require("./routes/recibos"));
 app.use("/api/cobranza", require("./routes/cobranza"));
+app.use("/api/consolidaciones", require("./routes/consolidaciones"));
 app.use("/api/contabilidad", require("./routes/contabilidad"));
 app.use("/api/registro", require("./routes/registro"));
 app.use("/api/solicitudes", require("./routes/solicitudes"));

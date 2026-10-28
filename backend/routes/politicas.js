@@ -243,7 +243,7 @@ router.get("/:id(\\d+)/aceptaciones", soloSuperAdmin, async (req, res) => {
        LEFT JOIN politicas_aceptaciones a ON a.id_usuario = u.id_usuario AND a.id_politica = ? AND a.version >= ?
        WHERE u.estado = 'activo'
        GROUP BY u.id_usuario, u.nombre_completo, u.dni
-       ORDER BY aceptada_en IS NULL DESC, u.nombre_completo`,
+       ORDER BY MAX(a.aceptada_en) IS NULL DESC, u.nombre_completo`,
       [req.params.id, p.version_requerida]
     );
     res.json({ success: true, data: rows.map((r) => ({ ...r, aceptada: !!r.aceptada_en })) });

@@ -188,6 +188,9 @@ export default function Contabilidad() {
       <h6 className="fw-bold mb-2">Ingresos</h6>
       <Fila etiqueta="Intereses de préstamos" valor={fmt(r.ingresos.intereses_prestamos)} sangria />
       <Fila etiqueta="Mora cobrada" valor={fmt(r.ingresos.mora)} sangria />
+      {r.ingresos.intereses_capitalizados > 0 && (
+        <Fila etiqueta="Intereses capitalizados (consolidaciones)" valor={fmt(r.ingresos.intereses_capitalizados)} sangria />
+      )}
       {r.ingresos.otros.map((o) => (
         <Fila key={o.tipo} etiqueta={o.etiqueta} valor={fmt(o.total)} sangria />
       ))}

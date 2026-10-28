@@ -178,7 +178,7 @@ router.post("/login", async (req, res) => {
 // ============================================
 router.get("/", async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', estado = '' } = req.query;
+    const { page = 1, limit = 10, search = '', estado = '', rol = '', orden = '', filtro = '' } = req.query;
     const offset = (page - 1) * limit;
 
     // Construir condiciones de búsqueda
@@ -196,9 +196,23 @@ router.get("/", async (req, res) => {
       params.push(estado);
     }
 
+    if (rol) {
+      whereClause += ` AND r.nombre = ?`;
+      params.push(rol);
+    }
+
+    // Filtros rápidos de la lista de socios (Ventanilla)
+    if (filtro === "con_prestamo") {
+      whereClause += ` AND EXISTS (SELECT 1 FROM prestamos x WHERE x.id_usuario = u.id_usuario AND x.estado IN ('activo','mora'))`;
+    } else if (filtro === "en_mora") {
+      whereClause += ` AND EXISTS (SELECT 1 FROM prestamos x WHERE x.id_usuario = u.id_usuario AND x.estado = 'mora')`;
+    } else if (filtro === "sin_prestamo") {
+      whereClause += ` AND NOT EXISTS (SELECT 1 FROM prestamos x WHERE x.id_usuario = u.id_usuario AND x.estado IN ('activo','mora'))`;
+    }
+
     // Obtener total de registros
     const [countResult] = await pool.query(
-      `SELECT COUNT(*) as total FROM usuarios u ${whereClause}`,
+      `SELECT COUNT(*) as total FROM usuarios u INNER JOIN roles r ON u.rol_id = r.id_rol ${whereClause}`,
       params
     );
     const total = countResult[0].total;
@@ -207,11 +221,14 @@ router.get("/", async (req, res) => {
     const [usuarios] = await pool.query(
       `SELECT u.*, r.nombre AS rol,
        (SELECT COUNT(*) FROM prestamos WHERE id_usuario = u.id_usuario AND estado = 'activo') as prestamos_activos,
-       (SELECT IFNULL(SUM(saldo_actual), 0) FROM cuentas WHERE id_usuario = u.id_usuario) as saldo_total
+       (SELECT IFNULL(SUM(saldo_actual), 0) FROM cuentas WHERE id_usuario = u.id_usuario) as saldo_total,
+       (SELECT COUNT(*) FROM prestamos WHERE id_usuario = u.id_usuario AND estado IN ('activo','mora')) as prestamos_vigentes,
+       (SELECT IFNULL(SUM(saldo_restante), 0) FROM prestamos WHERE id_usuario = u.id_usuario AND estado IN ('activo','mora')) as saldo_prestamos,
+       (SELECT COUNT(*) FROM prestamos WHERE id_usuario = u.id_usuario AND estado = 'mora') as prestamos_en_mora
        FROM usuarios u 
        INNER JOIN roles r ON u.rol_id = r.id_rol 
        ${whereClause}
-       ORDER BY u.fecha_registro DESC
+       ORDER BY ${orden === "nombre" ? "u.nombre_completo ASC" : "u.fecha_registro DESC"}
        LIMIT ? OFFSET ?`,
       [...params, parseInt(limit), parseInt(offset)]
     );

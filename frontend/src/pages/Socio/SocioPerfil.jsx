@@ -62,6 +62,7 @@ const estadoBadge = (estado) => {
     pagado:    { bg: "#dbeafe", color: "#1e40af", label: "Pagado" },
     rechazado: { bg: "#fee2e2", color: "#991b1b", label: "Rechazado" },
     activo:    { bg: "#d1fae5", color: "#065f46", label: "Activo" },
+    consolidado: { bg: "#ede9fe", color: "#5b21b6", label: "Consolidado" },
   };
   const s = map[(estado || "").toLowerCase()] || { bg: "#e5e7eb", color: "#374151", label: estado };
   return (

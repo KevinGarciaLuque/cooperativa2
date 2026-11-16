@@ -9,6 +9,7 @@ const { avisarAprobacion } = require("../utils/cartaAprobacion");
 const { dinero } = require("../utils/pais");
 const { planDePrestamo } = require("../utils/planPagos");
 const { obtenerProducto, fueraDeProducto } = require("../utils/productos");
+const { faltaGarantia } = require("../utils/garantias");
 const {
   calcularCuotaMensual,
   generarTablaAmortizacion,
@@ -418,6 +419,13 @@ router.post("/:id/desembolsar", async (req, res) => {
           ? "El préstamo debe aprobarse antes de desembolsarse."
           : `Este préstamo no se puede desembolsar (estado actual: ${p.estado}).`,
       });
+    }
+
+    // La garantía que exige el producto debe estar registrada antes de entregar el dinero
+    const falta = await faltaGarantia(connection, p);
+    if (falta) {
+      await connection.rollback();
+      return res.status(400).json({ message: falta });
     }
 
     const monto = parseFloat(p.monto);

@@ -174,6 +174,7 @@ app.use("/api/usuarios", require("./routes/usuarios"));
 app.use("/api/cuentas", require("./routes/cuentas"));
 app.use("/api/prestamos", ocultarInteresSocio, require("./routes/prestamos"));
 app.use("/api/productos", require("./routes/productos"));
+app.use("/api/garantias", require("./routes/garantias"));
 app.use("/api/aportaciones", require("./routes/aportaciones"));
 app.use("/api/pagos", ocultarInteresSocio, require("./routes/pagos"));
 app.use("/api/movimientos", require("./routes/movimientos"));

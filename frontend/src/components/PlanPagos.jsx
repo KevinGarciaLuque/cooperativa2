@@ -18,6 +18,8 @@ const ESTADOS = {
 
 export default function PlanPagos({ datos, idPrestamo, headers, titulo = "Plan de pagos", maxAlto }) {
   const [cargado, setCargado] = useState(datos === undefined ? null : datos);
+  // Depende del token y no del objeto headers (que puede ser nuevo en cada render)
+  const autorizacion = headers?.Authorization;
 
   useEffect(() => {
     if (datos !== undefined) {
@@ -26,13 +28,13 @@ export default function PlanPagos({ datos, idPrestamo, headers, titulo = "Plan d
     }
     let activo = true;
     axios
-      .get(`${API_URL}/prestamos/${idPrestamo}/plan`, { headers })
+      .get(`${API_URL}/prestamos/${idPrestamo}/plan`, { headers: { Authorization: autorizacion } })
       .then((r) => activo && setCargado(r.data))
       .catch(() => activo && setCargado({ plan: null, motivo: "error" }));
     return () => {
       activo = false;
     };
-  }, [datos, idPrestamo, headers]);
+  }, [datos, idPrestamo, autorizacion]);
 
   if (cargado === null) return <div className="spinner-border spinner-border-sm text-success" />;
   if (!cargado?.plan) {

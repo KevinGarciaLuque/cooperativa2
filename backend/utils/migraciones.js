@@ -571,6 +571,55 @@ const MIGRACIONES = [
       }
     },
   },
+  {
+    id: "2026_11_003_garantias",
+    descripcion: "Garantías de los préstamos (el aval de las solicitudes pasa a ser garantía)",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS garantias (
+          id_garantia INT AUTO_INCREMENT PRIMARY KEY,
+          id_prestamo INT NOT NULL,
+          tipo ENUM('aval','prendaria','hipotecaria','ahorros','otra') NOT NULL,
+          descripcion VARCHAR(300) NULL,
+          valor_estimado DECIMAL(12,2) NULL,
+          aval_nombre VARCHAR(100) NULL,
+          aval_identidad VARCHAR(20) NULL,
+          aval_telefono VARCHAR(20) NULL,
+          aval_parentesco VARCHAR(50) NULL,
+          estado ENUM('vigente','liberada') NOT NULL DEFAULT 'vigente',
+          motivo_liberacion VARCHAR(255) NULL,
+          liberada_en DATETIME NULL,
+          liberada_por INT NULL,
+          registrada_por INT NULL,
+          registrada_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_garantia_prestamo (id_prestamo)
+        )
+      `);
+      // El aval que el socio puso en su solicitud queda como garantía fiduciaria del préstamo
+      const [solicitudes] = await conn.query(
+        `SELECT s.id_prestamo, s.referencias, s.creada_en FROM solicitudes_prestamo s
+         INNER JOIN prestamos p ON p.id_prestamo = s.id_prestamo
+         WHERE p.estado <> 'rechazado'
+           AND NOT EXISTS (SELECT 1 FROM garantias g WHERE g.id_prestamo = s.id_prestamo AND g.tipo = 'aval')`
+      );
+      for (const s of solicitudes) {
+        let refs = [];
+        try {
+          refs = JSON.parse(s.referencias || "[]");
+        } catch {
+          refs = [];
+        }
+        const aval = refs.find((r) => r.tipo === "aval") || refs[0];
+        if (!aval?.nombre) continue;
+        await conn.query(
+          `INSERT INTO garantias (id_prestamo, tipo, descripcion, aval_nombre, aval_telefono, aval_parentesco, registrada_en)
+           VALUES (?, 'aval', 'Aval indicado en la solicitud', ?, ?, ?, ?)`,
+          [s.id_prestamo, String(aval.nombre).substring(0, 100), String(aval.telefono || "").substring(0, 20) || null,
+            String(aval.parentesco || "").substring(0, 50) || null, s.creada_en]
+        );
+      }
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

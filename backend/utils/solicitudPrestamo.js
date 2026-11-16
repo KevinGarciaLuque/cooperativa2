@@ -133,6 +133,16 @@ const insertarSolicitud = async (conn, idUsuario, d) => {
     ]
   );
 
+  // El aval de la solicitud queda registrado como garantía fiduciaria del préstamo
+  const aval = (d.referencias || []).find((r) => r.tipo === "aval");
+  if (aval?.nombre) {
+    await conn.query(
+      `INSERT INTO garantias (id_prestamo, tipo, descripcion, aval_nombre, aval_telefono, aval_parentesco, registrada_por)
+       VALUES (?, 'aval', 'Aval indicado en la solicitud', ?, ?, ?, ?)`,
+      [pr.insertId, aval.nombre, aval.telefono || null, aval.parentesco || null, idUsuario]
+    );
+  }
+
   return { id_prestamo: pr.insertId, cuota_estimada: cuotaEstimada };
 };
 

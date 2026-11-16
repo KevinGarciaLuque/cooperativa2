@@ -4,6 +4,7 @@ import { FaMoneyBillWave, FaCheckCircle, FaHourglassHalf, FaTimesCircle, FaChart
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 import { dinero, cifra, simboloMoneda, docIdentidad } from "../../utils/pais";
 import PlanPagos from "../../components/PlanPagos";
+import GarantiasPrestamo from "../../components/GarantiasPrestamo";
 
 // ==================== COMPONENTE MODAL DETALLE PRÉSTAMO ====================
 export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo, token, apiUrl, onLiquidado }) {
@@ -558,6 +559,19 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
                     headers={{ Authorization: `Bearer ${token}` }}
                     titulo="📅 Plan de pagos (vencimientos)"
                     maxAlto={320}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Garantías (registrarlas antes de desembolsar si el producto las exige) */}
+            {String(prestamo.estado || "").toLowerCase() !== "rechazado" && (
+              <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: "12px" }}>
+                <div className="card-body">
+                  <GarantiasPrestamo
+                    idPrestamo={prestamo.id_prestamo}
+                    headers={{ Authorization: `Bearer ${token}` }}
+                    estadoPrestamo={prestamo.estado}
                   />
                 </div>
               </div>

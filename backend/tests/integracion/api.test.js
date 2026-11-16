@@ -1267,6 +1267,8 @@ test("productos de crédito: los crea el Super Administrador y mandan en las sol
 
     const ok = await api("POST", "/solicitudes/prestamo", { ...base, id_producto: idProd }, t);
     assert.equal(ok.s, 201, ok.b?.message);
+    const [avales] = await pool.query("SELECT aval_nombre FROM garantias WHERE id_prestamo = ? AND tipo = 'aval'", [ok.b.id_prestamo]);
+    assert.equal(avales.length, 1, "el aval de la solicitud queda como garantía");
     const [[pr]] = await pool.query("SELECT id_producto, tasa_interes FROM prestamos WHERE id_prestamo = ?", [ok.b.id_prestamo]);
     assert.equal(pr.id_producto, idProd);
     cerca(parseFloat(pr.tasa_interes), 30); // 2.5% mensual = 30% anual
@@ -1277,12 +1279,91 @@ test("productos de crédito: los crea el Super Administrador y mandan en las sol
     assert.ok(!despues.b.data.productos.some((p) => p.id_producto === idProd));
   } finally {
     await pool.query("UPDATE productos_credito SET activo = 0 WHERE id_producto = ?", [idProd]);
+    await pool.query("DELETE g FROM garantias g JOIN prestamos p ON p.id_prestamo = g.id_prestamo WHERE p.id_usuario = ?", [u.insertId]);
     await pool.query("DELETE s FROM solicitudes_prestamo s JOIN prestamos p ON p.id_prestamo = s.id_prestamo WHERE p.id_usuario = ?", [u.insertId]);
     await pool.query("DELETE FROM prestamos WHERE id_usuario = ?", [u.insertId]);
     await pool.query("DELETE FROM notificaciones WHERE id_usuario = ?", [u.insertId]).catch(() => {});
     await pool.query("DELETE FROM bitacora WHERE id_usuario = ?", [u.insertId]);
     await pool.query("DELETE FROM usuarios WHERE id_usuario = ?", [u.insertId]);
   }
+});
+
+test("garantías: el producto las exige al desembolsar; se registran, se liberan y el socio las ve", async () => {
+  const prod = await api("POST", "/productos", {
+    nombre: "Vehículo Prueba", tasa_mensual: 1.8, monto_min: 10000, monto_max: 300000,
+    plazo_min: 6, plazo_max: 60, garantia_requerida: "real", visible_socios: false,
+  }, ids.tSuper);
+  assert.equal(prod.s, 201, prod.b?.message);
+  const idProd = prod.b.data.id_producto;
+  const nuevo = await api("POST", "/prestamos", {
+    id_usuario: ids.socio, monto: 50000, tasa_interes: 21.6, plazo_meses: 24, estado: "aprobado", id_producto: idProd,
+  }, ids.tSuper);
+  assert.equal(nuevo.s, 201, nuevo.b?.message);
+  const idPr = nuevo.b.id_prestamo || nuevo.b.data?.id_prestamo || nuevo.b.prestamo?.id_prestamo;
+  assert.ok(idPr, "id del préstamo nuevo");
+  try {
+    // Sin la garantía que exige el producto no se desembolsa
+    const sin = await api("POST", `/prestamos/${idPr}/desembolsar`, { metodo: "efectivo" }, ids.tSuper);
+    assert.equal(sin.s, 400);
+    assert.match(sin.b.message, /prendaria o hipotecaria/);
+
+    // Un aval no basta para este producto
+    const aval = await api("POST", `/garantias/prestamo/${idPr}`, { tipo: "aval", aval_nombre: "Pedro Aval", aval_telefono: "99887766" }, ids.tSuper);
+    assert.equal(aval.s, 201, aval.b?.message);
+    assert.equal((await api("POST", `/prestamos/${idPr}/desembolsar`, { metodo: "efectivo" }, ids.tSuper)).s, 400);
+
+    assert.equal((await api("POST", `/garantias/prestamo/${idPr}`, { tipo: "prendaria", descripcion: "Pick-up 2019" }, ids.tSuper)).s, 400, "pide el valor");
+    assert.equal((await api("POST", `/garantias/prestamo/${idPr}`, { tipo: "prendaria", descripcion: "Pick-up", valor_estimado: 60000 }, ids.tSocio)).s, 403, "el socio no registra");
+    const real = await api("POST", `/garantias/prestamo/${idPr}`, {
+      tipo: "prendaria", descripcion: "Pick-up Toyota Hilux 2019, placa HAA-1234", valor_estimado: 60000,
+    }, ids.tSuper);
+    assert.equal(real.s, 201, real.b?.message);
+    assert.equal(real.b.resumen.cobertura_real_pct, 120);
+
+    const ok = await api("POST", `/prestamos/${idPr}/desembolsar`, { metodo: "efectivo" }, ids.tSuper);
+    assert.equal(ok.s, 200, ok.b?.message);
+
+    // El socio dueño las ve; otro socio no
+    const suyo = await api("GET", `/garantias/prestamo/${idPr}`, null, ids.tSocio);
+    assert.equal(suyo.s, 200);
+    assert.equal(suyo.b.garantias.length, 2);
+    assert.equal((await api("GET", `/garantias/prestamo/${idPr}`, null, ids.tSocio2)).s, 403);
+
+    // Liberar exige motivo
+    const idAval = suyo.b.garantias.find((g) => g.tipo === "aval").id_garantia;
+    assert.equal((await api("POST", `/garantias/${idAval}/liberar`, {}, ids.tSuper)).s, 400);
+    const lib = await api("POST", `/garantias/${idAval}/liberar`, { motivo: "Se cambia por otro aval" }, ids.tSuper);
+    assert.equal(lib.s, 200);
+    assert.equal(lib.b.garantias.find((g) => g.id_garantia === idAval).estado_efectivo, "liberada");
+
+    // Préstamo cancelado: todas quedan liberadas
+    await pool.query("UPDATE prestamos SET estado = 'pagado', saldo_restante = 0 WHERE id_prestamo = ?", [idPr]);
+    const fin = await api("GET", `/garantias/prestamo/${idPr}`, null, ids.tSuper);
+    assert.ok(fin.b.garantias.every((g) => g.estado_efectivo === "liberada"));
+    assert.equal(fin.b.resumen.vigentes, 0);
+  } finally {
+    await pool.query("DELETE FROM garantias WHERE id_prestamo = ?", [idPr]);
+    await pool.query("DELETE FROM caja_movimientos WHERE referencia_tipo = 'prestamo' AND referencia_id = ?", [idPr]);
+    await pool.query("DELETE FROM recibos WHERE referencia_tipo = 'prestamo' AND referencia_id = ?", [idPr]);
+    await pool.query("DELETE FROM prestamos WHERE id_prestamo = ?", [idPr]);
+    await pool.query("UPDATE productos_credito SET activo = 0 WHERE id_producto = ?", [idProd]);
+  }
+});
+
+test("garantías: la migración copia el aval de las solicitudes existentes sin duplicar", async () => {
+  const [[s]] = await pool.query(
+    `SELECT s.id_prestamo FROM solicitudes_prestamo s JOIN prestamos p ON p.id_prestamo = s.id_prestamo
+     WHERE p.estado <> 'rechazado' AND s.referencias LIKE '%aval%' LIMIT 1`
+  );
+  assert.ok(s, "hay una solicitud con aval de las pruebas anteriores");
+  await pool.query("DELETE FROM garantias WHERE id_prestamo = ?", [s.id_prestamo]);
+  await pool.query("DELETE FROM schema_migraciones WHERE id = '2026_11_003_garantias'");
+  const { aplicarMigraciones } = require("../../utils/migraciones");
+  await aplicarMigraciones();
+  await pool.query("DELETE FROM schema_migraciones WHERE id = '2026_11_003_garantias'");
+  await aplicarMigraciones(); // otra vez: no duplica
+  const [g] = await pool.query("SELECT tipo FROM garantias WHERE id_prestamo = ?", [s.id_prestamo]);
+  assert.deepEqual(g.map((x) => x.tipo), ["aval"]);
 });
 
 test("monitoreo: el estado del servicio responde", async () => {

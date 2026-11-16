@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import ReciboModal from "../components/ReciboModal";
 import PlanPagos from "../components/PlanPagos";
+import GarantiasPrestamo from "../components/GarantiasPrestamo";
 import {
   FaArrowLeft,
   FaPrint,
@@ -363,6 +364,11 @@ export default function DetallePrestamoVentanilla({
             <PlanPagos datos={plan} titulo={null} />
           </div>
         )}
+
+        {/* Garantías */}
+        <div className="dp-card p-3 mb-3">
+          <GarantiasPrestamo idPrestamo={idPrestamo} headers={headers} estadoPrestamo={p.estado} />
+        </div>
 
         {/* Tabla de amortización (plazo indefinido: pagos registrados) */}
         {!plan && (

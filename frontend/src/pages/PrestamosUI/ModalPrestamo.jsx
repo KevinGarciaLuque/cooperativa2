@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FaMoneyBillWave, FaCheckCircle, FaTimesCircle, FaCalendarAlt, FaPercentage, FaClock, FaUserTie } from "react-icons/fa";
 import { TIPOS_TASA, calcularTasaAnual, calcularCuotaSimulador } from "./helpers";
+import { dinero, cifra, simboloMoneda, docIdentidad, montoATexto, textoAMonto } from "../../utils/pais";
 
 // ==================== COMPONENTE MODAL PRÉSTAMO ====================
 export default function ModalPrestamo({
@@ -16,18 +17,14 @@ export default function ModalPrestamo({
   // ── Hooks antes del early return (regla de React) ──
   const [busquedaSocio, setBusquedaSocio] = useState("");
   const [dropdownSocioAbierto, setDropdownSocioAbierto] = useState(false);
-  const [montoDisplay, setMontoDisplay] = useState(() => {
-    if (!form.monto && form.monto !== 0) return "";
-    const parts = String(form.monto).split(".");
-    return parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (parts[1] !== undefined ? "." + parts[1] : "");
-  });
+  const [montoDisplay, setMontoDisplay] = useState(() =>
+    !form.monto && form.monto !== 0 ? "" : montoATexto(form.monto)
+  );
 
   const handleMontoChange = (e) => {
-    const raw = e.target.value.replace(/,/g, "");
+    const raw = textoAMonto(e.target.value);
     if (raw !== "" && !/^\d*\.?\d*$/.test(raw)) return;
-    const parts = raw.split(".");
-    const display = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (parts.length > 1 ? "." + parts[1] : "");
-    setMontoDisplay(display);
+    setMontoDisplay(montoATexto(raw));
     handleInput({ target: { name: "monto", value: raw } });
   };
 
@@ -47,7 +44,7 @@ export default function ModalPrestamo({
   const haySimulacion = form.monto && form.tasa_interes && (esIndefinido || form.plazo_meses) && cuotaSimulada > 0;
 
   const fmt = (n) =>
-    parseFloat(n || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    cifra(parseFloat(n || 0));
 
   return (
     <>
@@ -154,7 +151,7 @@ export default function ModalPrestamo({
                                   autoFocus
                                   type="text"
                                   className="form-control form-control-sm"
-                                  placeholder="🔍 Buscar por nombre o DNI..."
+                                  placeholder={`🔍 Buscar por nombre o ${docIdentidad().nombre}...`}
                                   value={busquedaSocio}
                                   onChange={(e) => setBusquedaSocio(e.target.value)}
                                   onClick={(e) => e.stopPropagation()}
@@ -214,17 +211,17 @@ export default function ModalPrestamo({
                   {/* Aviso pagos existentes al editar */}
                   {editPrestamo && parseInt(editPrestamo.total_pagos) > 0 && (
                     <div style={{ background: "#fffbeb", border: "1.5px solid #f59e0b", borderRadius: 8, padding: "8px 12px", fontSize: "0.8rem", color: "#78350f" }}>
-                      ⚠️ Este préstamo tiene <strong>{editPrestamo.total_pagos} pago{parseInt(editPrestamo.total_pagos) !== 1 ? "s" : ""}</strong> registrado{parseInt(editPrestamo.total_pagos) !== 1 ? "s" : ""}. El saldo actual es <strong>L. {parseFloat(editPrestamo.saldo_restante || 0).toLocaleString("es-HN", { minimumFractionDigits: 2 })}</strong>. Cambiar la tasa solo afecta los pagos futuros.
+                      ⚠️ Este préstamo tiene <strong>{editPrestamo.total_pagos} pago{parseInt(editPrestamo.total_pagos) !== 1 ? "s" : ""}</strong> registrado{parseInt(editPrestamo.total_pagos) !== 1 ? "s" : ""}. El saldo actual es <strong>{dinero(parseFloat(editPrestamo.saldo_restante || 0))}</strong>. Cambiar la tasa solo afecta los pagos futuros.
                     </div>
                   )}
 
                   {/* Monto */}
                   <div>
                     <label className="form-label fw-semibold small" style={{ color: "#2c3e50" }}>
-                      <FaMoneyBillWave className="me-1 text-success" /> Monto del Préstamo (L.)
+                      <FaMoneyBillWave className="me-1 text-success" /> Monto del Préstamo ({simboloMoneda()})
                     </label>
                     <div className="input-group">
-                      <span className="input-group-text fw-bold" style={{ background: "#27ae60", color: "#fff", border: "2px solid #27ae60" }}>L.</span>
+                      <span className="input-group-text fw-bold" style={{ background: "#27ae60", color: "#fff", border: "2px solid #27ae60" }}>{simboloMoneda()}</span>
                       <input
                         type="text"
                         inputMode="decimal"
@@ -420,7 +417,7 @@ export default function ModalPrestamo({
                           {esIndefinido ? "Interés mensual (solo intereses)" : "Cuota mensual estimada"}
                         </div>
                         <div className="fw-bold" style={{ fontSize: "1.7rem", letterSpacing: "-.5px" }}>
-                          L. {fmt(cuotaSimulada)}
+                          {simboloMoneda()} {fmt(cuotaSimulada)}
                         </div>
                         <div className="small mt-1" style={{ opacity: .75 }}>
                           {esIndefinido
@@ -433,7 +430,7 @@ export default function ModalPrestamo({
                       <div className="d-flex flex-column gap-2">
                         <div className="pmt-sim-item" style={{ background: "#fff", border: "1px solid #e2e8f0" }}>
                           <span className="small text-muted">Monto solicitado</span>
-                          <strong style={{ color: "#2c3e50" }}>L. {fmt(form.monto)}</strong>
+                          <strong style={{ color: "#2c3e50" }}>{simboloMoneda()} {fmt(form.monto)}</strong>
                         </div>
                         <div className="pmt-sim-item" style={{ background: "#fff", border: "1px solid #e2e8f0" }}>
                           <span className="small text-muted">Tasa anual equivalente</span>
@@ -447,15 +444,15 @@ export default function ModalPrestamo({
                           <>
                             <div className="pmt-sim-item" style={{ background: "#eaf6fb", border: "1px solid #2980b9" }}>
                               <span className="small" style={{ color: "#1a5276" }}>Interés mensual</span>
-                              <strong style={{ color: "#1a5276" }}>L. {fmt(cuotaSimulada)}</strong>
+                              <strong style={{ color: "#1a5276" }}>{simboloMoneda()} {fmt(cuotaSimulada)}</strong>
                             </div>
                             <div className="pmt-sim-item" style={{ background: "#fff3cd", border: "1px solid #ffc107" }}>
                               <span className="small" style={{ color: "#856404" }}>Interés anual estimado</span>
-                              <strong style={{ color: "#b7791f" }}>L. {fmt(cuotaSimulada * 12)}</strong>
+                              <strong style={{ color: "#b7791f" }}>{simboloMoneda()} {fmt(cuotaSimulada * 12)}</strong>
                             </div>
                             <div className="pmt-sim-item" style={{ background: "#fde8d8", border: "1px solid #e67e22" }}>
                               <span className="small" style={{ color: "#7d4e2e" }}>Capital adeudado (fijo)</span>
-                              <strong style={{ color: "#7d4e2e" }}>L. {fmt(form.monto)}</strong>
+                              <strong style={{ color: "#7d4e2e" }}>{simboloMoneda()} {fmt(form.monto)}</strong>
                             </div>
                             <div className="small px-1 mt-1" style={{ color: "#92400e", background: "#fef3c7", borderRadius: 6, padding: "6px 10px", border: "1px solid #fcd34d" }}>
                               ℹ El socio paga solo el interés cada mes. El capital permanece sin cambio hasta que se cancele el préstamo.
@@ -473,11 +470,11 @@ export default function ModalPrestamo({
                                 <div className="small fw-semibold mb-2" style={{ color: "#475569" }}>Desglose cuota (1er mes)</div>
                                 <div className="d-flex justify-content-between align-items-center mb-1" style={{ fontSize: ".78rem" }}>
                                   <span style={{ color: "#c0392b" }}>🔴 Interés</span>
-                                  <strong style={{ color: "#c0392b" }}>L. {fmt(intMes1)}</strong>
+                                  <strong style={{ color: "#c0392b" }}>{simboloMoneda()} {fmt(intMes1)}</strong>
                                 </div>
                                 <div className="d-flex justify-content-between align-items-center mb-2" style={{ fontSize: ".78rem" }}>
                                   <span style={{ color: "#27ae60" }}>🟢 Capital</span>
-                                  <strong style={{ color: "#27ae60" }}>L. {fmt(capMes1)}</strong>
+                                  <strong style={{ color: "#27ae60" }}>{simboloMoneda()} {fmt(capMes1)}</strong>
                                 </div>
                                 {/* Barra visual */}
                                 <div style={{ height: 10, borderRadius: 5, overflow: "hidden", display: "flex", background: "#e2e8f0" }}>
@@ -491,11 +488,11 @@ export default function ModalPrestamo({
                               </div>
                               <div className="pmt-sim-item" style={{ background: "#fff3cd", border: "1px solid #ffc107" }}>
                                 <span className="small" style={{ color: "#856404" }}>Total intereses</span>
-                                <strong style={{ color: "#b7791f" }}>L. {fmt(totalIntereses)}</strong>
+                                <strong style={{ color: "#b7791f" }}>{simboloMoneda()} {fmt(totalIntereses)}</strong>
                               </div>
                               <div className="pmt-sim-item" style={{ background: "#d4edda", border: "1px solid #28a745" }}>
                                 <span className="small" style={{ color: "#155724" }}>Total a pagar</span>
-                                <strong style={{ color: "#155724" }}>L. {fmt(totalPagar)}</strong>
+                                <strong style={{ color: "#155724" }}>{simboloMoneda()} {fmt(totalPagar)}</strong>
                               </div>
                             </>
                           );

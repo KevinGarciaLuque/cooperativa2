@@ -4,6 +4,7 @@ import { paginar } from "../../ui/paginar";
 import { FaMoneyBillWave, FaEye, FaEdit, FaTrash, FaCalendarAlt, FaPercentage, FaClock, FaUserTie } from "react-icons/fa";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 import { TIPOS_TASA } from "./helpers";
+import { dinero, docIdentidad } from "../../utils/pais";
 
 const TAM_PAG = 15;
 
@@ -117,7 +118,7 @@ export default function TablaPrestamos({ prestamos, usuarios, onEdit, onDelete, 
                           <div className="fw-semibold text-truncate" style={{ color: "#2c3e50", fontSize: 14 }}>
                             {grupo.nombre}
                           </div>
-                          <div className="text-muted" style={{ fontSize: "0.72rem" }}>DNI: {grupo.dni}</div>
+                          <div className="text-muted" style={{ fontSize: "0.72rem" }}>{docIdentidad().nombre}: {grupo.dni}</div>
                           <div className="d-flex gap-1 flex-wrap mt-1">
                             {activos > 0 && (
                               <span style={{ fontSize: "0.65rem", fontWeight: 700, background: "rgba(39,174,96,0.1)", color: "#27ae60", border: "1px solid #27ae60", borderRadius: 4, padding: "1px 5px" }}>
@@ -158,7 +159,7 @@ export default function TablaPrestamos({ prestamos, usuarios, onEdit, onDelete, 
                     {/* Monto total */}
                     <div style={{ flex: "0 0 20%", textAlign: "center" }}>
                       <div className="fw-bold" style={{ fontSize: 17, color: "#27ae60" }}>
-                        L. {parseFloat(montoGrupo).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {dinero(parseFloat(montoGrupo))}
                       </div>
                       <div style={{ fontSize: "0.72rem", color: "#7f8c8d" }}>otorgado</div>
                     </div>
@@ -166,7 +167,7 @@ export default function TablaPrestamos({ prestamos, usuarios, onEdit, onDelete, 
                     {/* Saldo pendiente */}
                     <div style={{ flex: "0 0 20%", textAlign: "center" }}>
                       <div className="fw-bold" style={{ fontSize: 17, color: saldoGrupo > 0 ? "#e74c3c" : "#27ae60" }}>
-                        L. {parseFloat(saldoGrupo).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {dinero(parseFloat(saldoGrupo))}
                       </div>
                       <div style={{ fontSize: "0.72rem", color: "#7f8c8d" }}>saldo restante</div>
                     </div>
@@ -192,7 +193,7 @@ export default function TablaPrestamos({ prestamos, usuarios, onEdit, onDelete, 
                         </div>
                         <div style={{ minWidth: 0 }}>
                           <div className="fw-semibold text-truncate" style={{ color: "#2c3e50", fontSize: 14 }}>{grupo.nombre}</div>
-                          <div className="text-muted" style={{ fontSize: "0.72rem" }}>DNI: {grupo.dni}</div>
+                          <div className="text-muted" style={{ fontSize: "0.72rem" }}>{docIdentidad().nombre}: {grupo.dni}</div>
                         </div>
                       </div>
                       <button className="btn btn-sm fw-semibold flex-shrink-0"
@@ -203,10 +204,10 @@ export default function TablaPrestamos({ prestamos, usuarios, onEdit, onDelete, 
                     </div>
                     <div className="d-flex flex-wrap gap-2 align-items-center">
                       <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#27ae60" }}>
-                        L. {parseFloat(montoGrupo).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {dinero(parseFloat(montoGrupo))}
                       </span>
                       <span style={{ fontSize: "0.8rem", color: "#e74c3c" }}>
-                        Saldo: L. {parseFloat(saldoGrupo).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        Saldo: {dinero(parseFloat(saldoGrupo))}
                       </span>
                       <span style={{ fontSize: "0.72rem", color: "#7f8c8d" }}>{grupo.prestamos.length} préstamo{grupo.prestamos.length !== 1 ? "s" : ""}</span>
                     </div>
@@ -230,10 +231,10 @@ export default function TablaPrestamos({ prestamos, usuarios, onEdit, onDelete, 
               Total préstamos: <span className="text-primary fw-bold">{prestamos.length}</span>
             </span>
             <span className="small fw-semibold text-muted">
-              Otorgado: <span className="text-success fw-bold">L. {montoTotal.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              Otorgado: <span className="text-success fw-bold">{dinero(montoTotal)}</span>
             </span>
             <span className="small fw-semibold text-muted">
-              Saldo total: <span className="text-danger fw-bold">L. {saldoTotal.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              Saldo total: <span className="text-danger fw-bold">{dinero(saldoTotal)}</span>
             </span>
           </div>
         </div>
@@ -288,7 +289,7 @@ function ModalHistorialPrestamos({ grupo, onClose, onEdit, onDelete, onVerDetall
               <div>
                 <div className="fw-bold" style={{ fontSize: "1.05rem" }}>{grupo.nombre}</div>
                 <div style={{ fontSize: "0.78rem", opacity: 0.85 }}>
-                  DNI: {grupo.dni} · {grupo.prestamos.length} préstamo{grupo.prestamos.length !== 1 ? "s" : ""} · Otorgado: L. {montoTotal.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {docIdentidad().nombre}: {grupo.dni} · {grupo.prestamos.length} préstamo{grupo.prestamos.length !== 1 ? "s" : ""} · Otorgado: {dinero(montoTotal)}
                 </div>
               </div>
             </div>
@@ -333,7 +334,7 @@ function ModalHistorialPrestamos({ grupo, onClose, onEdit, onDelete, onVerDetall
                           <div className="d-flex flex-wrap gap-2 mt-1">
                             <span style={{ fontSize: "0.75rem", color: "#27ae60", fontWeight: 600 }}>
                               <FaMoneyBillWave className="me-1" style={{ fontSize: 11 }} />
-                              L. {monto.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {dinero(monto)}
                             </span>
                             <span style={{ fontSize: "0.75rem", color: "#3498db", fontWeight: 600 }}>
                               <FaPercentage className="me-1" style={{ fontSize: 10 }} />
@@ -408,10 +409,10 @@ function ModalHistorialPrestamos({ grupo, onClose, onEdit, onDelete, onVerDetall
                     <div className="px-4 pb-3">
                       <div className="d-flex justify-content-between align-items-center mb-1" style={{ fontSize: "0.75rem" }}>
                         <span style={{ color: "#27ae60", fontWeight: 600 }}>
-                          Pagado: L. {pagado.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          Pagado: {dinero(pagado)}
                         </span>
                         <span style={{ color: "#e74c3c", fontWeight: 600 }}>
-                          Saldo: L. {saldo.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          Saldo: {dinero(saldo)}
                         </span>
                       </div>
                       <div style={{ height: 6, background: "#e9ecef", borderRadius: 10, overflow: "hidden" }}>
@@ -434,10 +435,10 @@ function ModalHistorialPrestamos({ grupo, onClose, onEdit, onDelete, onVerDetall
                 Total préstamos: <strong className="text-primary">{grupo.prestamos.length}</strong>
               </span>
               <span className="small fw-semibold text-muted">
-                Otorgado: <strong style={{ color: "#27ae60" }}>L. {montoTotal.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                Otorgado: <strong style={{ color: "#27ae60" }}>{dinero(montoTotal)}</strong>
               </span>
               <span className="small fw-semibold text-muted">
-                Saldo: <strong style={{ color: "#e74c3c" }}>L. {saldoTotal.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                Saldo: <strong style={{ color: "#e74c3c" }}>{dinero(saldoTotal)}</strong>
               </span>
             </div>
             <button type="button" className="btn btn-sm btn-light fw-semibold shadow-sm"

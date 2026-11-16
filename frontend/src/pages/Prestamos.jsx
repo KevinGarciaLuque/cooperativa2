@@ -10,6 +10,7 @@ import { FaMoneyBillWave, FaPlus, FaCheckCircle, FaExclamationTriangle, FaHourgl
 import TablaPrestamos from "./PrestamosUI/TablaPrestamos";
 import ModalPrestamo from "./PrestamosUI/ModalPrestamo";
 import ModalDetallePrestamo from "./PrestamosUI/ModalDetallePrestamo";
+import { dinero } from "../utils/pais";
 
 import "react-circular-progressbar/dist/styles.css";
 
@@ -151,7 +152,7 @@ export default function Prestamos() {
 
   // ── Flujo de aprobación ───────────────────────────────────────────────
   const aprobarPrestamo = async (p) => {
-    if (!window.confirm(`¿Aprobar el préstamo #${p.id_prestamo} por L. ${parseFloat(p.monto).toLocaleString("es-HN")}? El dinero se entrega al registrar el desembolso.`)) return;
+    if (!window.confirm(`¿Aprobar el préstamo #${p.id_prestamo} por ${dinero(parseFloat(p.monto))}? El dinero se entrega al registrar el desembolso.`)) return;
     try {
       const r = await axios.patch(`${API_URL}/prestamos/${p.id_prestamo}/aprobar`, {}, {
         headers: { Authorization: `Bearer ${token}` },
@@ -380,7 +381,7 @@ export default function Prestamos() {
                     {totalPrestamos}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
-                    L. {montoTotal.toFixed(2)}
+                    {dinero(montoTotal)}
                   </p>
                 </div>
                 <div
@@ -414,7 +415,7 @@ export default function Prestamos() {
                     {prestamosActivos}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
-                    L. {montoActivo.toFixed(2)}
+                    {dinero(montoActivo)}
                   </p>
                 </div>
                 <div

@@ -4,10 +4,11 @@ import { paginar } from "../../ui/paginar";
 import ReciboModal from "../../components/ReciboModal";
 import { FaMoneyCheckAlt, FaCalendarAlt, FaUser, FaEdit, FaTrash, FaFileInvoiceDollar, FaCheckCircle, FaClock } from "react-icons/fa";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
+import { cifra, simboloMoneda } from "../../utils/pais";
 
 const TAM_PAG = 15;
 const fmt = (n) =>
-  parseFloat(n || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  cifra(parseFloat(n || 0));
 
 // ==================== COMPONENTE TABLA PAGOS (agrupada por socio) ====================
 export default function TablaPagos({ pagos, prestamos, usuarios, onEdit, onDelete }) {
@@ -170,7 +171,7 @@ export default function TablaPagos({ pagos, prestamos, usuarios, onEdit, onDelet
                     {/* Total pagado */}
                     <div style={{ flex: "0 0 18%", textAlign: "center" }}>
                       <div className="fw-bold" style={{ fontSize: 18, color: "#27ae60" }}>
-                        L. {fmt(totalPagado)}
+                        {simboloMoneda()} {fmt(totalPagado)}
                       </div>
                       <div style={{ fontSize: "0.72rem", color: "#7f8c8d" }}>acumulado</div>
                     </div>
@@ -225,7 +226,7 @@ export default function TablaPagos({ pagos, prestamos, usuarios, onEdit, onDelet
                       </button>
                     </div>
                     <div className="d-flex flex-wrap gap-2 align-items-center">
-                      <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#27ae60" }}>L. {fmt(totalPagado)}</span>
+                      <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#27ae60" }}>{simboloMoneda()} {fmt(totalPagado)}</span>
                       <span className="badge d-inline-flex align-items-center gap-1"
                         style={{ background: "rgba(155,89,182,0.1)", color: "#9b59b6", border: "2px solid #9b59b6", borderRadius: 10, fontSize: 11, fontWeight: 600, padding: "4px 8px" }}>
                         <FaCalendarAlt />{ultimaFechaStr || "—"}
@@ -255,7 +256,7 @@ export default function TablaPagos({ pagos, prestamos, usuarios, onEdit, onDelet
               Total pagos: <span className="text-primary fw-bold">{pagos.length}</span>
             </span>
             <span className="small fw-semibold text-muted">
-              Monto total: <span className="text-success fw-bold">L. {fmt(montoTotalFooter)}</span>
+              Monto total: <span className="text-success fw-bold">{simboloMoneda()} {fmt(montoTotalFooter)}</span>
             </span>
           </div>
         </div>
@@ -319,7 +320,7 @@ function ModalHistorialPagos({ grupo, prestamos, onClose, onEdit, onDelete }) {
               <div>
                 <div className="fw-bold" style={{ fontSize: "1.05rem" }}>{grupo.nombre}</div>
                 <div style={{ fontSize: "0.78rem", opacity: 0.85 }}>
-                  {grupo.pagos.length} pago{grupo.pagos.length !== 1 ? "s" : ""} · Total acumulado: L. {fmt(totalGeneral)}
+                  {grupo.pagos.length} pago{grupo.pagos.length !== 1 ? "s" : ""} · Total acumulado: {simboloMoneda()} {fmt(totalGeneral)}
                 </div>
               </div>
             </div>
@@ -349,13 +350,13 @@ function ModalHistorialPagos({ grupo, prestamos, onClose, onEdit, onDelete }) {
                     {prestamo && (
                       <>
                         <span style={{ fontSize: "0.75rem", color: "#7f8c8d" }}>
-                          Principal: <strong style={{ color: "#2c3e50" }}>L. {fmt(montoPr)}</strong>
+                          Principal: <strong style={{ color: "#2c3e50" }}>{simboloMoneda()} {fmt(montoPr)}</strong>
                         </span>
                         <span style={{ fontSize: "0.75rem", color: "#7f8c8d" }}>
-                          Saldo: <strong style={{ color: "#e74c3c" }}>L. {fmt(saldoPr)}</strong>
+                          Saldo: <strong style={{ color: "#e74c3c" }}>{simboloMoneda()} {fmt(saldoPr)}</strong>
                         </span>
                         <span style={{ fontSize: "0.75rem", color: "#7f8c8d" }}>
-                          Pagado: <strong style={{ color: "#27ae60" }}>L. {fmt(pagadoPr)}</strong>
+                          Pagado: <strong style={{ color: "#27ae60" }}>{simboloMoneda()} {fmt(pagadoPr)}</strong>
                         </span>
                         <span className="ms-auto badge"
                           style={completado
@@ -393,7 +394,7 @@ function ModalHistorialPagos({ grupo, prestamos, onClose, onEdit, onDelete }) {
 
                           {/* Monto */}
                           <div className="fw-bold flex-shrink-0" style={{ color: "#27ae60", minWidth: 95 }}>
-                            L. {fmt(monto)}
+                            {simboloMoneda()} {fmt(monto)}
                           </div>
 
                           {/* Desglose int/cap */}
@@ -457,7 +458,7 @@ function ModalHistorialPagos({ grupo, prestamos, onClose, onEdit, onDelete }) {
                   <div className="d-flex justify-content-end align-items-center gap-3 px-4 py-2"
                     style={{ background: "rgba(39,174,96,0.05)", borderBottom: "2px solid #e2e8f0" }}>
                     <span className="small text-muted">Subtotal préstamo #{id_prestamo}:</span>
-                    <strong style={{ color: "#27ae60" }}>L. {fmt(subtotalPr)}</strong>
+                    <strong style={{ color: "#27ae60" }}>{simboloMoneda()} {fmt(subtotalPr)}</strong>
                   </div>
                 </div>
               );
@@ -476,7 +477,7 @@ function ModalHistorialPagos({ grupo, prestamos, onClose, onEdit, onDelete }) {
                 Total pagos: <strong className="text-primary">{grupo.pagos.length}</strong>
               </span>
               <span className="small fw-semibold text-muted">
-                Acumulado: <strong style={{ color: "#27ae60" }}>L. {fmt(totalGeneral)}</strong>
+                Acumulado: <strong style={{ color: "#27ae60" }}>{simboloMoneda()} {fmt(totalGeneral)}</strong>
               </span>
             </div>
             <button type="button" className="btn btn-sm btn-light fw-semibold shadow-sm"

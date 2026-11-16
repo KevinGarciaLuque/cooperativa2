@@ -20,6 +20,7 @@ import {
   FaSave,
   FaHistory,
 } from "react-icons/fa";
+import { localeApp } from "../utils/pais";
 
 const DIAS_SEMANA = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
@@ -154,7 +155,7 @@ export default function BaseDatos() {
 
   const formatearFechaISO = (iso) => {
     if (!iso) return "Nunca";
-    try { return new Date(iso).toLocaleString("es-HN"); } catch { return iso; }
+    try { return new Date(iso).toLocaleString(localeApp()); } catch { return iso; }
   };
 
   const describePrograma = (cfg) => {
@@ -649,7 +650,7 @@ export default function BaseDatos() {
                 <div className="col-6 col-md-4">
                   <div className="p-3 rounded-3 text-center" style={{ background: "#f8f9fa" }}>
                     <div className="fw-bold fs-4" style={{ color: "#1a2035" }}>
-                      {totalRegistros.toLocaleString("es-HN")}
+                      {totalRegistros.toLocaleString(localeApp())}
                     </div>
                     <small className="text-muted">Registros totales</small>
                   </div>
@@ -698,7 +699,7 @@ export default function BaseDatos() {
                               borderRadius: 20,
                             }}
                           >
-                            {Number(t.registros).toLocaleString("es-HN")}
+                            {Number(t.registros).toLocaleString(localeApp())}
                           </span>
                         </td>
                       </tr>

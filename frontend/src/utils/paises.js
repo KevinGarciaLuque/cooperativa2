@@ -1,5 +1,7 @@
-// Códigos telefónicos para el registro. Honduras es el predeterminado; los "frecuentes"
-// (donde más viven hondureños) salen primero en la lista y el resto en orden alfabético.
+// Códigos telefónicos para el registro. El predeterminado es el país de la cooperativa, que
+// sale primero; después los "frecuentes" (Centroamérica y donde más vive la diáspora) y el
+// resto en orden alfabético.
+import { pais as paisCooperativa } from "./pais";
 // Formato: "ISO|Nombre|código|dígitos" — dígitos = largo del número sin el código
 // (vacío cuando varía; entonces se aceptan de 6 a 12).
 
@@ -87,22 +89,26 @@ const crear = (fila, frecuente) => {
 const porNombre = (a, b) => a.nombre.localeCompare(b.nombre, "es");
 export const PAISES_TEL = [...FRECUENTES.map((f) => crear(f, true)), ...RESTO.map((f) => crear(f, false)).sort(porNombre)];
 
-export const PAIS_PREDETERMINADO = PAISES_TEL[0];
+const esLocal = (pais) => pais.clave === paisCooperativa().codigo;
+
+// El país de la cooperativa (Honduras si no está en la lista)
+export const paisTelPredeterminado = () => PAISES_TEL.find(esLocal) || PAISES_TEL[0];
 
 // Ayuda bajo el campo: "8 dígitos." / "Entre 6 y 12 dígitos, sin el código del país."
 export const ayudaTelefono = (pais) => {
   const largo = pais.minimo === pais.maximo ? `${pais.minimo} dígitos` : `Entre ${pais.minimo} y ${pais.maximo} dígitos`;
-  return pais.codigo === "504" ? `${largo}.` : `${largo}, sin el código del país.`;
+  return esLocal(pais) ? `${largo}.` : `${largo}, sin el código del país.`;
 };
 
 // Búsqueda sin tildes ni mayúsculas, por nombre o por código ("+44", "44", "reino")
 const normalizar = (t) => String(t).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 export const buscarPaises = (texto) => {
   const q = normalizar(texto);
-  if (!q) return PAISES_TEL;
+  if (!q) return [paisTelPredeterminado(), ...PAISES_TEL.filter((p) => p !== paisTelPredeterminado())];
   const cod = q.replace(/^\+/, "");
   return PAISES_TEL.filter((p) => normalizar(p.nombre).includes(q) || (/^\d+$/.test(cod) && p.codigo.startsWith(cod)));
 };
 
-// Número como se guarda: Honduras sin código (8 dígitos); otros países con "+código"
-export const telefonoCompleto = (pais, digitos) => (pais.codigo === "504" ? digitos : `+${pais.codigo}${digitos}`);
+// Número como se guarda: los del país de la cooperativa sin código (8 dígitos en Honduras);
+// los de otros países con "+código"
+export const telefonoCompleto = (pais, digitos) => (esLocal(pais) ? digitos : `+${pais.codigo}${digitos}`);

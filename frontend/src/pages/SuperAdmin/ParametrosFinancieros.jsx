@@ -3,6 +3,7 @@ import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import { useAlerta } from "../../context/AlertaContext";
 import { FaBell, FaSlidersH } from "react-icons/fa";
+import { simboloMoneda } from "../../utils/pais";
 
 const ACCENT = "#a8cd3a";
 const AZUL = "#1a2035";
@@ -144,7 +145,7 @@ export default function ParametrosFinancieros() {
         <div className="row g-3">
           {[
             ["sol_tasa_mensual", "Tasa referencial mensual (%)", "0.01"],
-            ["sol_monto_max", "Monto máximo a solicitar (L.)", "1"],
+            ["sol_monto_max", `Monto máximo a solicitar (${simboloMoneda()})`, "1"],
             ["sol_plazo_max", "Plazo máximo (meses)", "1"],
             ["sol_pct_ingreso_max", "Alerta si la cuota supera (% del ingreso)", "1"],
           ].map(([k, etiqueta, paso]) => (

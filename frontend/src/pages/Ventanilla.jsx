@@ -28,16 +28,14 @@ import {
   FaUserShield,
   FaFolderOpen,
 } from "react-icons/fa";
+import { cifra, simboloMoneda } from "../utils/pais";
 
 const ACCENT = "#a8cd3a";
 const AZUL = "#1a2035";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const fmt = (n) =>
-  parseFloat(n || 0).toLocaleString("es-HN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  cifra(parseFloat(n || 0));
 
 const ESTADOS_VIGENTES = ["activo", "mora"];
 const esVigente = (p) => ESTADOS_VIGENTES.includes((p.estado || "").toLowerCase());
@@ -493,7 +491,7 @@ export default function Ventanilla() {
                           )}
                         </td>
                         <td className="text-end fw-semibold">
-                          {parseFloat(u.saldo_prestamos) > 0 ? `L. ${fmt(u.saldo_prestamos)}` : <span className="text-muted fw-normal">—</span>}
+                          {parseFloat(u.saldo_prestamos) > 0 ? `${simboloMoneda()} ${fmt(u.saldo_prestamos)}` : <span className="text-muted fw-normal">—</span>}
                         </td>
                         <td>
                           {enMora ? (
@@ -546,7 +544,7 @@ export default function Ventanilla() {
               {resumen?.enMora && (
                 <span className="badge rounded-pill px-3 py-2" style={{ background: "#fee2e2", color: "#991b1b" }}>
                   <FaExclamationTriangle className="me-1" /> Cuota en mora
-                  {resumen.moraTotal > 0 && <> · Mora generada L. {fmt(resumen.moraTotal)}</>}
+                  {resumen.moraTotal > 0 && <> · Mora generada {simboloMoneda()} {fmt(resumen.moraTotal)}</>}
                 </span>
               )}
             </div>
@@ -560,20 +558,20 @@ export default function Ventanilla() {
                 <div className="col-6 col-lg-3">
                   <div className="vt-kpi">
                     <div className="small text-muted">Saldo en cuentas</div>
-                    <div className="fw-bold fs-5">L. {fmt(resumen.saldoCuentas)}</div>
+                    <div className="fw-bold fs-5">{simboloMoneda()} {fmt(resumen.saldoCuentas)}</div>
                   </div>
                 </div>
                 <div className="col-6 col-lg-3">
                   <div className="vt-kpi">
                     <div className="small text-muted">Total aportado</div>
-                    <div className="fw-bold fs-5">L. {fmt(resumen.aportado)}</div>
+                    <div className="fw-bold fs-5">{simboloMoneda()} {fmt(resumen.aportado)}</div>
                   </div>
                 </div>
                 <div className="col-6 col-lg-3">
                   <div className="vt-kpi">
                     <div className="small text-muted">Saldo de préstamos</div>
                     <div className="fw-bold fs-5" style={{ color: resumen.deuda > 0 ? "#92400e" : "inherit" }}>
-                      L. {fmt(resumen.deuda)}
+                      {simboloMoneda()} {fmt(resumen.deuda)}
                     </div>
                   </div>
                 </div>
@@ -643,7 +641,7 @@ export default function Ventanilla() {
                       <div className="border rounded-4 p-3 h-100">
                         <div className="d-flex justify-content-between align-items-start mb-2">
                           <div>
-                            <div className="fw-bold">Préstamo #{p.id_prestamo} · L. {fmt(p.monto)}</div>
+                            <div className="fw-bold">Préstamo #{p.id_prestamo} · {simboloMoneda()} {fmt(p.monto)}</div>
                             <div className="small text-muted">
                               Plazo: {parseInt(p.plazo_meses) === 0 ? "Indefinido" : `${p.plazo_meses} meses`}
                             </div>
@@ -657,11 +655,11 @@ export default function Ventanilla() {
                         <div className="row g-2 mb-3">
                           <div className="col-4">
                             <div className="small text-muted">Saldo</div>
-                            <div className="fw-bold">L. {fmt(p.saldo_restante)}</div>
+                            <div className="fw-bold">{simboloMoneda()} {fmt(p.saldo_restante)}</div>
                           </div>
                           <div className="col-4">
                             <div className="small text-muted">Cuota</div>
-                            <div className="fw-bold">L. {fmt(prox?.cuota_mensual ?? p.cuota_mensual)}</div>
+                            <div className="fw-bold">{simboloMoneda()} {fmt(prox?.cuota_mensual ?? p.cuota_mensual)}</div>
                           </div>
                           <div className="col-4">
                             <div className="small text-muted">Vence</div>
@@ -670,14 +668,14 @@ export default function Ventanilla() {
                         </div>
                         {prox?.en_mora && (
                           <div className="small mb-2" style={{ color: "#991b1b" }}>
-                            Mora generada: <strong>L. {fmt(prox.interes_moratorio)}</strong>
-                            {prox.mora_por_dia > 0 && <> · genera L. {fmt(prox.mora_por_dia)} por día</>}
+                            Mora generada: <strong>{simboloMoneda()} {fmt(prox.interes_moratorio)}</strong>
+                            {prox.mora_por_dia > 0 && <> · genera {simboloMoneda()} {fmt(prox.mora_por_dia)} por día</>}
                           </div>
                         )}
                         {prox?.total_para_saldar != null && (
                           <div className="small text-muted mb-3">
                             Para saldar hoy ({prox.dias_desde_ultimo_pago} día(s) desde el último pago):{" "}
-                            <strong>L. {fmt(prox.total_para_saldar)}</strong>
+                            <strong>{simboloMoneda()} {fmt(prox.total_para_saldar)}</strong>
                           </div>
                         )}
                         <button
@@ -727,7 +725,7 @@ export default function Ventanilla() {
                                 {c.estado}{c.fecha_apertura ? ` · desde ${String(c.fecha_apertura).substring(0, 10)}` : ""}
                               </div>
                             </div>
-                            <div className="fw-bold">L. {fmt(c.saldo_actual)}</div>
+                            <div className="fw-bold">{simboloMoneda()} {fmt(c.saldo_actual)}</div>
                           </div>
                         ))}
                       </div>
@@ -755,7 +753,7 @@ export default function Ventanilla() {
                                 <tr key={a.id_aportacion}>
                                   <td className="small">{String(a.fecha || "").substring(0, 10)}</td>
                                   <td className="small text-capitalize">{a.tipo_aportacion || "—"}</td>
-                                  <td className="text-end fw-semibold">L. {fmt(a.monto)}</td>
+                                  <td className="text-end fw-semibold">{simboloMoneda()} {fmt(a.monto)}</td>
                                 </tr>
                               ))}
                           </tbody>

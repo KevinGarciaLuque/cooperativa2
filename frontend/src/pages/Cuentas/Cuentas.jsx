@@ -15,6 +15,7 @@ import {
   FaChartPie,
 } from "react-icons/fa";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import { dinero, simboloMoneda } from "../../utils/pais";
 
 export default function Cuentas() {
   const { token } = useAuth();
@@ -303,7 +304,7 @@ export default function Cuentas() {
                 <div>
                   <p className="text-muted mb-1 small">Aportaciones</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#3498db" }}>
-                    L. {saldoAportaciones.toFixed(2)}
+                    {dinero(saldoAportaciones)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
                     {cuentasAportaciones.length} cuentas
@@ -338,7 +339,7 @@ export default function Cuentas() {
                 <div>
                   <p className="text-muted mb-1 small">Vivienda</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#27ae60" }}>
-                    L. {saldoVivienda.toFixed(2)}
+                    {dinero(saldoVivienda)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
                     {cuentasVivienda.length} cuentas
@@ -373,7 +374,7 @@ export default function Cuentas() {
                 <div>
                   <p className="text-muted mb-1 small">Pensiones</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#f39c12" }}>
-                    L. {saldoPensiones.toFixed(2)}
+                    {dinero(saldoPensiones)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
                     {cuentasPensiones.length} cuentas
@@ -430,7 +431,7 @@ export default function Cuentas() {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value) => `L. ${value.toFixed(2)}`}
+                      formatter={(value) => `${dinero(value)}`}
                     />
                     <Legend />
                   </PieChart>
@@ -780,7 +781,7 @@ function ModalCuenta({
                   style={{ color: "#2c3e50" }}
                 >
                   <FaCoins className="me-2" style={{ color: "#3498db" }} />
-                  Saldo {editCuenta ? "Actual" : "Inicial"} (L.)
+                  Saldo {editCuenta ? "Actual" : "Inicial"} ({simboloMoneda()})
                 </label>
                 <input
                   type="number"

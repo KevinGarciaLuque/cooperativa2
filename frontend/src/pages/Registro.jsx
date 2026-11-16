@@ -8,8 +8,9 @@ import { SOLICITUD_VACIA, fmt, solicitudDesde, simular } from "../utils/solicitu
 import { CampoFotoIdentidad } from "../components/FotosIdentidad";
 import { formatearNombre } from "../utils/nombres";
 import { VerPoliticasPublicas } from "../components/PoliticasSocio";
-import { PAIS_PREDETERMINADO, ayudaTelefono, telefonoCompleto } from "../utils/paises";
+import { paisTelPredeterminado, ayudaTelefono, telefonoCompleto } from "../utils/paises";
 import SelectorPaisTel from "../components/SelectorPaisTel";
+import { docIdentidad } from "../utils/pais";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const AZUL = "#1a2035";
@@ -28,7 +29,7 @@ export default function Registro() {
   const [paso, setPaso] = useState(1);
   const [hayPoliticas, setHayPoliticas] = useState(false);
   const [verPoliticas, setVerPoliticas] = useState(false);
-  const [paisTel, setPaisTel] = useState(PAIS_PREDETERMINADO); // Honduras salvo que elija otro país
+  const [paisTel, setPaisTel] = useState(paisTelPredeterminado); // el país de la cooperativa salvo que elija otro
   const [quierePrestamo, setQuierePrestamo] = useState(true);
   const [solicitud, setSolicitud] = useState(SOLICITUD_VACIA);
   const [dni, setDni] = useState({ frente: null, reverso: null }); // fotos de la identidad
@@ -65,7 +66,10 @@ export default function Registro() {
   const cambiar = (e) => {
     const { name, value, type, checked } = e.target;
     let v = type === "checkbox" ? checked : value;
-    if (name === "dni") v = value.replace(/\D/g, "").slice(0, 13);
+    if (name === "dni") {
+      const doc = docIdentidad();
+      v = doc.solo_digitos ? value.replace(/\D/g, "").slice(0, doc.largo_max) : value.toUpperCase().replace(/[^0-9A-Z-]/g, "").slice(0, doc.largo_max + 3);
+    }
     if (name === "telefono") v = value.replace(/\D/g, "").slice(0, paisTel.maximo);
     setForm((f) => ({ ...f, [name]: v }));
   };
@@ -331,11 +335,16 @@ export default function Registro() {
                         onBlur: () => setForm((f) => ({ ...f, nombre_completo: formatearNombre(f.nombre_completo) })),
                       },
                     })}
-                    {campo("Número de identidad", "dni", {
+                    {campo(`Número de identidad (${docIdentidad().nombre})`, "dni", {
                       requerido: true,
                       col: "col-12 col-md-6",
-                      ayuda: "13 dígitos, sin guiones.",
-                      input: { required: true, inputMode: "numeric", placeholder: "0801199012345", autoComplete: "off" },
+                      ayuda: docIdentidad().ayuda,
+                      input: {
+                        required: true,
+                        inputMode: docIdentidad().solo_digitos ? "numeric" : "text",
+                        placeholder: docIdentidad().ejemplo,
+                        autoComplete: "off",
+                      },
                     })}
                     <div className="col-12 col-md-6">
                       <label className="form-label fw-semibold small">
@@ -358,7 +367,7 @@ export default function Registro() {
                           required
                           inputMode="numeric"
                           autoComplete="tel-national"
-                          placeholder={paisTel.codigo === "504" ? "98765432" : "Número de teléfono"}
+                          placeholder={paisTel.clave === paisTelPredeterminado().clave ? "9876543210".slice(0, paisTel.maximo) : "Número de teléfono"}
                           minLength={paisTel.minimo}
                         />
                       </div>

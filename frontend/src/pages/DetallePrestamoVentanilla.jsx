@@ -11,16 +11,14 @@ import {
   FaCalendarAlt,
   FaHistory,
 } from "react-icons/fa";
+import { cifra, simboloMoneda } from "../utils/pais";
 
 const ACCENT = "#a8cd3a";
 const AZUL = "#1a2035";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const fmt = (n) =>
-  parseFloat(n || 0).toLocaleString("es-HN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  cifra(parseFloat(n || 0));
 
 const soloFecha = (v) => (v ? String(v).substring(0, 10) : null);
 
@@ -245,7 +243,7 @@ export default function DetallePrestamoVentanilla({
             <img src="/smartcoop.png" alt="SmartCoop" className="d-none d-print-block" style={{ height: 56 }} />
             <div>
               <h4 className="fw-bold mb-1" style={{ color: AZUL }}>
-                Préstamo #{p.id_prestamo} · L. {fmt(calc.monto)}
+                Préstamo #{p.id_prestamo} · {simboloMoneda()} {fmt(calc.monto)}
               </h4>
               <div className="text-muted">
                 Socio: <strong>{p.nombre_completo || nombreSocio}</strong> · Identidad: {p.dni || "—"}
@@ -272,7 +270,7 @@ export default function DetallePrestamoVentanilla({
           <div className="mt-3">
             <div className="d-flex justify-content-between small text-muted mb-1">
               <span>
-                Capital pagado: <strong>L. {fmt(calc.capitalPagado)}</strong> de L. {fmt(calc.monto)}
+                Capital pagado: <strong>{simboloMoneda()} {fmt(calc.capitalPagado)}</strong> de {simboloMoneda()} {fmt(calc.monto)}
               </span>
               <strong>{calc.progreso.toFixed(1)}%</strong>
             </div>
@@ -288,12 +286,12 @@ export default function DetallePrestamoVentanilla({
         {/* Indicadores */}
         <div className="row g-2 mb-3">
           {[
-            { t: "Saldo actual", v: calc.liquidado ? "Liquidado" : `L. ${fmt(calc.saldo)}`, c: calc.liquidado ? "#065f46" : "#92400e" },
-            { t: "Cuota mensual", v: calc.plazo === 0 ? `L. ${fmt(calc.monto * calc.tasaMensual)} (interés)` : `L. ${fmt(calc.cuota)}` },
-            { t: "Total pagado", v: `L. ${fmt(calc.totalPagado)}` },
-            { t: "Intereses pagados", v: `L. ${fmt(calc.interesPagado)}` },
+            { t: "Saldo actual", v: calc.liquidado ? "Liquidado" : `${simboloMoneda()} ${fmt(calc.saldo)}`, c: calc.liquidado ? "#065f46" : "#92400e" },
+            { t: "Cuota mensual", v: calc.plazo === 0 ? `${simboloMoneda()} ${fmt(calc.monto * calc.tasaMensual)} (interés)` : `${simboloMoneda()} ${fmt(calc.cuota)}` },
+            { t: "Total pagado", v: `${simboloMoneda()} ${fmt(calc.totalPagado)}` },
+            { t: "Intereses pagados", v: `${simboloMoneda()} ${fmt(calc.interesPagado)}` },
             { t: "Cuotas restantes", v: calc.plazo === 0 ? "—" : calc.cuotasRestantes },
-            { t: "Intereses proyectados", v: calc.plazo === 0 ? "—" : `L. ${fmt(calc.interesProyectado)}` },
+            { t: "Intereses proyectados", v: calc.plazo === 0 ? "—" : `${simboloMoneda()} ${fmt(calc.interesProyectado)}` },
           ].map((k) => (
             <div className="col-6 col-lg-2" key={k.t}>
               <div className="dp-kpi">
@@ -313,17 +311,17 @@ export default function DetallePrestamoVentanilla({
             </div>
             <div>
               <div className="small text-muted">Cuota a pagar</div>
-              <div className="fw-bold">L. {fmt(prox.cuota_mensual)}</div>
+              <div className="fw-bold">{simboloMoneda()} {fmt(prox.cuota_mensual)}</div>
             </div>
             {prox.en_mora && (
               <div>
                 <div className="small text-muted">Mora estimada ({prox.dias_mora} días)</div>
-                <div className="fw-bold" style={{ color: "#991b1b" }}>L. {fmt(prox.interes_moratorio)}</div>
+                <div className="fw-bold" style={{ color: "#991b1b" }}>{simboloMoneda()} {fmt(prox.interes_moratorio)}</div>
               </div>
             )}
             <div>
               <div className="small text-muted">Para saldar hoy</div>
-              <div className="fw-bold">L. {fmt(prox.total_para_saldar)}</div>
+              <div className="fw-bold">{simboloMoneda()} {fmt(prox.total_para_saldar)}</div>
             </div>
             {calc.vencidas > 0 && (
               <div>
@@ -413,7 +411,7 @@ export default function DetallePrestamoVentanilla({
                     <tr key={pg.id_pago}>
                       <td>{soloFecha(pg.fecha_pago)}</td>
                       <td>{pg.metodo_pago || "—"}</td>
-                      <td className="text-end fw-semibold">L. {fmt(pg.monto_pagado)}</td>
+                      <td className="text-end fw-semibold">{simboloMoneda()} {fmt(pg.monto_pagado)}</td>
                       <td className="text-end">{fmt(pg.monto_capital)}</td>
                       <td className="text-end">{fmt(pg.monto_interes)}</td>
                       <td className="text-end">{fmt(pg.saldo_restante)}</td>

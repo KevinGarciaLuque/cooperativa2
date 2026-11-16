@@ -35,6 +35,7 @@ import {
   Area,
   AreaChart,
 } from "recharts";
+import { dinero, simboloMoneda } from "../utils/pais";
 
 export default function Liquidaciones() {
   const { token } = useAuth();
@@ -316,7 +317,7 @@ export default function Liquidaciones() {
                 <div>
                   <p className="text-muted mb-1 small">Monto Total</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#27ae60" }}>
-                    L. {montoTotal.toFixed(2)}
+                    {dinero(montoTotal)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
                     Distribuido
@@ -355,7 +356,7 @@ export default function Liquidaciones() {
                   {ultimaLiquidacion ? (
                     <>
                       <h4 className="mb-0 fw-bold" style={{ color: "#3498db" }}>
-                        L. {parseFloat(ultimaLiquidacion.monto).toFixed(2)}
+                        {dinero(parseFloat(ultimaLiquidacion.monto))}
                       </h4>
                       <p className="mb-0 small text-muted mt-1">
                         {ultimaLiquidacion.fecha?.substring(0, 10)}
@@ -394,7 +395,7 @@ export default function Liquidaciones() {
                 <div>
                   <p className="text-muted mb-1 small">Promedio</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#9b59b6" }}>
-                    L. {promedioMonto.toFixed(2)}
+                    {dinero(promedioMonto)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
                     Por liquidación
@@ -469,7 +470,7 @@ export default function Liquidaciones() {
                       strokeWidth={3}
                       fillOpacity={1}
                       fill="url(#colorMonto)"
-                      name="Monto Distribuido (L.)"
+                      name={`Monto Distribuido (${simboloMoneda()})`}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -737,7 +738,7 @@ function TablaLiquidaciones({
                           className="fw-bold"
                           style={{ fontSize: "18px", color: "#27ae60" }}
                         >
-                          L. {parseFloat(liquidacion.monto || 0).toFixed(2)}
+                          {dinero(parseFloat(liquidacion.monto || 0))}
                         </div>
                         <div className="small text-muted">Distribuido</div>
                       </div>
@@ -973,7 +974,7 @@ function ModalLiquidacion({
                     className="me-2"
                     style={{ color: "#27ae60" }}
                   />
-                  Monto Total a Repartir (L.)
+                  Monto Total a Repartir ({simboloMoneda()})
                 </label>
                 <input
                   type="number"
@@ -1156,7 +1157,7 @@ function ModalDetalle({ show, liquidacion, detalle, onClose }) {
                   <div>
                     <div className="small text-muted">Monto Total</div>
                     <div className="fw-bold" style={{ color: "#27ae60" }}>
-                      L. {parseFloat(liquidacion?.monto || 0).toFixed(2)}
+                      {dinero(parseFloat(liquidacion?.monto || 0))}
                     </div>
                   </div>
                 </div>
@@ -1262,7 +1263,7 @@ function ModalDetalle({ show, liquidacion, detalle, onClose }) {
                             className="fw-bold"
                             style={{ fontSize: "16px", color: "#27ae60" }}
                           >
-                            L. {parseFloat(d.monto_asignado || 0).toFixed(2)}
+                            {dinero(parseFloat(d.monto_asignado || 0))}
                           </span>
                         </td>
                       </tr>
@@ -1285,7 +1286,7 @@ function ModalDetalle({ show, liquidacion, detalle, onClose }) {
                   className="fw-bold"
                   style={{ fontSize: "20px", color: "#27ae60" }}
                 >
-                  L. {totalReparto.toFixed(2)}
+                  {dinero(totalReparto)}
                 </span>
               </div>
               <button

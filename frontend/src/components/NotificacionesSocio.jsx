@@ -11,6 +11,7 @@ import {
   FaInfoCircle,
   FaReceipt,
 } from "react-icons/fa";
+import { localeApp } from "../utils/pais";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -32,7 +33,7 @@ const cuando = (v) => {
   const h = Math.round(min / 60);
   if (h < 24) return `hace ${h} h`;
   if (h < 48) return "ayer";
-  return d.toLocaleDateString("es-HN", { day: "numeric", month: "short" });
+  return d.toLocaleDateString(localeApp(), { day: "numeric", month: "short" });
 };
 
 export default function NotificacionesSocio({ headers, onVerRecibo }) {

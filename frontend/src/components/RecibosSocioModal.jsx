@@ -2,14 +2,12 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import ReciboModal from "./ReciboModal";
 import CartasAprobacionSocio from "./CartasAprobacionSocio";
+import { dinero } from "../utils/pais";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const fmt = (n) =>
-  `L. ${parseFloat(n || 0).toLocaleString("es-HN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  dinero(n || 0);
 
 const TIPOS = {
   pago_prestamo: "Pago de préstamo",

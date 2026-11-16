@@ -2,12 +2,10 @@
 // jsPDF se carga bajo demanda para no aumentar el peso inicial de la aplicación.
 
 import { numeroSocio } from "./numeroSocio";
+import { dinero, localeApp } from "./pais";
 
 const fmt = (n) =>
-  `L. ${parseFloat(n || 0).toLocaleString("es-HN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  dinero(n || 0);
 
 const TIPOS = {
   pago_prestamo: "Recibo de pago de préstamo",
@@ -27,7 +25,7 @@ const METODOS = {
 
 const fechaLarga = (f) => {
   const d = new Date(f);
-  return isNaN(d) ? "" : d.toLocaleString("es-HN", { dateStyle: "long", timeStyle: "short" });
+  return isNaN(d) ? "" : d.toLocaleString(localeApp(), { dateStyle: "long", timeStyle: "short" });
 };
 
 export const nombreArchivoRecibo = (recibo) =>
@@ -77,7 +75,7 @@ const ponerFirma = (doc, firma, x, yLinea, ancho) => {
 
 const soloFecha = (f) => {
   const d = new Date(f);
-  return isNaN(d) ? "" : d.toLocaleDateString("es-HN", { day: "numeric", month: "long", year: "numeric" });
+  return isNaN(d) ? "" : d.toLocaleDateString(localeApp(), { day: "numeric", month: "long", year: "numeric" });
 };
 
 // Constancia formal de cancelación (finiquito / paz y salvo)

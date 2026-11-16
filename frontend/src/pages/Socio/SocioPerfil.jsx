@@ -40,6 +40,7 @@ import {
   FaReceipt,
   FaBook,
 } from "react-icons/fa";
+import { cifra, simboloMoneda, docIdentidad } from "../../utils/pais";
 
 const VERDE = "#a8cd3a";
 const AZUL = "#2c3e50";
@@ -54,7 +55,7 @@ const fmtTasa = (t) => {
 
 const fecha = (v) => (v ? String(v).substring(0, 10) : "-");
 
-const fmt = (n) => parseFloat(n || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = (n) => cifra(parseFloat(n || 0));
 
 const estadoBadge = (estado) => {
   const map = {
@@ -127,8 +128,8 @@ export default function SocioPerfil() {
         <FaExclamationTriangle className="mt-1" />
         <div className="small">
           <strong>{mora.dias} día{mora.dias !== 1 ? "s" : ""} de mora</strong> · Mora generada:{" "}
-          <strong>L. {fmt(mora.mora)}</strong>
-          {mora.porDia > 0 && <> (aprox. L. {fmt(mora.porDia)} por día)</>}
+          <strong>{simboloMoneda()} {fmt(mora.mora)}</strong>
+          {mora.porDia > 0 && <> (aprox. {simboloMoneda()} {fmt(mora.porDia)} por día)</>}
           <div style={{ color: "#b45309" }}>Se cobra junto con tu próximo pago.</div>
         </div>
       </div>
@@ -416,7 +417,7 @@ export default function SocioPerfil() {
                       </>
                     )}
                     <span className="d-flex align-items-center gap-1" style={{ fontSize: ".88rem", opacity: .85 }}>
-                      <FaIdCard size={13} /> DNI: {user.dni}
+                      <FaIdCard size={13} /> {docIdentidad().nombre}: {user.dni}
                     </span>
                     <span style={{ opacity: .4 }}>•</span>
                     <span className="d-flex align-items-center gap-1" style={{ fontSize: ".88rem", opacity: .85 }}>
@@ -445,8 +446,8 @@ export default function SocioPerfil() {
             {/* Estadísticas rápidas */}
             <div className="row g-3 mt-3">
               {[
-                { label: "Saldo Total",          value: `L. ${fmt(totalSaldo)}`,          icon: <FaMoneyBillWave />, color: "#a8cd3a" },
-                { label: "Total Aportaciones",   value: `L. ${fmt(totalAportaciones)}`,   icon: <FaPiggyBank />,     color: "#60a5fa" },
+                { label: "Saldo Total",          value: `${simboloMoneda()} ${fmt(totalSaldo)}`,          icon: <FaMoneyBillWave />, color: "#a8cd3a" },
+                { label: "Total Aportaciones",   value: `${simboloMoneda()} ${fmt(totalAportaciones)}`,   icon: <FaPiggyBank />,     color: "#60a5fa" },
                 { label: "Préstamos Activos",    value: prestamosActivos,                  icon: <FaHandHoldingUsd />,color: "#f59e0b" },
                 { label: "Total Préstamos",      value: prestamos.filter((p) => p.estado !== "rechazado").length,                  icon: <FaClipboardList />, color: "#c084fc" },
               ].map((s) => (
@@ -519,7 +520,7 @@ export default function SocioPerfil() {
                   ¡Felicidades! Tu préstamo ha sido aprobado
                 </div>
                 <div className="small" style={{ color: "#047857" }}>
-                  Tu solicitud de <strong>L. {fmt(p.monto)}</strong> a {p.plazo_meses} meses fue aprobada. La
+                  Tu solicitud de <strong>{simboloMoneda()} {fmt(p.monto)}</strong> a {p.plazo_meses} meses fue aprobada. La
                   cooperativa se comunicará contigo para entregarte el desembolso.
                 </div>
                 <button
@@ -596,7 +597,7 @@ export default function SocioPerfil() {
                     <div>
                       <div className="fw-bold">Tienes cuotas atrasadas</div>
                       <div className="small">
-                        Mora generada hasta hoy: <strong>L. {fmt(totalMora)}</strong>. Mientras más días pasen, mayor será el cargo.
+                        Mora generada hasta hoy: <strong>{simboloMoneda()} {fmt(totalMora)}</strong>. Mientras más días pasen, mayor será el cargo.
                       </div>
                     </div>
                   </div>
@@ -627,7 +628,7 @@ export default function SocioPerfil() {
                           </div>
                           <div className="text-end">
                             <div className="fw-bold" style={{ color: "#065f46", fontSize: "1.1rem" }}>
-                              L. {fmt(c.saldo_actual)}
+                              {simboloMoneda()} {fmt(c.saldo_actual)}
                             </div>
                             <div className="small text-muted">Saldo disponible</div>
                           </div>
@@ -670,7 +671,7 @@ export default function SocioPerfil() {
                             <FaCalendarAlt size={13} style={{ color: "#d97706" }} />
                             <span className="small text-muted">{a.fecha ? a.fecha.substring(0, 10) : "-"}</span>
                           </div>
-                          <span className="fw-bold" style={{ color: "#065f46" }}>L. {fmt(a.monto)}</span>
+                          <span className="fw-bold" style={{ color: "#065f46" }}>{simboloMoneda()} {fmt(a.monto)}</span>
                         </div>
                       ))
                     )}
@@ -714,7 +715,7 @@ export default function SocioPerfil() {
                               <div className="rounded-3 p-3 h-100" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
                                 <div className="d-flex justify-content-between align-items-start mb-2">
                                   <div>
-                                    <div className="fw-bold" style={{ color: AZUL, fontSize: "1.1rem" }}>L. {fmt(monto)}</div>
+                                    <div className="fw-bold" style={{ color: AZUL, fontSize: "1.1rem" }}>{simboloMoneda()} {fmt(monto)}</div>
                                     <div className="small text-muted">
                                       {p.estado === "aprobado"
                                         ? `Aprobado: ${fecha(p.fecha_aprobacion)}`
@@ -730,12 +731,12 @@ export default function SocioPerfil() {
                                   </div>
                                   <div className="col-4">
                                     <div className="small text-muted">Cuota mensual</div>
-                                    <div className="fw-bold" style={{ color: "#065f46" }}>L. {fmt(cuota)}</div>
+                                    <div className="fw-bold" style={{ color: "#065f46" }}>{simboloMoneda()} {fmt(cuota)}</div>
                                   </div>
                                   <div className="col-4">
                                     <div className="small text-muted">Saldo restante</div>
                                     <div className="fw-bold" style={{ color: liquidado ? "#065f46" : "#92400e" }}>
-                                      {liquidado ? "Liquidado" : `L. ${fmt(saldo)}`}
+                                      {liquidado ? "Liquidado" : `${simboloMoneda()} ${fmt(saldo)}`}
                                     </div>
                                   </div>
                                 </div>
@@ -823,7 +824,7 @@ export default function SocioPerfil() {
                           }}>#{i + 1}</div>
                           <div>
                             <div className="fw-bold" style={{ color: AZUL, fontSize: "1.15rem" }}>
-                              L. {fmt(p.monto)}
+                              {simboloMoneda()} {fmt(p.monto)}
                             </div>
                             <div className="small text-muted">
                               {p.estado === "aprobado"
@@ -840,7 +841,7 @@ export default function SocioPerfil() {
                         <div className="col-6 col-md">
                           <div className="rounded-3 p-2 text-center" style={{ background: "#f0f4f8" }}>
                             <div className="small text-muted mb-1">Monto otorgado</div>
-                            <div className="fw-bold" style={{ color: "#2980b9", fontSize: ".95rem" }}>L. {fmt(monto)}</div>
+                            <div className="fw-bold" style={{ color: "#2980b9", fontSize: ".95rem" }}>{simboloMoneda()} {fmt(monto)}</div>
                           </div>
                         </div>
                         <div className="col-6 col-md">
@@ -858,7 +859,7 @@ export default function SocioPerfil() {
                         <div className="col-6 col-md">
                           <div className="rounded-3 p-2 text-center" style={{ background: "#f0f4f8" }}>
                             <div className="small text-muted mb-1">Cuota mensual</div>
-                            <div className="fw-bold" style={{ color: "#065f46", fontSize: ".95rem" }}>L. {fmt(cuotaCalcSocio)}</div>
+                            <div className="fw-bold" style={{ color: "#065f46", fontSize: ".95rem" }}>{simboloMoneda()} {fmt(cuotaCalcSocio)}</div>
                           </div>
                         </div>
                         <div className="col-6 col-md">
@@ -870,7 +871,7 @@ export default function SocioPerfil() {
                                 <FaCheckCircle size={13} /> Liquidado
                               </div>
                             ) : (
-                              <div className="fw-bold" style={{ color: "#92400e", fontSize: ".95rem" }}>L. {fmt(saldo)}</div>
+                              <div className="fw-bold" style={{ color: "#92400e", fontSize: ".95rem" }}>{simboloMoneda()} {fmt(saldo)}</div>
                             )}
                           </div>
                         </div>
@@ -879,17 +880,17 @@ export default function SocioPerfil() {
                       {/* Barra de progreso */}
                       <div className="mb-3">
                         <div className="d-flex justify-content-between small text-muted mb-1">
-                          <span>Amortizado: <strong style={{ color: "#065f46" }}>L. {fmt(capitalAmortizado)}</strong></span>
+                          <span>Amortizado: <strong style={{ color: "#065f46" }}>{simboloMoneda()} {fmt(capitalAmortizado)}</strong></span>
                           <span><strong style={{ color: estaPagado ? "#065f46" : "inherit" }}>{progresoFinal.toFixed(1)}%</strong></span>
                         </div>
                         <div className="sp-progress-bar" style={{ height: 10 }}>
                           <div className="sp-progress-fill" style={{ width: `${progresoFinal}%`, background: estaPagado ? "linear-gradient(90deg, #059669, #065f46)" : undefined }} />
                         </div>
                         <div className="d-flex justify-content-between small text-muted mt-1">
-                          <span>Total pagado: <strong>L. {fmt(totalPagado)}</strong></span>
+                          <span>Total pagado: <strong>{simboloMoneda()} {fmt(totalPagado)}</strong></span>
                           {estaPagado
                             ? <span className="fw-semibold" style={{ color: "#065f46" }}><FaCheckCircle className="me-1" size={11} />Pagado en su totalidad</span>
-                            : <span>Principal: L. {fmt(monto)}</span>
+                            : <span>Principal: {simboloMoneda()} {fmt(monto)}</span>
                           }
                         </div>
                       </div>
@@ -985,7 +986,7 @@ export default function SocioPerfil() {
                                     <div className="d-flex flex-wrap justify-content-between align-items-center gap-1">
                                       <div>
                                         <div className="fw-semibold" style={{ color: AZUL, fontSize: ".9rem" }}>
-                                          L. {fmt(pago.monto_pagado)}
+                                          {simboloMoneda()} {fmt(pago.monto_pagado)}
                                         </div>
                                         <div className="small text-muted">
                                           {pago.fecha_pago ? pago.fecha_pago.substring(0, 10) : "-"}
@@ -994,7 +995,7 @@ export default function SocioPerfil() {
                                       </div>
                                       <div className="text-end">
                                         <div className="small" style={{ color: "#6b7280" }}>
-                                          Saldo: <strong>L. {fmt(pago.saldo_restante)}</strong>
+                                          Saldo: <strong>{simboloMoneda()} {fmt(pago.saldo_restante)}</strong>
                                         </div>
                                       </div>
                                     </div>
@@ -1006,7 +1007,7 @@ export default function SocioPerfil() {
                             <div className="rounded-3 p-2 px-3 mt-2 d-flex justify-content-between align-items-center"
                               style={{ background: "linear-gradient(90deg,#e8f5e9,#f0faf4)", border: "1px solid #a5d6a7" }}>
                               <span className="small fw-semibold" style={{ color: "#2e7d32" }}>Total pagado</span>
-                              <span className="fw-bold" style={{ color: "#2e7d32" }}>L. {fmt(totalPagado)}</span>
+                              <span className="fw-bold" style={{ color: "#2e7d32" }}>{simboloMoneda()} {fmt(totalPagado)}</span>
                             </div>
                           </div>
                         )}
@@ -1029,7 +1030,7 @@ export default function SocioPerfil() {
                     <div>
                       <h5 className="mb-0 fw-bold" style={{ color: AZUL }}>Mis Aportaciones</h5>
                       <span className="text-muted small">{aportaciones.length} aportación(es) •
-                        <span className="fw-semibold" style={{ color: "#065f46" }}> Total: L. {fmt(totalAportaciones)}</span>
+                        <span className="fw-semibold" style={{ color: "#065f46" }}> Total: {simboloMoneda()} {fmt(totalAportaciones)}</span>
                       </span>
                     </div>
                   </div>
@@ -1057,7 +1058,7 @@ export default function SocioPerfil() {
                           <tr key={a.id_aportacion}>
                             <td className="text-muted fw-semibold">#{i + 1}</td>
                             <td className="fw-bold" style={{ color: "#065f46", fontSize: "1rem" }}>
-                              L. {fmt(a.monto)}
+                              {simboloMoneda()} {fmt(a.monto)}
                             </td>
                             <td className="text-muted small">
                               <FaCalendarAlt className="me-1" style={{ color: "#d97706" }} />
@@ -1078,7 +1079,7 @@ export default function SocioPerfil() {
                             Total General:
                           </td>
                           <td colSpan={2} className="fw-bold" style={{ color: "#065f46", fontSize: "1.05rem" }}>
-                            L. {fmt(totalAportaciones)}
+                            {simboloMoneda()} {fmt(totalAportaciones)}
                           </td>
                         </tr>
                       </tfoot>

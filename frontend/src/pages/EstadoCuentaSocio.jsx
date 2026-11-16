@@ -2,14 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { FaArrowLeft, FaPrint } from "react-icons/fa";
 import { numeroSocio } from "../utils/numeroSocio";
+import { dinero, localeApp } from "../utils/pais";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const fmt = (n) =>
-  `L. ${parseFloat(n || 0).toLocaleString("es-HN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  dinero(n || 0);
 
 const fecha = (v) => (v ? String(v).substring(0, 10) : "—");
 
@@ -90,7 +88,7 @@ export default function EstadoCuentaSocio({ idSocio, headers, onBack, textoVolve
                 {desde || hasta
                   ? `Período: ${desde || "inicio"} al ${hasta || "hoy"}`
                   : "Todo el historial"}{" "}
-                · Generado el {new Date(data.generado).toLocaleString("es-HN")}
+                · Generado el {new Date(data.generado).toLocaleString(localeApp())}
               </div>
 
               <div className="row g-2 mt-2">

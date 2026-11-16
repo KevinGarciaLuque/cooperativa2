@@ -4,6 +4,7 @@ import { FaInfoCircle } from "react-icons/fa";
 import InputMonto from "../ui/InputMonto";
 import { OCUPACIONES, PROPOSITOS, fmt, simular } from "../utils/solicitud";
 import { formatearNombre } from "../utils/nombres";
+import { simboloMoneda } from "../utils/pais";
 
 export const AvisoRelacion = ({ sim }) =>
   sim.relacionAlta ? (
@@ -21,7 +22,7 @@ export function CamposMonto({ param, form, setForm }) {
   return (
     <div className="row g-3">
       <div className="col-12 col-md-6">
-        <label className="form-label fw-semibold small">¿Cuánto necesitas? (L.) *</label>
+        <label className="form-label fw-semibold small">¿Cuánto necesitas? ({simboloMoneda()}) *</label>
         <InputMonto
           required className="form-control form-control-lg" placeholder="0.00"
           value={form.monto} onChange={poner("monto")}
@@ -104,7 +105,7 @@ export function CamposIngresos({ form, setForm }) {
         <input className="form-control" name="lugar_trabajo" maxLength={120} value={form.lugar_trabajo} onChange={cambiar} />
       </div>
       <div className="col-12 col-md-4">
-        <label className="form-label fw-semibold small">Ingreso mensual aproximado (L.) *</label>
+        <label className="form-label fw-semibold small">Ingreso mensual aproximado ({simboloMoneda()}) *</label>
         <InputMonto
           required className="form-control" placeholder="0.00"
           value={form.ingreso_mensual} onChange={(v) => setForm((f) => ({ ...f, ingreso_mensual: v }))}

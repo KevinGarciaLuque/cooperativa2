@@ -11,6 +11,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import FirmaDigital from "../components/FirmaDigital";
 import { formatearNombre } from "../utils/nombres";
+import { localeApp, docIdentidad } from "../utils/pais";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -28,7 +29,7 @@ function getInitials(name) {
 
 function fmtFecha(iso) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("es-HN", {
+  return new Date(iso).toLocaleDateString(localeApp(), {
     day: "2-digit", month: "long", year: "numeric",
   });
 }
@@ -445,7 +446,7 @@ export default function MiPerfil() {
 
                       {/* DNI (solo lectura) */}
                       <div className="col-12 col-md-6">
-                        <div className="mp-field-label"><FaIdCard style={{ marginRight: 5 }} />DNI / Identidad</div>
+                        <div className="mp-field-label"><FaIdCard style={{ marginRight: 5 }} />Identidad ({docIdentidad().nombre})</div>
                         <div className="mp-field-value" style={{ color: MUTED }}>
                           {perfil?.dni || "—"}
                           <span style={{ marginLeft: 8, fontSize: ".72rem", color: MUTED }}>(no editable)</span>
@@ -637,7 +638,7 @@ export default function MiPerfil() {
                           </div>
                           <div style={{ fontSize: ".75rem", color: MUTED, whiteSpace: "nowrap", flexShrink: 0 }}>
                             {log.fecha
-                              ? new Date(log.fecha).toLocaleString("es-HN", {
+                              ? new Date(log.fecha).toLocaleString(localeApp(), {
                                   day: "2-digit", month: "short",
                                   hour: "2-digit", minute: "2-digit",
                                 })

@@ -129,7 +129,7 @@ test("recordatorios de pago: cuándo toca cada uno", () => {
 
   const previo = mensajeRecordatorio(fila(3, 0), "SmartCoop");
   assert.match(previo.texto, /Hola Ana/);
-  assert.match(previo.texto, /L\. 1,000\.00/);
+  assert.match(previo.texto, /L\.\s1,000\.00/);
   assert.match(mensajeRecordatorio(fila(-2, 4), "SmartCoop").texto, /4 día\(s\) de atraso/);
 });
 
@@ -170,21 +170,21 @@ test("país: moneda, montos, identidad y teléfono de cada país", () => {
   try {
     // Honduras (por defecto): como siempre
     pais.establecer("HN");
-    assert.equal(pais.dinero(1234.5), "L. 1,234.50");
-    assert.equal(pais.dinero(-0.001), "L. 0.00");
-    assert.equal(pais.dinero(-1500), "L. -1,500.00");
-    assert.equal(pais.dinero("abc"), "L. 0.00");
+    assert.equal(pais.dinero(1234.5), "L.\u00a01,234.50");
+    assert.equal(pais.dinero(-0.001), "L.\u00a00.00");
+    assert.equal(pais.dinero(-1500), "L.\u00a0-1,500.00");
+    assert.equal(pais.dinero("abc"), "L.\u00a00.00");
     assert.ok(pais.validarIdentidad("0801-1990-12345"), "con guiones se limpian");
     assert.equal(pais.normalizarIdentidad(" 0801-1990-12345 "), "0801199012345");
     assert.ok(!pais.validarIdentidad("080119901234"));
     assert.ok(validarTelefono("98765432"));
 
     pais.establecer("GT");
-    assert.equal(pais.dinero(1234.5), "Q 1,234.50");
+    assert.equal(pais.dinero(1234.5), "Q\u00a01,234.50");
     assert.ok(pais.validarIdentidad("2547 89632 0101"));
 
     pais.establecer("SV");
-    assert.equal(pais.dinero(10), "$ 10.00");
+    assert.equal(pais.dinero(10), "$\u00a010.00");
     assert.ok(pais.validarIdentidad("01234567-8"));
     assert.ok(!pais.validarIdentidad("0801199012345"));
 
@@ -193,11 +193,11 @@ test("país: moneda, montos, identidad y teléfono de cada país", () => {
     assert.equal(pais.normalizarIdentidad("001-150590-0000a"), "0011505900000A");
 
     pais.establecer("CR");
-    assert.equal(pais.dinero(1234567.891), "₡ 1 234 567,89");
+    assert.equal(pais.dinero(1234567.891), "₡\u00a01\u00a0234\u00a0567,89");
     assert.ok(pais.validarIdentidad("1-0987-0654"));
 
     pais.establecer("PA");
-    assert.equal(pais.dinero(5), "B/. 5.00");
+    assert.equal(pais.dinero(5), "B/.\u00a05.00");
     assert.ok(pais.validarIdentidad("8-123-4567"));
     assert.ok(pais.validarIdentidad("PE-1-1234"));
     assert.ok(!pais.validarIdentidad("81234567"));

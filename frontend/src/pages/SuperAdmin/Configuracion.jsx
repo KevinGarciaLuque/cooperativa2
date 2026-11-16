@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import { useAlerta } from "../../context/AlertaContext";
-import { FaCog, FaSave, FaHome, FaSignInAlt, FaPlus, FaTrash, FaUpload, FaImage } from "react-icons/fa";
+import { FaCog, FaSave, FaHome, FaSignInAlt, FaPlus, FaTrash, FaUpload, FaImage, FaGlobeAmericas } from "react-icons/fa";
+import { establecerPais, dinero } from "../../utils/pais";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -416,6 +417,12 @@ export default function Configuracion() {
   const [subiendoLogo,  setSubiendoLogo]  = useState(false);
   const inputLogoRef = useRef();
 
+  // País de la cooperativa: moneda, documento de identidad, teléfono y zona horaria
+  const [pais,         setPais]         = useState("HN");
+  const [paisGuardado, setPaisGuardado] = useState("HN");
+  const [paises,       setPaises]       = useState([]);
+  const [guardandoPais, setGuardandoPais] = useState(false);
+
   const headers = { Authorization: `Bearer ${token}` };
 
   const cargarConfig = useCallback(async () => {
@@ -439,6 +446,11 @@ export default function Configuracion() {
           login_subtitle: c.login_subtitle ?? DEFAULTS_LOGIN.login_subtitle,
           login_features: Array.isArray(c.login_features) ? c.login_features : DEFAULTS_LOGIN.login_features,
         });
+        if (c.pais) {
+          setPais(c.pais);
+          setPaisGuardado(c.pais);
+        }
+        if (Array.isArray(c.paises)) setPaises(c.paises);
         if (c.logo_url) setLogoActual(c.logo_url);
         if (c.site_name) setSiteName(c.site_name);
       }
@@ -461,6 +473,27 @@ export default function Configuracion() {
       mostrarAlerta(err.response?.data?.message || "Error al guardar la configuración", "error");
     } finally {
       setGuardando(false);
+    }
+  };
+
+  const guardarPais = async () => {
+    const elegido = paises.find((p) => p.codigo === pais);
+    if (!elegido) return;
+    const aviso =
+      `¿Cambiar el país de la cooperativa a ${elegido.nombre}?\n\n` +
+      `Los montos se mostrarán en ${elegido.moneda} y se pedirá el documento de identidad de ${elegido.nombre}.\n` +
+      "Los montos ya registrados NO se convierten: el cambio es solo para cooperativas nuevas o para corregir la configuración inicial.";
+    if (!window.confirm(aviso)) return;
+    try {
+      setGuardandoPais(true);
+      await axios.put(`${API_URL}/configuracion`, { pais }, { headers });
+      const { data } = await axios.get(`${API_URL}/configuracion`);
+      establecerPais(data?.data?.pais_datos);
+      // Se recarga para que todas las pantallas tomen la moneda y el documento nuevos
+      window.location.reload();
+    } catch (err) {
+      mostrarAlerta(err.response?.data?.message || "No se pudo cambiar el país", "error");
+      setGuardandoPais(false);
     }
   };
 
@@ -549,6 +582,61 @@ export default function Configuracion() {
       </div>
 
       <div className="row g-4">
+        {/* ── País de la cooperativa ─────────────────────────────── */}
+        <div className="col-12">
+          <div className="card border-0 shadow-sm" style={{ borderRadius: 14 }}>
+            <div
+              className="card-header border-0 py-3 px-4"
+              style={{
+                background: `linear-gradient(135deg, ${DARK} 0%, #2d3a5a 100%)`,
+                borderRadius: "14px 14px 0 0",
+              }}
+            >
+              <div className="d-flex align-items-center gap-2">
+                <FaGlobeAmericas style={{ color: ACCENT, fontSize: 16 }} />
+                <span className="fw-semibold text-white" style={{ fontSize: 14 }}>
+                  País de la cooperativa
+                </span>
+              </div>
+            </div>
+            <div className="card-body px-4 py-3">
+              <p className="small text-muted mb-3">
+                Define la moneda de los montos, el documento de identidad que se pide a los socios (DNI, DPI, DUI,
+                cédula...), el código del teléfono y la zona horaria de los procesos diarios. Se elige al instalar el
+                sistema: cambiarlo <strong>no convierte</strong> los montos ya registrados.
+              </p>
+              <div className="d-flex flex-wrap align-items-end gap-3">
+                <div style={{ minWidth: 260 }}>
+                  <label className="form-label small fw-semibold mb-1" htmlFor="pais-cooperativa">País</label>
+                  <select
+                    id="pais-cooperativa"
+                    className="form-select"
+                    value={pais}
+                    onChange={(e) => setPais(e.target.value)}
+                    disabled={guardandoPais || !paises.length}
+                  >
+                    {paises.map((p) => (
+                      <option key={p.codigo} value={p.codigo}>
+                        {p.nombre} — {p.moneda}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  className="btn d-flex align-items-center gap-2 fw-semibold"
+                  style={{ background: ACCENT, color: DARK, border: "none", borderRadius: 10 }}
+                  onClick={guardarPais}
+                  disabled={guardandoPais || pais === paisGuardado}
+                >
+                  {guardandoPais ? <span className="spinner-border spinner-border-sm" role="status" /> : <FaSave />}
+                  Cambiar país
+                </button>
+                <span className="small text-muted">Ejemplo de monto: <strong>{dinero(1234.5)}</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* ── Panel Logo ─────────────────────────────────────────── */}
         <div className="col-12">
           <div className="card border-0 shadow-sm" style={{ borderRadius: 14 }}>

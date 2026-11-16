@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { FaMoneyBillWave, FaCheckCircle, FaHourglassHalf, FaTimesCircle, FaChartLine, FaClock, FaUserTie } from "react-icons/fa";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
+import { dinero, cifra, simboloMoneda, docIdentidad } from "../../utils/pais";
 
 // ==================== COMPONENTE MODAL DETALLE PRÉSTAMO ====================
 export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo, token, apiUrl, onLiquidado }) {
@@ -251,10 +252,7 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
     : 0;
 
   const fmt = (n) =>
-    parseFloat(n || 0).toLocaleString("es-HN", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+    cifra(parseFloat(n || 0));
 
   // Timeline states — usa estaLiquidado para el paso final
   const estadoNorm = (prestamo.estado || "").toLowerCase();
@@ -334,7 +332,7 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
                       Información del Socio
                     </h6>
                     <div className="mb-1 small"><strong>Nombre:</strong> {usuario?.nombre_completo || "N/A"}</div>
-                    <div className="mb-1 small"><strong>DNI:</strong> {usuario?.dni || "N/A"}</div>
+                    <div className="mb-1 small"><strong>{docIdentidad().nombre}:</strong> {usuario?.dni || "N/A"}</div>
                     <div className="mb-1 small"><strong>Teléfono:</strong> {usuario?.telefono || "N/A"}</div>
                     <div className="small"><strong>Correo:</strong> {usuario?.correo || "N/A"}</div>
                   </div>
@@ -389,16 +387,16 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
                     <div className="mb-1 small">
                       <strong>Total Pagado:</strong>{" "}
                       <span style={{ color: "#3498db", fontWeight: "bold" }}>
-                        L. {fmt(totalPagadoReal)}
+                        {simboloMoneda()} {fmt(totalPagadoReal)}
                       </span>
                     </div>
                     <div className="small">
                       <strong>Saldo Restante:</strong>{" "}
                       <span style={{ color: estaLiquidado ? "#27ae60" : "#e74c3c", fontWeight: "bold" }}>
                         {estaLiquidado ? (
-                          <><span style={{ fontSize: "0.85rem" }}>✅</span> L. 0.00 — Liquidado</>
+                          <><span style={{ fontSize: "0.85rem" }}>✅</span> {dinero(0)} — Liquidado</>
                         ) : (
-                          `L. ${saldoMostrar.toFixed(2)}`
+                          `${dinero(saldoMostrar)}`
                         )}
                       </span>
                     </div>
@@ -581,7 +579,7 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
                       <div className="d-flex flex-wrap gap-3" style={{ fontSize: ".8rem", color: "#555" }}>
                         <span>
                           Principal:{" "}
-                          <strong style={{ color: "#2c3e50" }}>L. {fmt(montoP)}</strong>
+                          <strong style={{ color: "#2c3e50" }}>{simboloMoneda()} {fmt(montoP)}</strong>
                         </span>
                         <span>
                           Tasa mensual:{" "}
@@ -655,16 +653,16 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
                     </div>
                     <div className="small mt-1" style={{ color: "#555" }}>
                       Cuota francesa ({plazoP} meses):{" "}
-                      <strong style={{ color: "#27ae60" }}>L. {fmt(cuotaFrances)}</strong>
+                      <strong style={{ color: "#27ae60" }}>{simboloMoneda()} {fmt(cuotaFrances)}</strong>
                       {cuotaDetectada > 0 && Math.abs(cuotaDetectada - cuotaFrances) > 0.05 && (
                         <span className="ms-1" style={{ color: "#7f8c8d" }}>
-                          · pagando: L. {fmt(cuotaDetectada)}
+                          · pagando: {simboloMoneda()} {fmt(cuotaDetectada)}
                         </span>
                       )}
                     </div>
                     {cuotaPersonalizada && !usandoCustom && (
                       <div className="small mt-1" style={{ color: "#e53935" }}>
-                        ⚠ Ingresa un valor mayor a L. {fmt(cuotaEstandar)}
+                        ⚠ Ingresa un valor mayor a {simboloMoneda()} {fmt(cuotaEstandar)}
                       </div>
                     )}
                   </div>}
@@ -676,8 +674,8 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
                     style={{ background: "rgba(243,156,18,0.08)", border: "1.5px solid #f39c12" }}>
                     <span style={{ fontSize: "0.82rem", color: "#7d5a00" }}>
                       💡 Este socio está pagando{" "}
-                      <strong>L. {fmt(cuotaDetectada)}/mes</strong>{" "}
-                      (<strong style={{ color: "#27ae60" }}>+L. {fmt(cuotaDetectada - cuotaFrances)}</strong> sobre la cuota del contrato).
+                      <strong>{simboloMoneda()} {fmt(cuotaDetectada)}/mes</strong>{" "}
+                      (<strong style={{ color: "#27ae60" }}>+{simboloMoneda()} {fmt(cuotaDetectada - cuotaFrances)}</strong> sobre la cuota del contrato).
                       {" "}Si mantiene ese ritmo, terminará antes del plazo pactado.
                     </span>
                     <button type="button" className="btn btn-sm ms-auto"
@@ -701,10 +699,10 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
                       <div className="col-6 col-md-3">
                         <div className="small text-muted">Cuota personalizada</div>
                         <div className="fw-bold" style={{ color: "#1565c0", fontSize: "1rem" }}>
-                          L. {fmt(cuotaCustom)}
+                          {simboloMoneda()} {fmt(cuotaCustom)}
                         </div>
                         <div className="small" style={{ color: "#e53935" }}>
-                          +L. {fmt(cuotaCustom - cuotaEstandar)} extra/mes
+                          +{simboloMoneda()} {fmt(cuotaCustom - cuotaEstandar)} extra/mes
                         </div>
                       </div>
                       <div className="col-6 col-md-3">
@@ -722,10 +720,10 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
                       <div className="col-6 col-md-3">
                         <div className="small text-muted">Intereses totales</div>
                         <div className="fw-bold" style={{ color: "#b7791f", fontSize: "1rem" }}>
-                          L. {fmt(interesesCustom)}
+                          {simboloMoneda()} {fmt(interesesCustom)}
                         </div>
                         <div className="small text-muted">
-                          vs L. {fmt(interesesEstandar)} estándar
+                          vs {simboloMoneda()} {fmt(interesesEstandar)} estándar
                         </div>
                       </div>
                       <div className="col-6 col-md-3">
@@ -737,7 +735,7 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
                             fontSize: "1rem",
                           }}
                         >
-                          {ahorroIntereses > 0 ? "🎉 " : ""}L. {fmt(ahorroIntereses)}
+                          {ahorroIntereses > 0 ? "🎉 " : ""}{simboloMoneda()} {fmt(ahorroIntereses)}
                         </div>
                         <div className="small" style={{ color: "#27ae60" }}>
                           {ahorroIntereses > 0
@@ -848,19 +846,19 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
                               {fila.fecha || "—"}
                             </td>
                             <td style={{ padding: "10px 12px", whiteSpace: "nowrap", color: "#2c3e50" }}>
-                              L. {fmt(fila.saldoInicial)}
+                              {simboloMoneda()} {fmt(fila.saldoInicial)}
                             </td>
                             <td style={{ padding: "10px 12px", whiteSpace: "nowrap", color: "#b7791f" }}>
-                              L. {fmt(fila.interes)}
+                              {simboloMoneda()} {fmt(fila.interes)}
                             </td>
                             <td
                               className="fw-bold"
                               style={{ padding: "10px 12px", whiteSpace: "nowrap", color: "#27ae60" }}
                             >
-                              L. {fmt(fila.cuotaMensual)}
+                              {simboloMoneda()} {fmt(fila.cuotaMensual)}
                             </td>
                             <td style={{ padding: "10px 12px", whiteSpace: "nowrap", color: "#1565c0" }}>
-                              L. {fmt(fila.capital)}
+                              {simboloMoneda()} {fmt(fila.capital)}
                             </td>
                             {usandoCustom && (
                               <td
@@ -872,11 +870,11 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
                                   background: tieneExtra ? "rgba(21,101,192,0.05)" : "transparent",
                                 }}
                               >
-                                {tieneExtra ? `+L. ${fmt(fila.abonoExtra)}` : "—"}
+                                {tieneExtra ? `+${simboloMoneda()} ${fmt(fila.abonoExtra)}` : "—"}
                               </td>
                             )}
                             <td style={{ padding: "10px 12px", whiteSpace: "nowrap", color: fila.saldo < 0.01 ? "#27ae60" : "#e74c3c", fontWeight: fila.saldo < 0.01 ? "700" : "400" }}>
-                              L. {fmt(fila.saldo)}
+                              {simboloMoneda()} {fmt(fila.saldo)}
                             </td>
                             {/* Estado */}
                             <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
@@ -946,13 +944,13 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
                 }}>
                   <span style={{ fontWeight: 800 }}>TOTAL</span>
                   <span style={{ color: "#94a3b8" }}>·</span>
-                  <span>Int.: <strong style={{ color: "#fbbf24" }}>L. {fmt(tablaAmortizacion.reduce((acc, f) => acc + f.interes, 0))}</strong></span>
-                  <span>Pago: <strong style={{ color: "#4ade80" }}>L. {fmt(tablaAmortizacion.reduce((acc, f) => acc + f.cuotaMensual, 0))}</strong></span>
-                  <span>Capital: <strong>L. {fmt(tablaAmortizacion.reduce((acc, f) => acc + f.capital, 0))}</strong></span>
+                  <span>Int.: <strong style={{ color: "#fbbf24" }}>{simboloMoneda()} {fmt(tablaAmortizacion.reduce((acc, f) => acc + f.interes, 0))}</strong></span>
+                  <span>Pago: <strong style={{ color: "#4ade80" }}>{simboloMoneda()} {fmt(tablaAmortizacion.reduce((acc, f) => acc + f.cuotaMensual, 0))}</strong></span>
+                  <span>Capital: <strong>{simboloMoneda()} {fmt(tablaAmortizacion.reduce((acc, f) => acc + f.capital, 0))}</strong></span>
                   {usandoCustom && (
-                    <span>Extra: <strong>+L. {fmt(tablaAmortizacion.reduce((acc, f) => acc + f.abonoExtra, 0))}</strong></span>
+                    <span>Extra: <strong>+{simboloMoneda()} {fmt(tablaAmortizacion.reduce((acc, f) => acc + f.abonoExtra, 0))}</strong></span>
                   )}
-                  <span>Saldo: <strong style={{ color: "#4ade80" }}>L. 0.00</strong></span>
+                  <span>Saldo: <strong style={{ color: "#4ade80" }}>{dinero(0)}</strong></span>
                   <span style={{ marginLeft: "auto" }}>
                     {estaLiquidado ? (
                       <span style={{ color: "#4ade80" }}>✅ {pagosPrestamo.length} pagadas — Liquidado</span>
@@ -992,7 +990,7 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
                   padding: "6px 16px",
                 }}
                 onClick={async () => {
-                  if (!window.confirm(`¿Marcar el préstamo #${prestamo.id_prestamo} como PAGADO/LIQUIDADO? Esto pondrá el saldo en L. 0.00.`)) return;
+                  if (!window.confirm(`¿Marcar el préstamo #${prestamo.id_prestamo} como PAGADO/LIQUIDADO? Esto pondrá el saldo en ${dinero(0)}.`)) return;
                   try {
                     await axios.patch(
                       `${apiUrl}/prestamos/${prestamo.id_prestamo}/estado`,

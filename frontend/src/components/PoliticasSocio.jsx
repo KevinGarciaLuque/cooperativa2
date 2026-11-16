@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { FaBook, FaCheckCircle, FaChevronDown, FaChevronUp, FaSignOutAlt } from "react-icons/fa";
 import TextoPolitica from "./TextoPolitica";
+import { localeApp } from "../utils/pais";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const fecha = (v) => {
   const d = new Date(v);
-  return isNaN(d) ? "" : d.toLocaleDateString("es-HN", { day: "numeric", month: "long", year: "numeric" });
+  return isNaN(d) ? "" : d.toLocaleDateString(localeApp(), { day: "numeric", month: "long", year: "numeric" });
 };
 
 // Lista de políticas que se abren para leerlas

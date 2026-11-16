@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import { dinero } from "../utils/pais";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const fmt = (n) =>
-  `L. ${parseFloat(n || 0).toLocaleString("es-HN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  dinero(n || 0);
 
 // Nueva liquidación: elegir actividad, tipo de reparto, ver quién recibe cuánto y confirmar
 export default function NuevaLiquidacionModal({ token, onClose, onCreada, mostrarAlerta }) {

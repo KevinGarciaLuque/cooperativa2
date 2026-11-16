@@ -16,6 +16,7 @@ import {
   FaInfoCircle,
   FaTimes
 } from "react-icons/fa";
+import { docIdentidad } from "../utils/pais";
 
 export default function Roles() {
   const { token } = useAuth();
@@ -560,7 +561,7 @@ export default function Roles() {
                       <thead style={{ background: "#f8f9fa" }}>
                         <tr>
                           <th style={{ color: "#2c3e50", fontWeight: "600", borderBottom: "2px solid #667eea" }}>Nombre</th>
-                          <th style={{ color: "#2c3e50", fontWeight: "600", borderBottom: "2px solid #667eea" }}>DNI</th>
+                          <th style={{ color: "#2c3e50", fontWeight: "600", borderBottom: "2px solid #667eea" }}>{docIdentidad().nombre}</th>
                           <th style={{ color: "#2c3e50", fontWeight: "600", borderBottom: "2px solid #667eea" }}>Estado</th>
                           <th style={{ color: "#2c3e50", fontWeight: "600", borderBottom: "2px solid #667eea" }}>Fecha Registro</th>
                         </tr>

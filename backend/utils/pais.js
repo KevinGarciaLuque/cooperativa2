@@ -82,7 +82,7 @@ const PAISES = {
     locale: "es-CR",
     zona: "America/Costa_Rica",
     moneda: { iso: "CRC", simbolo: "₡", nombre: "colones" },
-    numeros: { miles: " ", decimal: "," },
+    numeros: { miles: "\u00a0", decimal: "," }, // espacio que no se corta
     telefono: { codigo: "506", digitos: 8 },
     identidad: {
       nombre: "Cédula",
@@ -175,7 +175,8 @@ const numero = (n, decimales = 2) => {
 };
 
 // 1234.5 → "L. 1,234.50"
-const dinero = (n, decimales = 2) => `${actual.moneda.simbolo} ${numero(n, decimales)}`;
+// (con un espacio que no se corta: el símbolo nunca queda solo al final de una línea)
+const dinero = (n, decimales = 2) => `${actual.moneda.simbolo}\u00a0${numero(n, decimales)}`;
 
 // Idioma de fechas y números del país (es-HN, es-GT...)
 const locale = () => actual.locale;

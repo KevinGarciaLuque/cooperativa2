@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import { FaEnvelope, FaPhone, FaMapMarkerAlt, FaBirthdayCake, FaIdCard } from "react-icons/fa";
 import { numeroSocio } from "../../utils/numeroSocio";
+import { docIdentidad } from "../../utils/pais";
 
 export default function TablaUsuarios({ usuarios, onEdit, onDelete, onVerPerfil }) {
 
@@ -34,7 +35,7 @@ export default function TablaUsuarios({ usuarios, onEdit, onDelete, onVerPerfil 
             <tr>
               <th style={{ padding: "14px 12px", borderBottom: "none", width: "48px" }}>#</th>
               <th style={{ padding: "14px 12px", borderBottom: "none" }}>Nombre Completo</th>
-              <th style={{ padding: "14px 12px", borderBottom: "none" }}>DNI</th>
+              <th style={{ padding: "14px 12px", borderBottom: "none" }}>{docIdentidad().nombre}</th>
               <th style={{ padding: "14px 12px", borderBottom: "none" }}>Contacto</th>
               <th style={{ padding: "14px 12px", borderBottom: "none" }}>Dirección</th>
               <th style={{ padding: "14px 12px", borderBottom: "none" }}>Nacimiento</th>

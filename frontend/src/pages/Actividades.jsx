@@ -34,6 +34,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import { dinero, simboloMoneda } from "../utils/pais";
 
 export default function Actividades() {
   const { token } = useAuth();
@@ -334,7 +335,7 @@ export default function Actividades() {
                 <div>
                   <p className="text-muted mb-1 small">Ingreso Total</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#27ae60" }}>
-                    L. {ingresoTotal.toFixed(2)}
+                    {dinero(ingresoTotal)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
                     Todas las actividades
@@ -369,7 +370,7 @@ export default function Actividades() {
                 <div>
                   <p className="text-muted mb-1 small">Este Mes</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#9b59b6" }}>
-                    L. {ingresoEsteMes.toFixed(2)}
+                    {dinero(ingresoEsteMes)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
                     {actividadesEsteMes.length} actividades
@@ -404,7 +405,7 @@ export default function Actividades() {
                 <div>
                   <p className="text-muted mb-1 small">Promedio</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#3498db" }}>
-                    L. {ingresoPromedio.toFixed(2)}
+                    {dinero(ingresoPromedio)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
                     Por actividad
@@ -456,7 +457,7 @@ export default function Actividades() {
                     <Bar
                       dataKey="ingreso"
                       fill="#e67e22"
-                      name="Ingreso (L.)"
+                      name={`Ingreso (${simboloMoneda()})`}
                       radius={[8, 8, 0, 0]}
                     />
                   </BarChart>
@@ -505,7 +506,7 @@ export default function Actividades() {
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={(value) => `L.${value.toFixed(2)}`}
+                        formatter={(value) => `${dinero(value)}`}
                       />
                     </PieChart>
                   </ResponsiveContainer>
@@ -830,7 +831,7 @@ function TablaActividades({ actividades, onEdit, onDelete, getColorForTipo }) {
                         className="fw-bold"
                         style={{ fontSize: "18px", color: "#27ae60" }}
                       >
-                        L. {parseFloat(actividad.monto || 0).toFixed(2)}
+                        {dinero(parseFloat(actividad.monto || 0))}
                       </div>
                     </div>
                   </div>
@@ -1087,7 +1088,7 @@ function ModalActividad({
                   style={{ color: "#2c3e50" }}
                 >
                   <FaMoneyBillWave className="me-2" style={{ color: "#27ae60" }} />
-                  Ingreso Generado (L.)
+                  Ingreso Generado ({simboloMoneda()})
                 </label>
                 <input
                   type="number"

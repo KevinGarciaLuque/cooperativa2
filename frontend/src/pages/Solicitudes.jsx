@@ -14,6 +14,7 @@ import { verComprobanteReportado } from "../utils/pagosReportados";
 import { useConfigSitio } from "../hooks/useConfigSitio";
 import { OCUPACIONES, PROPOSITOS, fmt } from "../utils/solicitud";
 import { compartirCarta, descargarCarta } from "../utils/cartaAprobacion";
+import { simboloMoneda } from "../utils/pais";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const ACCENT = "#a8cd3a";
@@ -737,7 +738,7 @@ export default function Solicitudes() {
                 </p>
                 <div className="row g-2">
                   <div className="col-12 col-md-4">
-                    <label className="form-label small fw-semibold">Monto (L.)</label>
+                    <label className="form-label small fw-semibold">Monto ({simboloMoneda()})</label>
                     <InputMonto
                       className="form-control"
                       value={condiciones.monto}

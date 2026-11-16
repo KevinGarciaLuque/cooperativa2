@@ -7,14 +7,12 @@ import FirmaDigital from "./FirmaDigital";
 import { generarReciboPdf, nombreArchivoRecibo } from "../utils/reciboPdf";
 import { comprimirImagen } from "../utils/imagen";
 import { numeroSocio } from "../utils/numeroSocio";
+import { dinero, cifra, simboloMoneda, localeApp, numeroWhatsApp } from "../utils/pais";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const fmt = (n) =>
-  `L. ${parseFloat(n || 0).toLocaleString("es-HN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  dinero(n || 0);
 
 const TIPOS = {
   pago_prestamo: "Recibo de pago de préstamo",
@@ -36,7 +34,7 @@ const formatearFecha = (f) => {
   const d = new Date(f);
   return isNaN(d)
     ? ""
-    : d.toLocaleString("es-HN", { dateStyle: "long", timeStyle: "short" });
+    : d.toLocaleString(localeApp(), { dateStyle: "long", timeStyle: "short" });
 };
 
 // Muestra un recibo por su id, o lo busca por la operación que lo originó
@@ -177,11 +175,11 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
       const blob = await generarReciboPdf(recibo);
       const nombre = nombreArchivoRecibo(recibo);
       const archivo = new File([blob], nombre, { type: "application/pdf" });
-      const montoTxt = parseFloat(recibo.monto).toLocaleString("es-HN", { minimumFractionDigits: 2 });
+      const montoTxt = cifra(parseFloat(recibo.monto));
       const texto =
         recibo.tipo === "finiquito"
-          ? `${recibo.cooperativa}: constancia de cancelación ${recibo.numero}. Tu préstamo de L. ${montoTxt} está totalmente pagado. ¡Felicidades!`
-          : `${recibo.cooperativa}: recibo ${recibo.numero} por L. ${montoTxt}. ¡Gracias!`;
+          ? `${recibo.cooperativa}: constancia de cancelación ${recibo.numero}. Tu préstamo de ${simboloMoneda()} ${montoTxt} está totalmente pagado. ¡Felicidades!`
+          : `${recibo.cooperativa}: recibo ${recibo.numero} por ${simboloMoneda()} ${montoTxt}. ¡Gracias!`;
 
       if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
         try {
@@ -193,8 +191,7 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
       }
 
       descargarArchivo(blob, nombre);
-      const tel = String(recibo.socio?.telefono || "").replace(/\D/g, "");
-      const numero = tel.length === 8 ? `504${tel}` : tel;
+      const numero = numeroWhatsApp(recibo.socio?.telefono);
       const enlace = numero
         ? `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`
         : `https://wa.me/?text=${encodeURIComponent(texto)}`;

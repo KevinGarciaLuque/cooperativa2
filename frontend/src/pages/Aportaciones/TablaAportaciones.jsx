@@ -14,6 +14,7 @@ import {
   FaFileAlt,
   FaCheckCircle,
 } from "react-icons/fa";
+import { dinero } from "../../utils/pais";
 
 export default function TablaAportaciones({
   aportaciones,
@@ -168,7 +169,7 @@ export default function TablaAportaciones({
                           className="fw-bold"
                           style={{ fontSize: "18px", color: "#27ae60" }}
                         >
-                          L. {monto.toFixed(2)}
+                          {dinero(monto)}
                         </div>
                       </div>
                     </div>

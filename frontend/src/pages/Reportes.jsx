@@ -21,6 +21,7 @@ import {
   FaPhone,
   FaInfoCircle,
 } from "react-icons/fa";
+import { dinero, docIdentidad } from "../utils/pais";
 
 export default function Reportes() {
   const { token } = useAuth();
@@ -261,7 +262,7 @@ export default function Reportes() {
                         {socioSeleccionado.nombre_completo}
                       </p>
                       <p className="mb-0 small text-muted">
-                        DNI: {socioSeleccionado.dni || "N/A"}
+                        {docIdentidad().nombre}: {socioSeleccionado.dni || "N/A"}
                       </p>
                     </div>
                     <button
@@ -289,7 +290,7 @@ export default function Reportes() {
                       <input
                         type="text"
                         className="form-control border-start-0"
-                        placeholder="Buscar por nombre o DNI..."
+                        placeholder={`Buscar por nombre o ${docIdentidad().nombre}...`}
                         value={filtro}
                         onChange={(e) => {
                           setFiltro(e.target.value);
@@ -339,7 +340,7 @@ export default function Reportes() {
                                 {u.nombre_completo}
                               </p>
                               <p className="mb-0 small text-muted">
-                                DNI: {u.dni || "N/A"}
+                                {docIdentidad().nombre}: {u.dni || "N/A"}
                               </p>
                             </div>
                           ))
@@ -453,7 +454,7 @@ export default function Reportes() {
                         <FaIdCard style={{ fontSize: "20px" }} />
                       </div>
                       <div>
-                        <p className="mb-0 small text-muted">DNI</p>
+                        <p className="mb-0 small text-muted">{docIdentidad().nombre}</p>
                         <p className="mb-0 fw-bold" style={{ color: "#2c3e50" }}>
                           {usuarioInfo.usuario.dni || "N/A"}
                         </p>
@@ -540,7 +541,7 @@ export default function Reportes() {
                         {usuarioInfo.totalCuentas}
                       </h4>
                       <p className="mb-0 small" style={{ color: "#27ae60", fontWeight: "600" }}>
-                        L. {usuarioInfo.saldoCuentas.toFixed(2)}
+                        {dinero(usuarioInfo.saldoCuentas)}
                       </p>
                     </div>
                   </div>
@@ -562,7 +563,7 @@ export default function Reportes() {
                         {usuarioInfo.totalPrestamos}
                       </h4>
                       <p className="mb-0 small" style={{ color: "#e67e22", fontWeight: "600" }}>
-                        L. {usuarioInfo.montoPrestamos.toFixed(2)}
+                        {dinero(usuarioInfo.montoPrestamos)}
                       </p>
                     </div>
                   </div>
@@ -584,7 +585,7 @@ export default function Reportes() {
                         {usuarioInfo.totalAportaciones}
                       </h4>
                       <p className="mb-0 small" style={{ color: "#27ae60", fontWeight: "600" }}>
-                        L. {usuarioInfo.montoAportaciones.toFixed(2)}
+                        {dinero(usuarioInfo.montoAportaciones)}
                       </p>
                     </div>
                   </div>

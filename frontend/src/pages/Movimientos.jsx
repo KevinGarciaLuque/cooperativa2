@@ -32,6 +32,7 @@ import {
   Legend,
   Tooltip,
 } from "recharts";
+import { dinero, simboloMoneda } from "../utils/pais";
 
 export default function Movimientos() {
   const { token } = useAuth();
@@ -311,7 +312,7 @@ export default function Movimientos() {
                 <div>
                   <p className="text-muted mb-1 small">Abonos</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#27ae60" }}>
-                    L. {montoAbonos.toFixed(2)}
+                    {dinero(montoAbonos)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
                     {abonos.length} transacciones
@@ -346,7 +347,7 @@ export default function Movimientos() {
                 <div>
                   <p className="text-muted mb-1 small">Retiros</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#e74c3c" }}>
-                    L. {montoRetiros.toFixed(2)}
+                    {dinero(montoRetiros)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
                     {retiros.length} transacciones
@@ -384,7 +385,7 @@ export default function Movimientos() {
                     className="mb-0 fw-bold"
                     style={{ color: balance >= 0 ? "#27ae60" : "#e74c3c" }}
                   >
-                    L. {balance.toFixed(2)}
+                    {dinero(balance)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
                     Abonos - Retiros
@@ -448,7 +449,7 @@ export default function Movimientos() {
                     </Pie>
                     <Tooltip
                       formatter={(value, name, props) =>
-                        `${value} (L.${props.payload.monto.toFixed(2)})`
+                        `${value} (${dinero(props.payload.monto)})`
                       }
                     />
                     <Legend />
@@ -849,7 +850,7 @@ function TablaMovimientos({
                           className="fw-bold"
                           style={{ fontSize: "18px", color: tipoConfig.color }}
                         >
-                          L. {parseFloat(movimiento.monto || 0).toFixed(2)}
+                          {dinero(parseFloat(movimiento.monto || 0))}
                         </div>
                       </div>
                     </div>
@@ -1144,7 +1145,7 @@ function ModalMovimiento({
                   style={{ color: "#2c3e50" }}
                 >
                   <FaMoneyBillWave className="me-2" style={{ color: "#27ae60" }} />
-                  Monto (L.)
+                  Monto ({simboloMoneda()})
                 </label>
                 <input
                   type="number"

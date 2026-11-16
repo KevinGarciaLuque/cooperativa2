@@ -8,6 +8,7 @@ import { comprimirImagen } from "../utils/imagen";
 import { hoyLocal } from "../utils/fechas";
 import { fmt } from "../utils/solicitud";
 import { verComprobanteReportado } from "../utils/pagosReportados";
+import { simboloMoneda } from "../utils/pais";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const METODOS = [
@@ -182,7 +183,7 @@ export default function ReportarPagoSocio({ token }) {
                   </select>
                 </div>
                 <div className="col-12 col-md-6">
-                  <label className="form-label fw-semibold small">¿Cuánto pagaste? (L.) *</label>
+                  <label className="form-label fw-semibold small">¿Cuánto pagaste? ({simboloMoneda()}) *</label>
                   <InputMonto
                     required className="form-control" placeholder="0.00"
                     value={form.monto} onChange={(v) => setForm((f) => ({ ...f, monto: v }))}

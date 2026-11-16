@@ -6,6 +6,7 @@ import axios from "axios";
 import { FaCamera, FaCheckCircle, FaChevronLeft, FaChevronRight, FaEye, FaEyeSlash, FaIdCard, FaTimes } from "react-icons/fa";
 import { comprimirImagen } from "../utils/imagen";
 import CamaraIdentidad from "./CamaraIdentidad";
+import { docIdentidad } from "../utils/pais";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const LADOS = [
@@ -203,7 +204,7 @@ export default function FotosIdentidad({ idSocio, headers, puedeSubir = true, so
       })}
       <button type="button" className="btn btn-sm btn-outline-dark ms-auto" onClick={() => setAbierto((a) => !a)}>
         {abierto ? <FaEyeSlash className="me-1" /> : <FaEye className="me-1" />}
-        {abierto ? "Ocultar DNI" : "Ver DNI"}
+        {abierto ? `Ocultar ${docIdentidad().nombre}` : `Ver ${docIdentidad().nombre}`}
       </button>
     </div>
   );

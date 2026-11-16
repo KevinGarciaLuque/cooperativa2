@@ -6,6 +6,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useAlerta } from "../../context/AlertaContext";
 import { FaBook, FaCheckCircle, FaEye, FaPen, FaPlus, FaSave, FaTrash, FaUsers } from "react-icons/fa";
 import TextoPolitica from "../../components/TextoPolitica";
+import { localeApp } from "../../utils/pais";
 
 const ACCENT = "#a8cd3a";
 const AZUL = "#1a2035";
@@ -13,7 +14,7 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const fecha = (v) => {
   const d = new Date(v);
-  return isNaN(d) ? "" : d.toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" });
+  return isNaN(d) ? "" : d.toLocaleDateString(localeApp(), { day: "numeric", month: "short", year: "numeric" });
 };
 
 export default function Politicas() {

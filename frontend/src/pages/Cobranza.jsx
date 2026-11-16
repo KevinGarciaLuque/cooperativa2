@@ -5,16 +5,14 @@ import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
 import { FaPhoneAlt, FaClipboardList, FaTimes, FaWhatsapp, FaEnvelope } from "react-icons/fa";
 import { DataTable, EmptyState, PageHeader } from "../ui/Componentes";
+import { dinero, numeroWhatsApp } from "../utils/pais";
 
 const AZUL = "#1a2035";
 const ACCENT = "#a8cd3a";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const fmt = (n) =>
-  `L. ${parseFloat(n || 0).toLocaleString("es-HN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  dinero(n || 0);
 
 const CATEGORIAS = [
   { key: "todas", label: "Toda la cartera", color: "#475569" },
@@ -103,8 +101,7 @@ export default function Cobranza() {
     try {
       const r = await axios.get(`${API_URL}/cobranza/recordatorio/${f.id_prestamo}`, { headers });
       const { texto, telefono } = r.data.data;
-      const tel = String(telefono || "").replace(/\D/g, "");
-      const numero = tel.length === 8 ? `504${tel}` : tel;
+      const numero = numeroWhatsApp(telefono);
       window.open(
         numero ? `https://wa.me/${numero}?text=${encodeURIComponent(texto)}` : `https://wa.me/?text=${encodeURIComponent(texto)}`,
         "_blank",

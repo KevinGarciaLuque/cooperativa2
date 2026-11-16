@@ -39,6 +39,7 @@ import {
   Area,
   AreaChart,
 } from "recharts";
+import { dinero } from "../utils/pais";
 
 const COLORS = {
   primary: "#667eea",
@@ -110,7 +111,7 @@ export default function Dashboard() {
   };
 
   const formatCurrency = (value) => {
-    return `L. ${parseFloat(value).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return dinero(value);
   };
 
   if (loading) {

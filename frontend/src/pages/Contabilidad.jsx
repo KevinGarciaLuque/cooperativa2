@@ -13,16 +13,14 @@ import {
   FaUnlock,
   FaExclamationTriangle,
 } from "react-icons/fa";
+import { dinero, localeApp } from "../utils/pais";
 
 const AZUL = "#1a2035";
 const ACCENT = "#a8cd3a";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const fmt = (n) =>
-  `L. ${parseFloat(n || 0).toLocaleString("es-HN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  dinero(n || 0);
 
 const mesActualISO = () => {
   const d = new Date();
@@ -37,7 +35,7 @@ const moverMes = (iso, delta) => {
 
 const nombreMes = (iso) => {
   const [y, m] = iso.split("-").map(Number);
-  const t = new Date(y, m - 1, 1).toLocaleDateString("es-HN", { month: "long", year: "numeric" });
+  const t = new Date(y, m - 1, 1).toLocaleDateString(localeApp(), { month: "long", year: "numeric" });
   return t.charAt(0).toUpperCase() + t.slice(1);
 };
 

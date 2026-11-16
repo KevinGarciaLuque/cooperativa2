@@ -1,7 +1,9 @@
 // Datos y cálculos de la solicitud de préstamo (panel del socio y enlace de registro).
 
+import { dinero } from "./pais";
+
 export const fmt = (n) =>
-  `L. ${parseFloat(n || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  dinero(n || 0);
 
 export const PROPOSITOS = {
   negocio: "Negocio o capital de trabajo",

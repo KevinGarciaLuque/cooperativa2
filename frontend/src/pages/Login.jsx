@@ -4,6 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { FaIdCard, FaLock, FaEye, FaEyeSlash } from "react-icons/fa";
 import LogoCoop from "../components/LogoCoop";
 import { useConfigSitio } from "../hooks/useConfigSitio";
+import { docIdentidad } from "../utils/pais";
 
 const ACCENT = "#a8cd3a";
 const DARK = "#1a2035";
@@ -35,7 +36,7 @@ export default function Login() {
         navigate("/dashboard");
       }
     } else {
-      setError(typeof ok === "string" ? ok : "DNI o contraseña incorrectos");
+      setError(typeof ok === "string" ? ok : `${docIdentidad().nombre} o contraseña incorrectos`);
     }
   };
 
@@ -378,7 +379,7 @@ export default function Login() {
           <form onSubmit={handleSubmit} autoComplete="off">
             {/* DNI */}
             <div className="login-field">
-              <label>DNI</label>
+              <label>{docIdentidad().nombre}</label>
               <div className="login-input-wrap">
                 <FaIdCard className="login-input-icon" />
                 <input
@@ -388,7 +389,7 @@ export default function Login() {
                   onChange={(e) => setDni(e.target.value)}
                   required
                   autoFocus
-                  placeholder="Ingresa tu DNI"
+                  placeholder={`Ingresa tu ${docIdentidad().nombre}`}
                 />
               </div>
             </div>

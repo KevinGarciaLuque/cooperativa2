@@ -27,6 +27,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { dinero, simboloMoneda } from "../../utils/pais";
 
 export default function Aportaciones() {
   const { token } = useAuth();
@@ -380,7 +381,7 @@ export default function Aportaciones() {
                 <div>
                   <p className="text-muted mb-1 small">Monto Acumulado</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#3498db" }}>
-                    L. {montoTotal.toFixed(2)}
+                    {dinero(montoTotal)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
                     Total histórico
@@ -417,7 +418,7 @@ export default function Aportaciones() {
                 <div>
                   <p className="text-muted mb-1 small">Promedio</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#f39c12" }}>
-                    L. {promedioAportacion.toFixed(2)}
+                    {dinero(promedioAportacion)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
                     Por aportación
@@ -452,7 +453,7 @@ export default function Aportaciones() {
                 <div>
                   <p className="text-muted mb-1 small">Este Mes</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#9b59b6" }}>
-                    L. {montoMes.toFixed(2)}
+                    {dinero(montoMes)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
                     {aportacionesMes.length} registros
@@ -493,7 +494,7 @@ export default function Aportaciones() {
                     <XAxis dataKey="mes" stroke="#95a5a6" />
                     <YAxis stroke="#95a5a6" />
                     <Tooltip
-                      formatter={(value) => `L. ${value.toFixed(2)}`}
+                      formatter={(value) => `${dinero(value)}`}
                       contentStyle={{
                         background: "white",
                         border: "1px solid #e9ecef",
@@ -508,7 +509,7 @@ export default function Aportaciones() {
                       strokeWidth={3}
                       dot={{ fill: "#27ae60", r: 5 }}
                       activeDot={{ r: 7 }}
-                      name="Monto (L.)"
+                      name={`Monto (${simboloMoneda()})`}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -577,7 +578,7 @@ export default function Aportaciones() {
                             className="fw-bold"
                             style={{ fontSize: "14px", color: color }}
                           >
-                            L. {contribuyente.total.toFixed(2)}
+                            {dinero(contribuyente.total)}
                           </span>
                         </div>
                         <div
@@ -825,7 +826,7 @@ function ModalAportacion({
                     className="me-2"
                     style={{ color: "#27ae60" }}
                   />
-                  Monto (L.)
+                  Monto ({simboloMoneda()})
                 </label>
                 <input
                   type="number"

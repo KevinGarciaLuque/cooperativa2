@@ -1,10 +1,8 @@
 import { useState } from "react";
+import { dinero } from "../utils/pais";
 
 const fmt = (n) =>
-  `L. ${parseFloat(n || 0).toLocaleString("es-HN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  dinero(n || 0);
 
 const OPCIONES = [
   { value: "efectivo", label: "Efectivo", desc: "Se entrega en ventanilla y sale de caja" },

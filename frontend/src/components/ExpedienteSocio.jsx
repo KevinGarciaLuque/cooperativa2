@@ -6,6 +6,7 @@ import { FaBook, FaBriefcase, FaCheckCircle, FaIdCard, FaUser } from "react-icon
 import FotosIdentidad from "./FotosIdentidad";
 import { OCUPACIONES, fmt } from "../utils/solicitud";
 import { numeroSocio } from "../utils/numeroSocio";
+import { docIdentidad } from "../utils/pais";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const AZUL = "#1a2035";
@@ -134,7 +135,7 @@ export default function ExpedienteSocio({ idSocio, headers }) {
         </Seccion>
       )}
 
-      <Seccion icono={<FaIdCard />} titulo="Identidad (DNI)">
+      <Seccion icono={<FaIdCard />} titulo={`Identidad (${docIdentidad().nombre})`}>
         <FotosIdentidad idSocio={idSocio} headers={headers} />
       </Seccion>
     </div>

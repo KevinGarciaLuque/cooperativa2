@@ -1,5 +1,6 @@
 // Carta de aprobación de préstamo: el PDF lo genera el servidor (el mismo que se envía por correo).
 import axios from "axios";
+import { numeroWhatsApp } from "./pais";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -46,8 +47,7 @@ export const compartirCarta = async (idPrestamo, token, { telefono, cooperativa 
   }
 
   guardar(blob, nombre);
-  const tel = String(telefono || "").replace(/\D/g, "");
-  const numero = tel.length === 8 ? `504${tel}` : tel;
+  const numero = numeroWhatsApp(telefono);
   window.open(
     numero ? `https://wa.me/${numero}?text=${encodeURIComponent(texto)}` : `https://wa.me/?text=${encodeURIComponent(texto)}`,
     "_blank",

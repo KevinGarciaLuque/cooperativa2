@@ -12,6 +12,7 @@ import {
   FaLock,
   FaCheckCircle,
 } from "react-icons/fa";
+import { dinero, localeApp } from "../utils/pais";
 
 const ACCENT = "#a8cd3a";
 const AZUL = "#1a2035";
@@ -60,10 +61,7 @@ const METODOS = {
 };
 
 const fmt = (n) =>
-  `L. ${parseFloat(n || 0).toLocaleString("es-HN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  dinero(n || 0);
 
 const hoyISO = () => {
   const d = new Date();
@@ -78,7 +76,7 @@ const moverDia = (iso, delta) => {
 
 const hora = (f) => {
   const d = new Date(f);
-  return isNaN(d) ? "" : d.toLocaleTimeString("es-HN", { hour: "2-digit", minute: "2-digit" });
+  return isNaN(d) ? "" : d.toLocaleTimeString(localeApp(), { hour: "2-digit", minute: "2-digit" });
 };
 
 export default function Caja() {

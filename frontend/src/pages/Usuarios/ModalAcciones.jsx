@@ -18,6 +18,7 @@ import {
   FaTimes,
   FaCamera
 } from "react-icons/fa";
+import { docIdentidad, pais } from "../../utils/pais";
 
 export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh }) {
   const { token, user: usuarioLogueado, updateUser } = useAuth();
@@ -282,7 +283,7 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
               <div className="col-md-6">
                 <label className="form-label fw-semibold d-flex align-items-center" style={{ color: "#2c3e50" }}>
                   <FaIdCard className="me-2" style={{ color: "#667eea" }} />
-                  DNI (13 dígitos)
+                  {docIdentidad().nombre}
                 </label>
                 <input
                   type="text"
@@ -292,9 +293,9 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
                   onChange={handleInput}
                   required
                   disabled={tipo === "editar"}
-                  placeholder="0801199012345"
-                  maxLength="13"
-                  pattern="[0-9]{13}"
+                  placeholder={docIdentidad().ejemplo}
+                  maxLength={docIdentidad().largo_max + 3}
+                  title={docIdentidad().ayuda}
                   style={{ 
                     borderRadius: "10px",
                     border: "2px solid #e9ecef",
@@ -315,9 +316,9 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
                   className="form-control form-control-lg"
                   value={form.telefono}
                   onChange={handleInput}
-                  placeholder="98765432"
-                  maxLength="8"
-                  pattern="[0-9]{8}"
+                  placeholder={"9876543210".slice(0, pais().telefono.digitos)}
+                  maxLength={pais().telefono.digitos}
+                  pattern={`[0-9]{${pais().telefono.digitos}}`}
                   style={{ 
                     borderRadius: "10px",
                     border: "2px solid #e9ecef",

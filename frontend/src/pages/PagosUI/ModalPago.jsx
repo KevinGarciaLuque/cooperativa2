@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import { FaMoneyCheckAlt, FaCalendarAlt, FaMoneyBillWave, FaFileInvoiceDollar, FaClock } from "react-icons/fa";
+import { cifra, simboloMoneda, montoATexto, textoAMonto } from "../../utils/pais";
 
 const fmt = (n) =>
-  parseFloat(n || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  cifra(parseFloat(n || 0));
 const API_URL_MODAL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 // ==================== COMPONENTE MODAL PAGO ====================
@@ -28,23 +29,15 @@ export default function ModalPago({
   const [dropdownAbierto, setDropdownAbierto] = useState(false);
   const [tipoPago, setTipoPago] = useState("cuota_fija"); // "cuota_fija" | "desglose" | "indefinido"
 
-  // Estado local para mostrar el monto con comas mientras se escribe
-  const [montoDisplay, setMontoDisplay] = useState(() => {
-    if (!form.monto && form.monto !== 0) return "";
-    const raw = String(form.monto);
-    const parts = raw.split(".");
-    const intFmt = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    return parts.length > 1 ? intFmt + "." + parts[1] : intFmt;
-  });
+  // Estado local para mostrar el monto con separador de miles mientras se escribe
+  const [montoDisplay, setMontoDisplay] = useState(() =>
+    !form.monto && form.monto !== 0 ? "" : montoATexto(form.monto)
+  );
 
   const handleMontoChange = (e) => {
-    const raw = e.target.value.replace(/,/g, ""); // quitar comas
+    const raw = textoAMonto(e.target.value); // sin separadores de miles, con punto decimal
     if (raw !== "" && !/^\d*\.?\d*$/.test(raw)) return; // solo números
-    // Formatear parte entera con comas
-    const parts = raw.split(".");
-    const intFmt = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    const display = parts.length > 1 ? intFmt + "." + parts[1] : intFmt;
-    setMontoDisplay(display);
+    setMontoDisplay(montoATexto(raw));
     handleInput({ target: { name: "monto", value: raw } });
   };
 
@@ -115,9 +108,7 @@ export default function ModalPago({
     if (editPago || reporte || !prestamoSeleccionado || tipoPago !== "cuota_fija") return;
     const valor = parseFloat(((prestamoSeleccionado.cuota_mensual || 0) + moraAplicable).toFixed(2));
     const raw = String(valor);
-    const parts = raw.split(".");
-    const intFmt = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    setMontoDisplay(parts.length > 1 ? intFmt + "." + parts[1] : intFmt);
+    setMontoDisplay(montoATexto(raw));
     handleInput({ target: { name: "monto", value: raw } });
   // eslint-disable-next-line
   }, [tipoPago, prestamoSeleccionado?.id_prestamo, moraAplicable]);
@@ -136,9 +127,7 @@ export default function ModalPago({
     const interes = parseFloat((saldo * tasaDia * dias).toFixed(2));
     const valor = parseFloat((saldo + interes + moraAplicable).toFixed(2));
     const raw = String(valor);
-    const parts = raw.split(".");
-    const intFmt = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    setMontoDisplay(parts.length > 1 ? intFmt + "." + parts[1] : intFmt);
+    setMontoDisplay(montoATexto(raw));
     handleInput({ target: { name: "monto", value: raw } });
   // eslint-disable-next-line
   }, [tipoPago, prestamoSeleccionado?.id_prestamo, fechaReferencia, form.fecha, moraAplicable]);
@@ -235,7 +224,7 @@ export default function ModalPago({
             {reporte && (
               <div className="m-3 mb-0 p-3 small" style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 12 }}>
                 <div className="fw-bold mb-1" style={{ color: "#065f46" }}>Pago reportado por el socio</div>
-                L. {fmt(reporte.monto)} por {String(reporte.metodo).toLowerCase()}
+                {simboloMoneda()} {fmt(reporte.monto)} por {String(reporte.metodo).toLowerCase()}
                 {reporte.banco ? ` · ${reporte.banco}` : ""}
                 {reporte.referencia ? ` · Ref. ${reporte.referencia}` : ""} · {String(reporte.fecha_pago).substring(0, 10)}
                 {onVerComprobante && (
@@ -458,9 +447,9 @@ export default function ModalPago({
                       style={{ background: "rgba(52,152,219,0.07)", borderRadius: 8, border: "1px solid rgba(52,152,219,0.2)" }}>
                       <span><strong>{usuarioSeleccionado?.nombre_completo}</strong></span>
                       <span className="text-muted">·</span>
-                      <span>Préstamo: <strong>L. {fmt(prestamoSeleccionado.monto)}</strong></span>
+                      <span>Préstamo: <strong>{simboloMoneda()} {fmt(prestamoSeleccionado.monto)}</strong></span>
                       <span className="text-muted">·</span>
-                      <span>Saldo: <strong style={{ color: "#e74c3c" }}>L. {fmt(prestamoSeleccionado.saldo_restante)}</strong></span>
+                      <span>Saldo: <strong style={{ color: "#e74c3c" }}>{simboloMoneda()} {fmt(prestamoSeleccionado.saldo_restante)}</strong></span>
                       <span className="text-muted">·</span>
                       <span className="badge" style={{
                         background: prestamoSeleccionado.estado === "activo" ? "rgba(39,174,96,0.15)" : "rgba(149,165,166,0.15)",
@@ -477,11 +466,11 @@ export default function ModalPago({
                 <div className="row g-2">
                   <div className="col-7">
                     <label className="form-label fw-semibold small mb-1" style={{ color: "#2c3e50" }}>
-                      <FaMoneyBillWave className="me-1" style={{ color: "#27ae60" }} /> Monto (L.)
+                      <FaMoneyBillWave className="me-1" style={{ color: "#27ae60" }} /> Monto ({simboloMoneda()})
                     </label>
                     <div className="input-group input-group-sm">
                       <span className="input-group-text fw-bold"
-                        style={{ background: "#27ae60", color: "#fff", border: "1.5px solid #27ae60", borderRight: "none" }}>L.</span>
+                        style={{ background: "#27ae60", color: "#fff", border: "1.5px solid #27ae60", borderRight: "none" }}>{simboloMoneda()}</span>
                       <input
                         type="text"
                         inputMode="decimal"
@@ -592,7 +581,7 @@ export default function ModalPago({
                       <div className="d-flex justify-content-between align-items-center small px-2 py-1"
                         style={{ background: "rgba(52,152,219,0.08)", borderRadius: 7, border: "1.5px solid #3498db" }}>
                         <span style={{ color: "#2980b9", fontWeight: 600 }}>💰 Cuota mensual:</span>
-                        <strong style={{ color: "#2980b9" }}>L. {fmt(prestamoSeleccionado.cuota_mensual)}</strong>
+                        <strong style={{ color: "#2980b9" }}>{simboloMoneda()} {fmt(prestamoSeleccionado.cuota_mensual)}</strong>
                       </div>
                     )}
                     {tipoPago === "desglose" && (
@@ -612,8 +601,8 @@ export default function ModalPago({
                       <div className="small px-2 py-2"
                         style={{ background: "rgba(231,76,60,0.08)", borderRadius: 8, border: "1.5px solid #e74c3c", color: "#c0392b" }}>
                         <div className="fw-bold">
-                          ⚠ {moraInfo.dias} día(s) de mora — Mora generada: L. {fmt(moraInfo.mora)}
-                          {moraInfo.porDia > 0 && <span className="fw-normal"> (≈ L. {fmt(moraInfo.porDia)} por día)</span>}
+                          ⚠ {moraInfo.dias} día(s) de mora — Mora generada: {simboloMoneda()} {fmt(moraInfo.mora)}
+                          {moraInfo.porDia > 0 && <span className="fw-normal"> (≈ {simboloMoneda()} {fmt(moraInfo.porDia)} por día)</span>}
                         </div>
                         {esSuperAdmin ? (
                           <div className="form-check mt-1">
@@ -696,7 +685,7 @@ export default function ModalPago({
                     <div className="d-flex justify-content-between align-items-center small px-2 py-1"
                       style={{ background: "white", borderRadius: 7, border: "1px solid #e2e8f0" }}>
                       <span style={{ color: "#7f8c8d" }}>Saldo actual:</span>
-                      <strong style={{ color: "#e74c3c" }}>L. {fmt(saldoActualPrestamo)}</strong>
+                      <strong style={{ color: "#e74c3c" }}>{simboloMoneda()} {fmt(saldoActualPrestamo)}</strong>
                     </div>
 
                     {/* ── Interés generado ── */}
@@ -706,7 +695,7 @@ export default function ModalPago({
                         Interés {tipoPago === "cuota_fija" ? "(mensual)" : `(${diasTranscurridos}d)`}:
                       </span>
                       <strong style={{ color: "#d35400", fontSize: "0.9rem" }}>
-                        + L. {fmt(interesEsperado)}
+                        + {simboloMoneda()} {fmt(interesEsperado)}
                       </strong>
                     </div>
 
@@ -714,7 +703,7 @@ export default function ModalPago({
                     {tipoPago !== "cuota_fija" && diasTranscurridos !== 30 && (
                       <div className="d-flex justify-content-between small" style={{ color: "#94a3b8", paddingLeft: 4 }}>
                         <span>(30 días serían):</span>
-                        <span>L. {fmt(interesBase30)}</span>
+                        <span>{simboloMoneda()} {fmt(interesBase30)}</span>
                       </div>
                     )}
 
@@ -727,7 +716,7 @@ export default function ModalPago({
                           💰 Cuota acordada:
                         </span>
                         <strong style={{ color: "#2980b9", fontSize: "1rem" }}>
-                          L. {fmt((prestamoSeleccionado.cuota_mensual || 0) + moraAplicable)}
+                          {simboloMoneda()} {fmt((prestamoSeleccionado.cuota_mensual || 0) + moraAplicable)}
                         </strong>
                       </div>
                     ) : (
@@ -738,7 +727,7 @@ export default function ModalPago({
                           💰 Total a pagar ({diasTranscurridos}d):
                         </span>
                         <strong style={{ color: "#1e8449", fontSize: "1rem" }}>
-                          L. {fmt(saldoActualPrestamo + interesEsperado + moraAplicable)}
+                          {simboloMoneda()} {fmt(saldoActualPrestamo + interesEsperado + moraAplicable)}
                         </strong>
                       </div>
                     )}
@@ -750,12 +739,12 @@ export default function ModalPago({
                       <>
                         <div className="d-flex justify-content-between small">
                           <span style={{ color: "#7f8c8d" }}>De ese monto — Interés:</span>
-                          <strong style={{ color: "#e67e22" }}>L. {fmt(interesDelPago)}</strong>
+                          <strong style={{ color: "#e67e22" }}>{simboloMoneda()} {fmt(interesDelPago)}</strong>
                         </div>
                         <div className="d-flex justify-content-between small">
                           <span style={{ color: "#7f8c8d" }}>Abono a capital:</span>
                           <strong style={{ color: capitalDelPago > 0 ? "#27ae60" : "#94a3b8" }}>
-                            L. {fmt(capitalDelPago)}
+                            {simboloMoneda()} {fmt(capitalDelPago)}
                           </strong>
                         </div>
 
@@ -779,7 +768,7 @@ export default function ModalPago({
                         {capitalDelPago > 0 && (
                           <div className="small px-2 py-1 fw-semibold"
                             style={{ background: "rgba(39,174,96,0.1)", borderRadius: 6, color: "#27ae60", border: "1px solid #27ae60" }}>
-                            ✔ Nuevo saldo estimado: <strong>L. {fmt(Math.max(0, saldoActualPrestamo - capitalDelPago))}</strong>
+                            ✔ Nuevo saldo estimado: <strong>{simboloMoneda()} {fmt(Math.max(0, saldoActualPrestamo - capitalDelPago))}</strong>
                           </div>
                         )}
 
@@ -787,7 +776,7 @@ export default function ModalPago({
                         {montoPagoIngresado < interesEsperado && (
                           <div className="small px-2 py-1"
                             style={{ background: "rgba(231,76,60,0.08)", borderRadius: 6, color: "#e74c3c", border: "1px solid #e74c3c" }}>
-                            ⚠ Monto menor al interés generado (L. {fmt(interesEsperado)})
+                            ⚠ Monto menor al interés generado ({simboloMoneda()} {fmt(interesEsperado)})
                           </div>
                         )}
                       </>

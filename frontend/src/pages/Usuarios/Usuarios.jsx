@@ -7,6 +7,7 @@ import ModalPerfilUsuario from "./ModalPerfilUsuario";
 import ModalConfirmacion from "../../components/ModalConfirmacion";
 import { FaUserPlus, FaUsers, FaUserCheck, FaUserTimes, FaSearch } from "react-icons/fa";
 import { useAlerta } from "../../context/AlertaContext";
+import { docIdentidad } from "../../utils/pais";
 
 export default function Usuarios() {
   const { token } = useAuth();
@@ -224,7 +225,7 @@ export default function Usuarios() {
                 <input
                   type="text"
                   className="form-control border-start-0"
-                  placeholder="Buscar por nombre, DNI o correo..."
+                  placeholder={`Buscar por nombre, ${docIdentidad().nombre}, N.º de socio o correo...`}
                   value={filtro}
                   onChange={(e) => setFiltro(e.target.value)}
                   style={{ borderRadius: "0 10px 10px 0", boxShadow: "none" }}

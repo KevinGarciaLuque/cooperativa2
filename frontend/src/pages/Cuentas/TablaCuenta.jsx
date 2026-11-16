@@ -16,6 +16,7 @@ import {
   FaWallet,
 } from "react-icons/fa";
 import { useAuth } from "../../context/AuthContext";
+import { dinero } from "../../utils/pais";
 
 const TIPOS = ["Aportaciones", "Vivienda", "Pensiones"];
 const TIPO_CONFIG = {
@@ -142,7 +143,7 @@ export default function TablaCuenta({ cuentas, usuarios, onEdit, onDelete }) {
                     return (
                       <div key={tipo} className="text-center" style={{ flex: 1 }}>
                         <div className="fw-bold" style={{ color: cfg.color, fontSize: "14px" }}>
-                          L. {saldo.toFixed(2)}
+                          {dinero(saldo)}
                         </div>
                         <div className="mb-1">
                           <span className="badge px-2 py-1"
@@ -216,7 +217,7 @@ export default function TablaCuenta({ cuentas, usuarios, onEdit, onDelete }) {
                           <TipoIcon style={{ color: cfg.color, fontSize: "14px" }} />
                           <div>
                             <div style={{ color: cfg.color, fontSize: "11px", fontWeight: 600 }}>{tipo}</div>
-                            <div className="fw-bold" style={{ fontSize: "14px", color: cfg.color }}>L. {saldo.toFixed(2)}</div>
+                            <div className="fw-bold" style={{ fontSize: "14px", color: cfg.color }}>{dinero(saldo)}</div>
                           </div>
                           <span className="badge px-1"
                             style={{ background: activa ? "rgba(39,174,96,.15)" : "rgba(149,165,166,.15)", color: activa ? "#27ae60" : "#95a5a6", fontSize: "10px", borderRadius: "6px" }}>
@@ -252,7 +253,7 @@ export default function TablaCuenta({ cuentas, usuarios, onEdit, onDelete }) {
         <p className="text-muted mb-0 small fw-semibold">
           <FaWallet className="me-2" />
           {filas.length} socios &middot; {cuentas.length} cuentas &middot; Saldo total:{" "}
-          <span className="text-success fw-bold">L. {saldoTotal.toFixed(2)}</span>
+          <span className="text-success fw-bold">{dinero(saldoTotal)}</span>
         </p>
       </div>
     </div>

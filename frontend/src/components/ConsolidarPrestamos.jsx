@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import InputMonto from "../ui/InputMonto";
+import { dinero, simboloMoneda } from "../utils/pais";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const ACCENT = "#a8cd3a";
 
 const fmt = (n) =>
-  `L. ${parseFloat(n || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  dinero(n || 0);
 
 // Asistente para juntar varios préstamos vigentes de un socio en uno solo.
 // El interés acumulado (y la mora, salvo que se omita) se suma al capital del préstamo nuevo.
@@ -189,7 +190,7 @@ export default function ConsolidarPrestamos({ socio, prestamos, headers, onClose
                 />
               </div>
               <div className="col-6 col-md-3">
-                <label className="form-label small fw-semibold">Dinero adicional (L.)</label>
+                <label className="form-label small fw-semibold">Dinero adicional ({simboloMoneda()})</label>
                 <InputMonto className="form-control" placeholder="0.00" value={adicional} onChange={setAdicional} />
               </div>
               <div className="col-6 col-md-3">

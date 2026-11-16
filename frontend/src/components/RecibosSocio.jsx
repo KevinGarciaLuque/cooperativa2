@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { FaCheckCircle, FaReceipt, FaSignature } from "react-icons/fa";
+import { cifra, simboloMoneda, localeApp } from "../utils/pais";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -12,11 +13,11 @@ const TIPOS = {
   finiquito: ["Constancia de cancelación", "#7c3aed", "#ede9fe"],
 };
 
-const fmt = (n) => parseFloat(n || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = (n) => cifra(parseFloat(n || 0));
 
 const fecha = (v) => {
   const d = new Date(v);
-  return isNaN(d) ? "" : d.toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" });
+  return isNaN(d) ? "" : d.toLocaleDateString(localeApp(), { day: "numeric", month: "short", year: "numeric" });
 };
 
 // recargar: cambia cuando se cierra un recibo, para ver si quedó firmado
@@ -89,7 +90,7 @@ export default function RecibosSocio({ idSocio, headers, onVer, recargar }) {
                   </span>
                   {r.tipo !== "finiquito" && (
                     <span className="fw-bold text-nowrap" style={{ textDecoration: r.anulado ? "line-through" : "none" }}>
-                      L. {fmt(r.monto)}
+                      {simboloMoneda()} {fmt(r.monto)}
                     </span>
                   )}
                 </button>

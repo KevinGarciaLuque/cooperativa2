@@ -10,9 +10,10 @@ import { FaMoneyCheckAlt, FaPlus, FaSearch, FaChartLine, FaCalendarAlt, FaFileIn
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import TablaPagos from "./PagosUI/TablaPagos";
 import ModalPago from "./PagosUI/ModalPago";
+import { cifra, simboloMoneda } from "../utils/pais";
 
 const fmt = (n) =>
-  parseFloat(n || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  cifra(parseFloat(n || 0));
 
 export default function Pagos() {
   const { token } = useAuth();
@@ -385,7 +386,7 @@ export default function Pagos() {
                 <div>
                   <p className="text-muted mb-1 small">Monto Total Pagado</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#27ae60" }}>
-                    L. {fmt(montoTotal)}
+                    {simboloMoneda()} {fmt(montoTotal)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">Acumulado</p>
                 </div>
@@ -420,7 +421,7 @@ export default function Pagos() {
                 <div>
                   <p className="text-muted mb-1 small">Este Mes</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#9b59b6" }}>
-                    L. {fmt(montoMes)}
+                    {simboloMoneda()} {fmt(montoMes)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">
                     {pagosMes.length} pagos
@@ -455,7 +456,7 @@ export default function Pagos() {
                 <div>
                   <p className="text-muted mb-1 small">Promedio por Pago</p>
                   <h3 className="mb-0 fw-bold" style={{ color: "#f39c12" }}>
-                    L. {fmt(promedioPago)}
+                    {simboloMoneda()} {fmt(promedioPago)}
                   </h3>
                   <p className="mb-0 small text-muted mt-1">Por transacción</p>
                 </div>
@@ -494,7 +495,7 @@ export default function Pagos() {
                     <XAxis dataKey="mes" stroke="#95a5a6" />
                     <YAxis stroke="#95a5a6" />
                     <Tooltip
-                      formatter={(value) => `L. ${fmt(value)}`}
+                      formatter={(value) => `${simboloMoneda()} ${fmt(value)}`}
                       contentStyle={{
                         background: "white",
                         border: "1px solid #e9ecef",
@@ -506,7 +507,7 @@ export default function Pagos() {
                       dataKey="monto"
                       fill="#3498db"
                       radius={[8, 8, 0, 0]}
-                      name="Monto Pagado (L.)"
+                      name={`Monto Pagado (${simboloMoneda()})`}
                     />
                   </BarChart>
                 </ResponsiveContainer>

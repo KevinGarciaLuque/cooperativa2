@@ -1777,6 +1777,62 @@ test("comité de crédito: por encima del límite se aprueba por votos", async (
   assert.equal((await api("PUT", "/comite/miembros", { miembros: [] }, ids.tSuper)).s, 200);
 });
 
+test("turnos de caja: abrir, registrar en el turno, exigir turno y cerrar con arqueo", async () => {
+  const sucs = await api("GET", "/caja/sucursales", null, ids.tAdmin);
+  assert.equal(sucs.s, 200);
+  const principal = sucs.b.data[0];
+  assert.equal(principal.nombre, "Oficina principal");
+  assert.equal((await api("POST", "/caja/sucursales", { nombre: "Agencia Norte" }, ids.tAdmin)).s, 403);
+  const norte = await api("POST", "/caja/sucursales", { nombre: "Agencia Norte", direccion: "Barrio El Centro" }, ids.tSuper);
+  assert.equal(norte.s, 201);
+
+  const fin = (await api("GET", "/configuracion/financiera", null, ids.tSuper)).b.data;
+  const exigir = (v) => api("PUT", "/configuracion/financiera", { mora_tasa_anual: fin.mora_tasa_anual, mora_dias_gracia: fin.mora_dias_gracia, caja_exigir_turno: v }, ids.tSuper);
+  const [[cta]] = await pool.query("SELECT id_cuenta FROM cuentas WHERE id_usuario = ? ORDER BY id_cuenta LIMIT 1", [ids.socio]);
+  const depositar = (monto, metodo = "efectivo") =>
+    api("POST", "/movimientos", { id_cuenta: cta.id_cuenta, tipo: "abono", monto, metodo, descripcion: "Turno" }, ids.tAdmin);
+
+  // Sin exigir turno, todo sigue igual
+  assert.equal((await api("GET", "/caja/turno", null, ids.tAdmin)).b.data, null);
+  assert.equal((await depositar(10)).s, 200);
+
+  // Exigiendo turno: el efectivo necesita turno abierto; la transferencia no
+  assert.equal((await exigir(1)).s, 200);
+  const sin = await depositar(10);
+  assert.equal(sin.s, 409);
+  assert.equal(sin.b.requiere_turno, true);
+  assert.equal((await depositar(10, "transferencia")).s, 200);
+
+  // Abrir turno
+  assert.equal((await api("POST", "/caja/turno/abrir", { id_sucursal: 99999, fondo_inicial: 500 }, ids.tAdmin)).s, 400);
+  const ab = await api("POST", "/caja/turno/abrir", { id_sucursal: norte.b.id_sucursal, fondo_inicial: 500 }, ids.tAdmin);
+  assert.equal(ab.s, 201, ab.b?.message);
+  assert.equal((await api("POST", "/caja/turno/abrir", { id_sucursal: norte.b.id_sucursal, fondo_inicial: 0 }, ids.tAdmin)).s, 409);
+
+  // Lo que registra queda en su turno y su sucursal
+  assert.equal((await depositar(200)).s, 200);
+  const gasto = await api("POST", "/caja/gasto", { categoria: "servicios", monto: 50, metodo: "efectivo", concepto: "Agua" }, ids.tAdmin);
+  assert.equal(gasto.s, 201, gasto.b?.message);
+  const [enTurno] = await pool.query("SELECT id_sucursal FROM caja_movimientos WHERE id_turno = ?", [ab.b.id_turno]);
+  assert.equal(enTurno.length, 2);
+  assert.ok(enTurno.every((m) => m.id_sucursal === norte.b.id_sucursal));
+  const t = await api("GET", "/caja/turno", null, ids.tAdmin);
+  assert.equal(t.b.data.efectivo_esperado, 650);
+  assert.equal(t.b.data.sucursal, "Agencia Norte");
+  const lista = await api("GET", "/caja/turnos", null, ids.tSuper);
+  assert.ok(lista.b.data.some((x) => x.id_turno === ab.b.id_turno && x.efectivo_esperado === 650));
+
+  // Cierre: la diferencia exige explicación
+  assert.equal((await api("POST", "/caja/turno/cerrar", { efectivo_contado: 640 }, ids.tAdmin)).s, 400);
+  const cierre = await api("POST", "/caja/turno/cerrar", { efectivo_contado: 640, observacion: "Faltante de cambio" }, ids.tAdmin);
+  assert.equal(cierre.s, 200, cierre.b?.message);
+  assert.equal(cierre.b.diferencia, -10);
+  assert.equal((await api("POST", "/caja/turno/cerrar", { efectivo_contado: 0 }, ids.tAdmin)).s, 400, "ya no hay turno abierto");
+  assert.equal((await depositar(10)).s, 409);
+
+  assert.equal((await exigir(0)).s, 200);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

@@ -168,6 +168,7 @@ if (!enPruebas) {
 // Seguridad: limpieza de respuestas + sesión y permisos en TODA la API
 app.use("/api", limpiarRespuestas);
 app.use("/api", guardiaApi);
+app.use("/api", require("./middleware/turnoCaja").exigirTurno);
 
 // Rutas principales
 app.use("/api/usuarios", require("./routes/usuarios"));

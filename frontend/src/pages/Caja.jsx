@@ -13,6 +13,7 @@ import {
   FaCheckCircle,
 } from "react-icons/fa";
 import { dinero, localeApp } from "../utils/pais";
+import TurnoCaja from "../components/TurnoCaja";
 
 const ACCENT = "#a8cd3a";
 const AZUL = "#1a2035";
@@ -80,7 +81,7 @@ const hora = (f) => {
 };
 
 export default function Caja() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { mostrarAlerta } = useAlerta();
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
@@ -224,6 +225,8 @@ export default function Caja() {
           )}
         </div>
       </div>
+
+      <TurnoCaja headers={headers} fecha={fecha} esSuper={user?.rol === "Super Administrador"} mostrarAlerta={mostrarAlerta} onCambio={() => cargar()} />
 
       {cargando && !data ? (
         <div className="text-center py-5">

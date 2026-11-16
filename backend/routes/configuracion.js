@@ -142,6 +142,7 @@ router.put("/financiera", verificarToken, soloSuperAdmin, async (req, res) => {
       aml_umbral: [0, 1000000000], // efectivo que genera alerta de cumplimiento (0 = el del país)
       aprob_monto_admin: [0, 1000000000], // préstamos mayores van al comité de crédito (0 = sin comité)
       aprob_votos_comite: [1, 15], // votos a favor del comité para aprobar
+      caja_exigir_turno: [0, 1], // efectivo solo con turno de caja abierto
     };
     for (const [k, [min, max]] of Object.entries(clavesSol)) {
       if (req.body[k] === undefined || req.body[k] === "") continue;

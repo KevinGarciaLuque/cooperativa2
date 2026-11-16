@@ -174,6 +174,16 @@ El catálogo base está en `backend/utils/contabilidad.js`; el contador puede ag
   los socios por aportaciones y por intereses pagados; se acredita en su cuenta de aportaciones, con la partida de
   cierre del ejercicio. Solo años terminados y una vez por año.
 
+## Sucursales y turnos de caja
+
+- Se crea una sucursal "Oficina principal"; el Super Administrador agrega más en **Caja → Mi turno → Sucursales**.
+- Cada cajero abre **su turno** con el fondo inicial que recibe. Todo lo que registra mientras está abierto
+  queda en su turno y su sucursal. Al cerrar cuenta el efectivo: si no cuadra con lo esperado
+  (fondo + entradas − salidas en efectivo), debe explicar la diferencia.
+- "Turnos del día" muestra los de todos los cajeros. El cierre diario general de la caja sigue igual.
+- En **Parámetros → Turnos de caja** se puede exigir el turno abierto para recibir o entregar efectivo
+  (desactivado por defecto). Transferencias, cheques y depósitos no lo necesitan.
+
 ## Comité de crédito (aprobación por niveles de monto)
 
 - En **Parámetros → Aprobación de préstamos** se indica el monto máximo que aprueba el personal y cuántos

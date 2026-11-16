@@ -52,13 +52,29 @@ const contabilizarMovimiento = (conn, mov, idMovimiento) => {
   });
 };
 
+// Turno de caja abierto del usuario (o null)
+const turnoAbierto = async (conn, idUsuario) => {
+  if (!idUsuario) return null;
+  try {
+    const [[t]] = await conn.query(
+      "SELECT id_turno, id_sucursal FROM cajas_turnos WHERE id_cajero = ? AND estado = 'abierto' ORDER BY id_turno DESC LIMIT 1",
+      [idUsuario]
+    );
+    return t || null;
+  } catch {
+    return null; // la tabla aún no existe
+  }
+};
+
 const registrarCaja = async (conn, mov) => {
   let id = null;
   try {
+    // El movimiento queda en el turno abierto de quien lo registra (si tiene uno)
+    const turno = await turnoAbierto(conn, mov.id_registrado_por);
     const [r] = await conn.query(
       `INSERT INTO caja_movimientos
-         (fecha, tipo, categoria, monto, metodo, descripcion, referencia_tipo, referencia_id, id_socio, id_registrado_por)
-       VALUES (COALESCE(?, NOW()), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (fecha, tipo, categoria, monto, metodo, descripcion, referencia_tipo, referencia_id, id_socio, id_registrado_por, id_turno, id_sucursal)
+       VALUES (COALESCE(?, NOW()), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         mov.fecha || null,
         mov.tipo,
@@ -70,6 +86,8 @@ const registrarCaja = async (conn, mov) => {
         mov.referencia_id || null,
         mov.id_socio || null,
         mov.id_registrado_por || null,
+        turno?.id_turno || null,
+        turno?.id_sucursal || null,
       ]
     );
     id = r.insertId;
@@ -90,4 +108,8 @@ const registrarCaja = async (conn, mov) => {
   return id;
 };
 
-module.exports = { registrarCaja, normalizarMetodo };
+module.exports = {
+  turnoAbierto,
+  registrarCaja,
+  normalizarMetodo,
+};

@@ -27,6 +27,8 @@ const DEFAULTS = {
   // comité de crédito con el número de votos indicado (0 = sin comité, como siempre)
   aprob_monto_admin: 0,
   aprob_votos_comite: 2,
+  // Caja: 1 = para recibir o entregar efectivo, el usuario debe tener su turno de caja abierto
+  caja_exigir_turno: 0,
 };
 
 let cache = { ...DEFAULTS };

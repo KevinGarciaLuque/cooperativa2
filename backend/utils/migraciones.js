@@ -913,6 +913,60 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_11_009_turnos_caja",
+    descripcion: "Sucursales y turnos de caja por cajero",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS sucursales (
+          id_sucursal INT AUTO_INCREMENT PRIMARY KEY,
+          nombre VARCHAR(100) NOT NULL,
+          direccion VARCHAR(255) NULL,
+          activa TINYINT(1) NOT NULL DEFAULT 1,
+          creada_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      const [[hay]] = await conn.query("SELECT COUNT(*) AS n FROM sucursales");
+      if (!hay.n) await conn.query("INSERT INTO sucursales (nombre) VALUES ('Oficina principal')");
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS cajas_turnos (
+          id_turno INT AUTO_INCREMENT PRIMARY KEY,
+          id_cajero INT NOT NULL,
+          id_sucursal INT NOT NULL,
+          abierto_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          fondo_inicial DECIMAL(14,2) NOT NULL DEFAULT 0,
+          cerrado_en DATETIME NULL,
+          ingresos_efectivo DECIMAL(14,2) NULL,
+          egresos_efectivo DECIMAL(14,2) NULL,
+          efectivo_esperado DECIMAL(14,2) NULL,
+          efectivo_contado DECIMAL(14,2) NULL,
+          diferencia DECIMAL(14,2) NULL,
+          observacion VARCHAR(255) NULL,
+          estado ENUM('abierto','cerrado') NOT NULL DEFAULT 'abierto',
+          INDEX idx_turno_cajero (id_cajero, estado),
+          INDEX idx_turno_fecha (abierto_en)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      const columnas = [
+        ["usuarios", "id_sucursal", "INT NULL"],
+        ["caja_movimientos", "id_turno", "INT NULL"],
+        ["caja_movimientos", "id_sucursal", "INT NULL"],
+      ];
+      for (const [tabla, nombre, def] of columnas) {
+        const [[e]] = await conn.query(
+          `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+          [tabla, nombre]
+        );
+        if (!e.n) await conn.query(`ALTER TABLE ${tabla} ADD COLUMN ${nombre} ${def}`);
+      }
+      const [[idx]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'caja_movimientos' AND INDEX_NAME = 'idx_caja_turno'`
+      );
+      if (!idx.n) await conn.query("ALTER TABLE caja_movimientos ADD INDEX idx_caja_turno (id_turno)");
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

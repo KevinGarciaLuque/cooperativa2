@@ -17,7 +17,7 @@ export default function ParametrosFinancieros() {
   const [tasa, setTasa] = useState("");
   const [gracia, setGracia] = useState("");
   const [prov, setProv] = useState({ prov_al_dia: "", prov_1_30: "", prov_31_60: "", prov_61_90: "", prov_90_mas: "" });
-  const [sol, setSol] = useState({ sol_tasa_mensual: "", sol_monto_max: "", sol_plazo_max: "", sol_pct_ingreso_max: "", aho_retencion_pct: "0", aml_umbral: "0", aprob_monto_admin: "0", aprob_votos_comite: "2" });
+  const [sol, setSol] = useState({ sol_tasa_mensual: "", sol_monto_max: "", sol_plazo_max: "", sol_pct_ingreso_max: "", aho_retencion_pct: "0", aml_umbral: "0", aprob_monto_admin: "0", aprob_votos_comite: "2", caja_exigir_turno: "0" });
   const [rec, setRec] = useState({ rec_activo: true, rec_dias_antes: "3", rec_mora_cada: "7" });
   const [enviando, setEnviando] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -38,6 +38,7 @@ export default function ParametrosFinancieros() {
           aml_umbral: String(res.data.data.aml_umbral ?? 0),
           aprob_monto_admin: String(res.data.data.aprob_monto_admin ?? 0),
           aprob_votos_comite: String(res.data.data.aprob_votos_comite ?? 2),
+          caja_exigir_turno: String(res.data.data.caja_exigir_turno ?? 0),
         });
         setRec({
           rec_activo: parseInt(res.data.data.rec_activo) === 1,
@@ -197,6 +198,19 @@ export default function ParametrosFinancieros() {
             <input type="number" step="1" min="1" max="15" className="form-control" value={sol.aprob_votos_comite}
               onChange={(e) => setSol({ ...sol, aprob_votos_comite: e.target.value })} disabled={cargando} />
           </div>
+        </div>
+
+        <h5 className="fw-bold mt-4 mb-1" style={{ color: AZUL }}>Turnos de caja</h5>
+        <p className="text-muted small">
+          Cada cajero abre su turno con un fondo inicial y al terminar cuenta el efectivo (Caja → Mi turno). Si lo
+          exiges, nadie puede recibir ni entregar efectivo sin tener su turno abierto.
+        </p>
+        <div className="form-check form-switch mb-2">
+          <input id="exigir-turno" type="checkbox" className="form-check-input" checked={sol.caja_exigir_turno === "1"}
+            onChange={(e) => setSol({ ...sol, caja_exigir_turno: e.target.checked ? "1" : "0" })} disabled={cargando} />
+          <label htmlFor="exigir-turno" className="form-check-label">
+            Exigir turno abierto para operar en efectivo
+          </label>
         </div>
 
         <h5 className="fw-bold mt-4 mb-1" style={{ color: AZUL }}>Prevención de lavado de dinero</h5>

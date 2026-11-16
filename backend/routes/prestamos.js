@@ -7,6 +7,7 @@ const { actualizarEstadosMora } = require("../utils/moraScheduler");
 const { notificarSocio, crearNotificacion, escaparHtml } = require("../utils/notificaciones");
 const { avisarAprobacion } = require("../utils/cartaAprobacion");
 const { dinero } = require("../utils/pais");
+const { planDePrestamo } = require("../utils/planPagos");
 const {
   calcularCuotaMensual,
   generarTablaAmortizacion,
@@ -101,6 +102,31 @@ router.get("/", async (req, res) => {
 // ============================================
 // OBTENER UN PRÉSTAMO POR ID CON TABLA DE AMORTIZACIÓN
 // ============================================
+// Plan de pagos: cuotas con su vencimiento y estado (pagada, parcial, vencida, pendiente).
+// Al socio le llega sin el desglose de interés y capital (lo quita ocultarInteresSocio).
+router.get("/:id/plan", async (req, res) => {
+  try {
+    const [[p]] = await pool.query(
+      `SELECT id_prestamo, id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado
+       FROM prestamos WHERE id_prestamo = ?`,
+      [req.params.id]
+    );
+    if (!p) return res.status(404).json({ message: "Préstamo no encontrado" });
+    const plan = planDePrestamo(p);
+    res.json({
+      success: true,
+      id_prestamo: p.id_prestamo,
+      // null: préstamo sin desembolsar o de plazo indefinido (paga solo interés cada mes)
+      plan: plan ? plan.cuotas : null,
+      resumen: plan ? plan.resumen : null,
+      motivo: plan ? null : parseInt(p.plazo_meses) === 0 ? "indefinido" : "sin_desembolsar",
+    });
+  } catch (error) {
+    console.error("ERROR AL OBTENER PLAN DE PAGOS:", error);
+    res.status(500).json({ message: "Error al obtener el plan de pagos" });
+  }
+});
+
 router.get("/:id", async (req, res) => {
   try {
     const [prestamo] = await pool.query(

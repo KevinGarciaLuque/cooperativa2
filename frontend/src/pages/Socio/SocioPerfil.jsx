@@ -13,6 +13,7 @@ import { comprimirImagen } from "../../utils/imagen";
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { numeroSocio } from "../../utils/numeroSocio";
+import PlanPagos from "../../components/PlanPagos";
 import {
   FaUserCircle,
   FaMoneyBillWave,
@@ -101,6 +102,7 @@ export default function SocioPerfil() {
   const [msg, setMsg]                   = useState("");
   const [msgTipo, setMsgTipo]           = useState("success");
   const [pagosExpandidos, setPagosExpandidos] = useState({});
+  const [planesAbiertos, setPlanesAbiertos] = useState({}); // plan de pagos visible por préstamo
   const [pagosData, setPagosData]       = useState({});
   const [pagosLoading, setPagosLoading] = useState({});
   const [showFotoModal, setShowFotoModal] = useState(false);
@@ -919,6 +921,23 @@ export default function SocioPerfil() {
                           </span>
                         )}
                       </button>
+                      {["activo", "mora"].includes((p.estado || "").toLowerCase()) && (
+                        <button
+                          className="btn btn-sm fw-semibold ms-2 d-inline-flex align-items-center gap-2"
+                          style={{
+                            background: planesAbiertos[p.id_prestamo] ? AZUL : "#f0f4f8",
+                            color: planesAbiertos[p.id_prestamo] ? "#fff" : AZUL,
+                            border: `1.5px solid ${planesAbiertos[p.id_prestamo] ? AZUL : "#e2e8f0"}`,
+                            borderRadius: ".6rem",
+                            padding: "6px 16px",
+                          }}
+                          onClick={() => setPlanesAbiertos((a) => ({ ...a, [p.id_prestamo]: !a[p.id_prestamo] }))}
+                        >
+                          <FaCalendarAlt size={12} />
+                          Mis cuotas y vencimientos
+                          {planesAbiertos[p.id_prestamo] ? <FaChevronUp size={11} /> : <FaChevronDown size={11} />}
+                        </button>
+                      )}
                       {entregas[p.id_prestamo] && (
                         <button
                           className="btn btn-sm fw-semibold ms-2"
@@ -947,6 +966,13 @@ export default function SocioPerfil() {
                         </button>
                       )}
                     </div>
+
+                    {/* Plan de pagos: cuotas y vencimientos (sin desglose de intereses) */}
+                    {planesAbiertos[p.id_prestamo] && (
+                      <div className="p-3" style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+                        <PlanPagos idPrestamo={p.id_prestamo} headers={headersAuth} titulo={null} maxAlto={360} />
+                      </div>
+                    )}
 
                     {/* Panel de pagos expandible */}
                     <div className={`sp-collapsible${abierto ? " open" : ""}`} style={{ background: "#f8fafc", borderTop: abierto ? "1px solid #e2e8f0" : "none" }}>

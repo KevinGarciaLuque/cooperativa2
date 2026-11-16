@@ -2,6 +2,7 @@ import { hoyLocal } from "../utils/fechas";
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import ReciboModal from "../components/ReciboModal";
+import PlanPagos from "../components/PlanPagos";
 import {
   FaArrowLeft,
   FaPrint,
@@ -60,6 +61,7 @@ export default function DetallePrestamoVentanilla({
   onLiquidar,
 }) {
   const [data, setData] = useState(null);
+  const [plan, setPlan] = useState(null); // { plan: [...], resumen } del servidor (null si es indefinido)
   const [error, setError] = useState("");
   const [verFiniquito, setVerFiniquito] = useState(false);
 
@@ -69,6 +71,10 @@ export default function DetallePrestamoVentanilla({
       .get(`${API_URL}/prestamos/${idPrestamo}`, { headers })
       .then((res) => activo && setData(res.data))
       .catch(() => activo && setError("No se pudo cargar el detalle del préstamo."));
+    axios
+      .get(`${API_URL}/prestamos/${idPrestamo}/plan`, { headers })
+      .then((res) => activo && setPlan(res.data.plan ? res.data : null))
+      .catch(() => activo && setPlan(null));
     return () => {
       activo = false;
     };
@@ -161,8 +167,14 @@ export default function DetallePrestamoVentanilla({
       saldo: liquidado ? 0 : saldoCursor,
       progreso: liquidado ? 100 : monto > 0 ? Math.min(100, (capitalPagado / monto) * 100) : 0,
       vencidas: futuras.filter((f) => f.estado === "vencida").length,
+      // Con plan de pagos, las cuotas y el atraso salen de él (vencimientos fijos desde el desembolso)
+      ...(plan && {
+        cuotasRestantes: plan.resumen.total_cuotas - plan.resumen.cuotas_pagadas,
+        interesProyectado: plan.plan.filter((c) => c.estado !== "pagada").reduce((t, c) => t + c.interes, 0),
+        vencidas: plan.resumen.cuotas_vencidas,
+      }),
     };
-  }, [data]);
+  }, [data, plan]);
 
   if (error) {
     return (
@@ -307,7 +319,11 @@ export default function DetallePrestamoVentanilla({
           <div className="dp-card p-3 mb-3 d-flex flex-wrap gap-4">
             <div>
               <div className="small text-muted">Próximo vencimiento</div>
-              <div className="fw-bold">{prox.fecha_vencimiento || "—"}</div>
+              <div className="fw-bold">
+                {plan?.resumen.proxima_cuota
+                  ? `${plan.resumen.proxima_cuota.fecha_vencimiento} (cuota ${plan.resumen.proxima_cuota.numero})`
+                  : prox.fecha_vencimiento || "—"}
+              </div>
             </div>
             <div>
               <div className="small text-muted">Cuota a pagar</div>
@@ -326,13 +342,29 @@ export default function DetallePrestamoVentanilla({
             {calc.vencidas > 0 && (
               <div>
                 <div className="small text-muted">Cuotas vencidas</div>
-                <div className="fw-bold" style={{ color: "#991b1b" }}>{calc.vencidas}</div>
+                <div className="fw-bold" style={{ color: "#991b1b" }}>
+                  {calc.vencidas}
+                  {plan && <> · {plan.resumen.dias_atraso} días de atraso · {simboloMoneda()} {fmt(plan.resumen.monto_vencido)}</>}
+                </div>
               </div>
             )}
           </div>
         )}
 
-        {/* Tabla de amortización */}
+        {/* Plan de pagos (préstamos con plazo) */}
+        {plan && (
+          <div className="dp-card p-3 mb-3">
+            <h5 className="fw-bold mb-1" style={{ color: AZUL }}>Plan de pagos</h5>
+            <div className="small text-muted mb-3">
+              Cuotas pactadas con su fecha de vencimiento, contadas desde el desembolso. Una cuota está pagada cuando
+              su capital ya se abonó; los abonos extra cubren por adelantado las siguientes.
+            </div>
+            <PlanPagos datos={plan} titulo={null} />
+          </div>
+        )}
+
+        {/* Tabla de amortización (plazo indefinido: pagos registrados) */}
+        {!plan && (
         <div className="dp-card p-3 mb-3">
           <h5 className="fw-bold mb-1" style={{ color: AZUL }}>Tabla de amortización</h5>
           <div className="small text-muted mb-3">
@@ -384,6 +416,7 @@ export default function DetallePrestamoVentanilla({
             </div>
           )}
         </div>
+        )}
 
         {/* Historial de pagos */}
         <div className="dp-card p-3 mb-4">

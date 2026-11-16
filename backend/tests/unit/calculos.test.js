@@ -270,3 +270,59 @@ test("ambiente de pruebas: ningún correo llega a los socios y los respaldos van
     }
   }
 });
+
+test("plan de pagos: cuotas, vencimientos y estado según el saldo", () => {
+  const { generarPlan, estadoDelPlan, planDePrestamo, sumarMeses } = require("../../utils/planPagos");
+  const { calcularCuotaMensual } = require("../../utils/calculosPrestamo");
+
+  // fin de mes sin desbordar
+  assert.equal(sumarMeses("2026-01-31", 1), "2026-02-28");
+  assert.equal(sumarMeses("2028-01-31", 1), "2028-02-29");
+  assert.equal(sumarMeses("2026-11-15", 3), "2027-02-15");
+
+  // 10,000 al 24% anual (2% mensual) a 12 meses, desembolsado el 15 de enero
+  const plan = generarPlan({ monto: 10000, tasaAnual: 24, plazo: 12, fechaInicio: "2026-01-15" });
+  assert.equal(plan.length, 12);
+  assert.equal(plan[0].fecha_vencimiento, "2026-02-15");
+  assert.equal(plan[11].fecha_vencimiento, "2027-01-15");
+  cerca(plan[0].cuota, calcularCuotaMensual(10000, 24, 12));
+  assert.equal(plan[0].interes, 200);
+  cerca(plan.reduce((t, c) => t + c.capital, 0), 10000, 0.001); // el capital suma exacto
+  assert.equal(plan[11].saldo, 0);
+
+  // Al día: pagó las 2 primeras cuotas, hoy es antes de la 3.ª
+  const saldoTras2 = plan[1].saldo;
+  let e = estadoDelPlan(plan, { saldoActual: saldoTras2, monto: 10000, hoy: "2026-04-10" });
+  assert.equal(e.resumen.cuotas_pagadas, 2);
+  assert.equal(e.resumen.cuotas_vencidas, 0);
+  assert.equal(e.resumen.dias_atraso, 0);
+  assert.equal(e.resumen.proxima_cuota.numero, 3);
+
+  // Se atrasó: el 10 de mayo ya venció la 3.ª cuota (15 de abril) y no la pagó
+  e = estadoDelPlan(plan, { saldoActual: saldoTras2, monto: 10000, hoy: "2026-05-10" });
+  assert.equal(e.resumen.cuotas_vencidas, 1);
+  assert.equal(e.resumen.dias_atraso, 25); // desde el 15 de abril
+  assert.equal(e.cuotas[2].estado, "vencida");
+  cerca(e.resumen.monto_vencido, plan[2].cuota);
+
+  // Pago parcial de la 3.ª: sigue vencida, con lo que falta
+  const parcial = saldoTras2 - plan[2].capital / 2;
+  e = estadoDelPlan(plan, { saldoActual: parcial, monto: 10000, hoy: "2026-05-10" });
+  assert.equal(e.cuotas[2].estado, "vencida");
+  cerca(e.resumen.capital_vencido, plan[2].capital / 2, 0.02);
+
+  // Abono extra: cubre por adelantado cuotas futuras
+  e = estadoDelPlan(plan, { saldoActual: plan[5].saldo, monto: 10000, hoy: "2026-03-01" });
+  assert.equal(e.resumen.cuotas_pagadas, 6);
+  assert.equal(e.resumen.proxima_cuota.numero, 7);
+
+  // Unos centavos de diferencia por redondeo no dejan la cuota "vencida"
+  e = estadoDelPlan(plan, { saldoActual: plan[0].saldo + 0.3, monto: 10000, hoy: "2026-03-01" });
+  assert.equal(e.cuotas[0].estado, "pagada");
+
+  // Préstamo cancelado: todas pagadas; indefinido o sin desembolsar: sin plan
+  const pagado = planDePrestamo({ estado: "pagado", monto: 5000, tasa_interes: 24, plazo_meses: 6, fecha_otorgado: "2026-01-01", saldo_restante: 0 }, "2026-12-01");
+  assert.equal(pagado.resumen.cuotas_pagadas, 6);
+  assert.equal(planDePrestamo({ estado: "activo", monto: 5000, tasa_interes: 24, plazo_meses: 0, fecha_otorgado: "2026-01-01", saldo_restante: 5000 }), null);
+  assert.equal(planDePrestamo({ estado: "aprobado", monto: 5000, tasa_interes: 24, plazo_meses: 6, fecha_otorgado: null, saldo_restante: 5000 }), null);
+});

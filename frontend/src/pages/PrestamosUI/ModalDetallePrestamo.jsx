@@ -3,6 +3,7 @@ import axios from "axios";
 import { FaMoneyBillWave, FaCheckCircle, FaHourglassHalf, FaTimesCircle, FaChartLine, FaClock, FaUserTie } from "react-icons/fa";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 import { dinero, cifra, simboloMoneda, docIdentidad } from "../../utils/pais";
+import PlanPagos from "../../components/PlanPagos";
 
 // ==================== COMPONENTE MODAL DETALLE PRÉSTAMO ====================
 export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo, token, apiUrl, onLiquidado }) {
@@ -547,6 +548,20 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
                 </div>
               </div>
             </div>
+
+            {/* Plan de pagos: vencimientos y estado de cada cuota */}
+            {["activo", "mora", "pagado"].includes(String(prestamo.estado || "").toLowerCase()) && (
+              <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: "12px" }}>
+                <div className="card-body">
+                  <PlanPagos
+                    idPrestamo={prestamo.id_prestamo}
+                    headers={{ Authorization: `Bearer ${token}` }}
+                    titulo="📅 Plan de pagos (vencimientos)"
+                    maxAlto={320}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Tabla de Amortización */}
             <div className="card border-0 shadow-sm" style={{ borderRadius: "12px" }}>

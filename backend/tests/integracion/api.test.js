@@ -1187,6 +1187,41 @@ test("respaldos: activados por defecto, configuración en la base y copia extern
   }
 });
 
+test("plan de pagos: vencimientos y atraso; el socio ve el suyo sin intereses", async () => {
+  const { generarPlan, sumarMeses } = require("../../utils/planPagos");
+  const { hoyISO } = require("../../utils/fechas");
+  // Préstamo desembolsado hace 3 meses y 10 días a 6 meses; pagó solo la 1.ª cuota
+  const inicio = sumarMeses(hoyISO(), -3).replace(/-(\d\d)$/, (m, d) => `-${String(Math.max(1, Number(d) - 10)).padStart(2, "0")}`);
+  const plan = generarPlan({ monto: 6000, tasaAnual: 24, plazo: 6, fechaInicio: inicio });
+  const [r] = await pool.query(
+    `INSERT INTO prestamos (id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado)
+     VALUES (?, 6000, 24, 6, ?, 'activo', ?)`,
+    [ids.socio, plan[0].saldo, `${inicio} 12:00:00`]
+  );
+  try {
+    const personal = await api("GET", `/prestamos/${r.insertId}/plan`, null, ids.tSuper);
+    assert.equal(personal.s, 200);
+    assert.equal(personal.b.plan.length, 6);
+    assert.equal(personal.b.plan[0].estado, "pagada");
+    assert.equal(personal.b.plan[1].estado, "vencida");
+    assert.ok(personal.b.resumen.cuotas_vencidas >= 1);
+    assert.ok(personal.b.resumen.dias_atraso > 30);
+    assert.ok(personal.b.plan[0].interes > 0, "el personal ve el desglose");
+
+    const socio = await api("GET", `/prestamos/${r.insertId}/plan`, null, ids.tSocio);
+    assert.equal(socio.s, 200);
+    assert.equal(socio.b.plan[1].estado, "vencida");
+    assert.ok(socio.b.plan[1].cuota > 0, "ve su cuota");
+    assert.equal(socio.b.plan[0].interes, undefined, "sin intereses");
+    assert.equal(socio.b.plan[0].capital, undefined, "sin desglose de capital");
+    assert.equal(socio.b.resumen.capital_vencido, undefined);
+
+    assert.equal((await api("GET", `/prestamos/${r.insertId}/plan`, null, ids.tSocio2)).s, 403, "otro socio no lo ve");
+  } finally {
+    await pool.query("DELETE FROM prestamos WHERE id_prestamo = ?", [r.insertId]);
+  }
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

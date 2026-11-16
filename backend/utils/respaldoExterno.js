@@ -9,9 +9,11 @@
 //   RESPALDO_S3_ENDPOINT     URL del servicio (R2: https://<cuenta>.r2.cloudflarestorage.com).
 //                            Sin ella se usa Amazon S3 de la región indicada.
 //   RESPALDO_S3_REGION       región (R2: "auto"; Amazon: por ejemplo "us-east-1")
-//   RESPALDO_S3_PREFIJO      carpeta dentro del bucket (por defecto "respaldos/")
+//   RESPALDO_S3_PREFIJO      carpeta dentro del bucket (por defecto "respaldos/"; en el
+//                            ambiente de pruebas, "pruebas/respaldos/")
 const crypto = require("crypto");
 const zlib = require("zlib");
+const { esPruebas } = require("./ambiente");
 
 const cfg = () => {
   const region = process.env.RESPALDO_S3_REGION || "auto";
@@ -24,7 +26,8 @@ const cfg = () => {
       process.env.RESPALDO_S3_ENDPOINT ||
       `https://s3.${region === "auto" ? "us-east-1" : region}.amazonaws.com`
     ).replace(/\/+$/, ""),
-    prefijo: (process.env.RESPALDO_S3_PREFIJO ?? "respaldos/").replace(/^\/+/, ""),
+    // En el ambiente de pruebas, en otra carpeta: nunca se mezclan con los respaldos reales
+    prefijo: (process.env.RESPALDO_S3_PREFIJO ?? (esPruebas() ? "pruebas/respaldos/" : "respaldos/")).replace(/^\/+/, ""),
   };
 };
 

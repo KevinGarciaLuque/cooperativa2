@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require("../db");
 const configFin = require("../utils/configFinanciera");
 const paisUtil = require("../utils/pais");
+const { nombreAmbiente } = require("../utils/ambiente");
 const archivos = require("../utils/archivos");
 const { verificarToken } = require("../middleware/auth");
 const multer = require("multer");
@@ -100,6 +101,7 @@ router.get("/", async (req, res) => {
     // Datos del país (moneda, identidad, teléfono) y la lista para elegirlo en Configuración
     if (!paisUtil.PAISES[resultado.pais]) resultado.pais = paisUtil.PREDETERMINADO;
     resultado.pais_datos = paisUtil.PAISES[resultado.pais];
+    resultado.ambiente = nombreAmbiente(); // "pruebas" muestra el aviso en todas las pantallas
     resultado.paises = Object.values(paisUtil.PAISES).map(({ codigo, nombre, moneda }) => ({
       codigo,
       nombre,

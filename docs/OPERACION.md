@@ -15,6 +15,8 @@ Guía para quien administra el servidor: variables, despliegue, respaldos y recu
 | `RESPALDO_S3_BUCKET`, `RESPALDO_S3_ACCESS_KEY`, `RESPALDO_S3_SECRET_KEY` | Recomendadas | Copia de cada respaldo fuera del servidor. Ver "Respaldos" |
 | `RESPALDO_S3_ENDPOINT`, `RESPALDO_S3_REGION`, `RESPALDO_S3_PREFIJO` | No | Servicio, región (`auto` en R2) y carpeta (`respaldos/`) de esa copia |
 | `BACKUPS_DIR` | No | Carpeta de los respaldos en el servidor. Por defecto `backend/backups` |
+| `AMBIENTE` | No | `pruebas` en el ambiente de pruebas: no envía correos a los socios y muestra el aviso. Ver "Ambiente de pruebas" |
+| `CORREO_PRUEBAS` | No | Solo en pruebas: todos los correos se desvían a esta dirección (sin ella, no se envían) |
 | `DB_TIMEZONE` | No | Fija la zona de cada sesión MySQL (ej. `-06:00`). Ver "Zona horaria" |
 | `LOG_LEVEL` | No | `debug`, `info`, `warn` o `error` |
 
@@ -29,6 +31,32 @@ Frontend: `VITE_API_URL` (URL de la API terminada en `/api`). Se define en Railw
    (`utils/migraciones.js`); quedan registradas en la tabla `schema_migraciones`.
 3. Verifica el estado en `GET /api/salud`: debe responder `{"estado":"ok", "bd":"ok", ...}`.
    Úsalo también como chequeo de salud en Railway o en un monitor externo (UptimeRobot, etc.).
+
+### Ambiente de pruebas
+
+Un segundo ambiente en Railway, con su propia base, para probar cada cambio con datos parecidos a los reales
+antes de que llegue a los socios.
+
+1. En el proyecto de Railway, crea un ambiente nuevo (por ejemplo `pruebas`) duplicando el de producción.
+   Revisa que la base de datos de ese ambiente sea **otra** (nunca la de producción).
+2. En el backend de ese ambiente: `AMBIENTE=pruebas`, otro `JWT_SECRET`, `FRONTEND_URL` del frontend de
+   pruebas y, si quieres ver los correos, `CORREO_PRUEBAS=tu-correo@...`. En el frontend: `VITE_API_URL`
+   apuntando al backend de pruebas.
+3. Conecta los servicios de ese ambiente a la rama `pruebas` del repositorio (producción sigue en `master`).
+4. Para tener datos parecidos a los reales: descarga un respaldo de producción (pantalla Base de Datos) y
+   cárgalo en la pantalla Base de Datos del ambiente de pruebas ("Importar SQL").
+
+Con `AMBIENTE=pruebas`:
+
+- **ningún correo llega a los socios** (recordatorios, recibos, avisos): se desvían a `CORREO_PRUEBAS` con el
+  destinatario original en el asunto, o no se envían;
+- los respaldos externos van a la carpeta `pruebas/respaldos/` del bucket;
+- todas las pantallas muestran "AMBIENTE DE PRUEBAS" y la pestaña del navegador empieza con `[PRUEBAS]`;
+- `GET /api/salud` responde `"ambiente": "pruebas"`.
+
+Los enlaces de WhatsApp los abre una persona, así que en pruebas no los envíes a socios reales.
+
+Flujo de trabajo: los cambios se suben primero a `pruebas`, se revisan ahí y luego se pasan a `master`.
 
 ### Cambios de base de datos
 

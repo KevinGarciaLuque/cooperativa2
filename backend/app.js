@@ -107,6 +107,7 @@ app.get("/api/salud", async (req, res) => {
     estado: bd === "ok" ? "ok" : "degradado",
     bd,
     migraciones,
+    ambiente: require("./utils/ambiente").nombreAmbiente(),
     uptime_s: Math.round(process.uptime()),
     version: process.env.RAILWAY_GIT_COMMIT_SHA ? process.env.RAILWAY_GIT_COMMIT_SHA.substring(0, 7) : "local",
   });

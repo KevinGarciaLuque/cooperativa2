@@ -6,7 +6,8 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./ui/tokens.css";
 
 import App from './App.jsx'
-import { cargarPais } from "./utils/pais";
+import { cargarArranque } from "./utils/arranque";
+import AvisoAmbiente from "./components/AvisoAmbiente";
 
 // Si se publicó una versión nueva mientras la pestaña seguía abierta, los archivos de las
 // pantallas de la versión anterior ya no existen: se recarga para traer la versión nueva
@@ -23,13 +24,14 @@ window.addEventListener("vite:preloadError", (evento) => {
   window.location.reload();
 });
 
-// Primero el país de la cooperativa (moneda, documento de identidad): así los montos salen
-// bien desde la primera pantalla. Si el servidor tarda, se usa el último conocido.
+// Primero el país de la cooperativa (moneda, documento de identidad) y el ambiente: así los
+// montos salen bien desde la primera pantalla. Si el servidor tarda, se usa lo último conocido.
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-cargarPais(API_URL).finally(() => {
+cargarArranque(API_URL).finally(() => {
   createRoot(document.getElementById("root")).render(
     <AlertaProvider>
       <App />
+      <AvisoAmbiente />
     </AlertaProvider>
   );
 });

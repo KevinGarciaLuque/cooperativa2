@@ -236,3 +236,37 @@ test("respaldo externo: firma S3 (ejemplos oficiales de AWS)", () => {
   });
   assert.equal(firma(put), "98ad721746da40c64f1a55b78f14c238d841ea1380cd77a1b5971af0ece108bd");
 });
+
+test("ambiente de pruebas: ningún correo llega a los socios y los respaldos van aparte", async () => {
+  const sendEmail = require("../../utils/sendEmail");
+  const { cfg } = require("../../utils/respaldoExterno");
+  const original = sendEmail.transporter;
+  const enviados = [];
+  sendEmail.transporter = { sendMail: async (m) => enviados.push(m) };
+  const antes = { AMBIENTE: process.env.AMBIENTE, CORREO_PRUEBAS: process.env.CORREO_PRUEBAS, RESPALDO_S3_PREFIJO: process.env.RESPALDO_S3_PREFIJO };
+  delete process.env.RESPALDO_S3_PREFIJO;
+  try {
+    process.env.AMBIENTE = "pruebas";
+    delete process.env.CORREO_PRUEBAS;
+    assert.deepEqual(await sendEmail({ to: "socio@real.hn", subject: "Recordatorio" }), { omitido: true });
+    assert.equal(enviados.length, 0);
+    assert.equal(cfg().prefijo, "pruebas/respaldos/");
+
+    process.env.CORREO_PRUEBAS = "equipo@cooperativa.hn";
+    await sendEmail({ to: "socio@real.hn", subject: "Recordatorio" });
+    assert.equal(enviados[0].to, "equipo@cooperativa.hn");
+    assert.equal(enviados[0].subject, "[PRUEBAS → socio@real.hn] Recordatorio");
+
+    // en producción, normal
+    process.env.AMBIENTE = "";
+    await sendEmail({ to: "socio@real.hn", subject: "Recordatorio" });
+    assert.equal(enviados[1].to, "socio@real.hn");
+    assert.equal(cfg().prefijo, "respaldos/");
+  } finally {
+    sendEmail.transporter = original;
+    for (const [k, v] of Object.entries(antes)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+});

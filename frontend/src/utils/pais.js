@@ -44,16 +44,6 @@ export const establecerPais = (datos) => {
   }
 };
 
-// Pide el país al servidor (como mucho espera unos segundos para no retrasar la entrada)
-export const cargarPais = (apiUrl, espera = 4000) =>
-  Promise.race([
-    fetch(`${apiUrl}/configuracion`)
-      .then((r) => r.json())
-      .then((r) => establecerPais(r?.data?.pais_datos))
-      .catch(() => {}),
-    new Promise((listo) => setTimeout(listo, espera)),
-  ]);
-
 export const pais = () => actual;
 export const simboloMoneda = () => actual.moneda.simbolo;
 export const localeApp = () => actual.locale;

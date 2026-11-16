@@ -50,6 +50,7 @@ const TODOS_MODULOS = [
   { key: "usuarios",      to: "/usuarios",      icon: <FaUsers />,          label: "Usuarios" },
   { key: "roles",         to: "/roles",         icon: <FaUserShield />,     label: "Roles" },
   { key: "cuentas",       to: "/cuentas",       icon: <FaUniversity />,     label: "Cuentas" },
+  { key: "cuentas",       to: "/ahorro",        icon: <FaPiggyBank />,      label: "Ahorro y plazo fijo" },
   { key: "prestamos",     to: "/prestamos",     icon: <FaHandHoldingUsd />, label: "Préstamos" },
   { key: "aportaciones",  to: "/aportaciones",  icon: <FaPiggyBank />,      label: "Aportaciones" },
   { key: "prestamos",     to: "/solicitudes",    icon: <FaInbox />,          label: "Solicitudes" },

@@ -20,6 +20,8 @@ const TIPOS = {
   desembolso: "Comprobante de desembolso",
   consolidacion: "Convenio de consolidación de préstamos",
   finiquito: "Constancia de cancelación de préstamo",
+  plazo_fijo: "Certificado de depósito a plazo fijo",
+  pago_plazo: "Comprobante de pago de depósito a plazo",
 };
 
 const METODOS = {

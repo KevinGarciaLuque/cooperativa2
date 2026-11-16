@@ -17,7 +17,7 @@ export default function ParametrosFinancieros() {
   const [tasa, setTasa] = useState("");
   const [gracia, setGracia] = useState("");
   const [prov, setProv] = useState({ prov_al_dia: "", prov_1_30: "", prov_31_60: "", prov_61_90: "", prov_90_mas: "" });
-  const [sol, setSol] = useState({ sol_tasa_mensual: "", sol_monto_max: "", sol_plazo_max: "", sol_pct_ingreso_max: "" });
+  const [sol, setSol] = useState({ sol_tasa_mensual: "", sol_monto_max: "", sol_plazo_max: "", sol_pct_ingreso_max: "", aho_retencion_pct: "0" });
   const [rec, setRec] = useState({ rec_activo: true, rec_dias_antes: "3", rec_mora_cada: "7" });
   const [enviando, setEnviando] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -34,6 +34,7 @@ export default function ParametrosFinancieros() {
           sol_monto_max: String(res.data.data.sol_monto_max),
           sol_plazo_max: String(res.data.data.sol_plazo_max),
           sol_pct_ingreso_max: String(res.data.data.sol_pct_ingreso_max),
+          aho_retencion_pct: String(res.data.data.aho_retencion_pct ?? 0),
         });
         setRec({
           rec_activo: parseInt(res.data.data.rec_activo) === 1,
@@ -162,6 +163,19 @@ export default function ParametrosFinancieros() {
               />
             </div>
           ))}
+        </div>
+
+        <h5 className="fw-bold mt-4 mb-1" style={{ color: AZUL }}>Intereses sobre ahorros</h5>
+        <p className="text-muted small">
+          Las tasas se configuran en cada producto (Ahorro → Productos). Aquí, el impuesto que se retiene de los intereses
+          que se pagan a los socios, si la ley del país lo exige (0 = no se retiene).
+        </p>
+        <div className="row g-3">
+          <div className="col-12 col-md-6">
+            <label className="form-label fw-semibold small">Retención sobre intereses (%)</label>
+            <input type="number" step="0.01" min="0" max="50" className="form-control" value={sol.aho_retencion_pct}
+              onChange={(e) => setSol({ ...sol, aho_retencion_pct: e.target.value })} disabled={cargando} />
+          </div>
         </div>
 
         <h5 className="fw-bold mt-4 mb-1" style={{ color: AZUL }}>

@@ -38,6 +38,17 @@ export default function Cuentas() {
     estado: "activa",
   });
 
+  // Tipos de cuenta: los productos de ahorro activos (Aportaciones, Vivienda, Pensiones u otros)
+  const [productosAhorro, setProductosAhorro] = useState([]);
+  useEffect(() => {
+    axios
+      .get(`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/ahorro/productos`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((r) => setProductosAhorro((r.data.data || []).filter((p) => p.activo && p.clase !== "plazo_fijo")))
+      .catch(() => setProductosAhorro([]));
+  }, [token]);
+
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
   // Obtener cuentas y usuarios
@@ -624,6 +635,7 @@ export default function Cuentas() {
           form={form}
           usuarios={usuarios}
           cuentas={cuentas}
+          productosAhorro={productosAhorro}
           onClose={() => setShowModal(false)}
           onSubmit={handleSubmit}
           handleInput={handleInput}
@@ -640,6 +652,7 @@ function ModalCuenta({
   form,
   usuarios,
   cuentas,
+  productosAhorro = [],
   onClose,
   onSubmit,
   handleInput,
@@ -767,7 +780,7 @@ function ModalCuenta({
                   }}
                 >
                   <option value="">Seleccionar tipo...</option>
-                  {[["Aportaciones","💰 Aportaciones"],["Vivienda","🏠 Vivienda"],["Pensiones","👴 Pensiones"]].map(([tipo, label]) => (
+                  {(productosAhorro.length ? productosAhorro.map((p) => [p.nombre, p.nombre]) : [["Aportaciones","💰 Aportaciones"],["Vivienda","🏠 Vivienda"],["Pensiones","👴 Pensiones"]]).map(([tipo, label]) => (
                     <option key={tipo} value={tipo} disabled={tiposOcupados.includes(tipo)}>
                       {label}{tiposOcupados.includes(tipo) ? " (ya existe)" : ""}
                     </option>

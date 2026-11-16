@@ -273,8 +273,9 @@ test("aprobación: el socio y el préstamo se aprueban juntos", async () => {
   );
   assert.equal(ok.s, 200);
 
-  const [[u]] = await pool.query("SELECT estado FROM usuarios WHERE id_usuario = ?", [ids.nuevo]);
+  const [[u]] = await pool.query("SELECT estado, numero_socio FROM usuarios WHERE id_usuario = ?", [ids.nuevo]);
   assert.equal(u.estado, "activo");
+  assert.ok(u.numero_socio > 0, "al aprobarlo recibe su número de socio");
   const [cuentas] = await pool.query("SELECT tipo_cuenta FROM cuentas WHERE id_usuario = ?", [ids.nuevo]);
   assert.equal(cuentas.length, 3);
 });
@@ -1037,6 +1038,49 @@ test("consolidación: junta préstamos vigentes en uno nuevo, solo el Super Admi
   const { anio, mes } = anioMesActual();
   const res = await api("GET", `/contabilidad/estado-resultados?anio=${anio}&mes=${mes}`, null, ids.tSuper);
   assert.ok(res.b.data.ingresos.intereses_capitalizados > 1000);
+});
+
+test("número de socio: correlativo, sin tocar al personal ni a los pendientes", async () => {
+  // Como en una base que ya tenía socios: se borran los números y se vuelve a aplicar la migración
+  await pool.query("UPDATE usuarios SET numero_socio = NULL");
+  await pool.query("DELETE FROM schema_migraciones WHERE id = '2026_11_001_numero_socio'");
+  const { aplicarMigraciones } = require("../../utils/migraciones");
+  await aplicarMigraciones();
+
+  const [filas] = await pool.query(
+    `SELECT u.id_usuario, u.numero_socio, u.estado, r.nombre AS rol FROM usuarios u
+       JOIN roles r ON r.id_rol = u.rol_id ORDER BY u.fecha_registro, u.id_usuario`
+  );
+  const socios = filas.filter((f) => f.rol === "Socio" && ["activo", "inactivo"].includes(f.estado));
+  assert.deepEqual(socios.map((f) => f.numero_socio), socios.map((_, i) => i + 1), "1, 2, 3... por antigüedad");
+  for (const f of filas.filter((f) => !socios.includes(f))) {
+    assert.equal(f.numero_socio, null, `${f.rol} ${f.estado} no lleva número`);
+  }
+
+  // un socio nuevo creado por el personal recibe el siguiente número
+  const nuevo = await api(
+    "POST", "/usuarios",
+    {
+      nombre_completo: "Socio Numerado Prueba", dni: "0801000000452", password: "Clave1234", rol_id: 2,
+      telefono: "98765432", correo: "numerado@prueba.hn", fecha_nacimiento: "1990-01-01",
+    },
+    ids.tSuper
+  );
+  assert.equal(nuevo.s, 201, nuevo.b?.message);
+  const [[n]] = await pool.query("SELECT numero_socio FROM usuarios WHERE id_usuario = ?", [nuevo.b.id_usuario]);
+  assert.equal(n.numero_socio, socios.length + 1);
+
+  // se ve al iniciar sesión y sirve para buscar
+  const login = await api("POST", "/usuarios/login", { dni: "0801000000452", password: "Clave1234" });
+  assert.equal(login.b.usuario.numero_socio, n.numero_socio);
+  const busca = await api("GET", `/usuarios?search=%23${n.numero_socio}`, null, ids.tSuper);
+  assert.ok(busca.b.data.some((u) => u.id_usuario === nuevo.b.id_usuario));
+
+  // desactivarlo y reactivarlo no le cambia el número
+  await api("PATCH", `/usuarios/${nuevo.b.id_usuario}/estado`, { estado: "inactivo" }, ids.tSuper);
+  await api("PATCH", `/usuarios/${nuevo.b.id_usuario}/estado`, { estado: "activo" }, ids.tSuper);
+  const [[otra]] = await pool.query("SELECT numero_socio FROM usuarios WHERE id_usuario = ?", [nuevo.b.id_usuario]);
+  assert.equal(otra.numero_socio, n.numero_socio);
 });
 
 test("monitoreo: el estado del servicio responde", async () => {

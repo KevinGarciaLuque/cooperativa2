@@ -11,6 +11,8 @@ import {
   FaTimes,
 } from "react-icons/fa";
 
+import { numeroSocio } from "../../utils/numeroSocio";
+
 export default function ModalPerfilUsuario({ show, usuario, onClose, onEdit, onDelete }) {
   if (!show || !usuario) return null;
 
@@ -192,6 +194,7 @@ export default function ModalPerfilUsuario({ show, usuario, onClose, onEdit, onD
             {/* Datos */}
             <div className="row g-2 mb-4">
               <div className="col-12">
+                {usuario.numero_socio && <InfoRow icon={<FaIdCard size={14} />} label="Número de socio" value={numeroSocio(usuario.numero_socio)} />}
                 <InfoRow icon={<FaIdCard size={14} />} label="DNI" value={usuario.dni} />
               </div>
               <div className="col-12 col-sm-6">

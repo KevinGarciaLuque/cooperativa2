@@ -512,6 +512,32 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_11_001_numero_socio",
+    descripcion: "Número de socio correlativo",
+    async up(conn) {
+      const [[e]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND COLUMN_NAME = 'numero_socio'`
+      );
+      if (!e.n) {
+        await conn.query(`ALTER TABLE usuarios ADD COLUMN numero_socio INT NULL AFTER id_usuario`);
+        await conn.query(`ALTER TABLE usuarios ADD UNIQUE KEY uq_numero_socio (numero_socio)`);
+      }
+      // Los socios que ya existen reciben su número por orden de registro (el más antiguo, el 1)
+      const [[{ ultimo }]] = await conn.query(`SELECT COALESCE(MAX(numero_socio), 0) AS ultimo FROM usuarios`);
+      const [socios] = await conn.query(
+        `SELECT u.id_usuario FROM usuarios u
+           INNER JOIN roles r ON r.id_rol = u.rol_id AND r.nombre = 'Socio'
+          WHERE u.numero_socio IS NULL AND u.estado IN ('activo', 'inactivo')
+          ORDER BY u.fecha_registro, u.id_usuario`
+      );
+      let n = ultimo;
+      for (const { id_usuario } of socios) {
+        await conn.query(`UPDATE usuarios SET numero_socio = ? WHERE id_usuario = ?`, [++n, id_usuario]);
+      }
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

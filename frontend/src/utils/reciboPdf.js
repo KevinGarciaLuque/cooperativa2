@@ -1,6 +1,8 @@
 // Genera el recibo en PDF (tamaño media carta) a partir de los datos del recibo.
 // jsPDF se carga bajo demanda para no aumentar el peso inicial de la aplicación.
 
+import { numeroSocio } from "./numeroSocio";
+
 const fmt = (n) =>
   `L. ${parseFloat(n || 0).toLocaleString("es-HN", {
     minimumFractionDigits: 2,
@@ -205,6 +207,7 @@ export async function generarReciboPdf(recibo) {
   const filas = [["Fecha", fechaLarga(recibo.fecha)]];
   if (recibo.socio) {
     filas.push(["Socio", recibo.socio.nombre]);
+    if (recibo.socio.numero) filas.push(["Número de socio", numeroSocio(recibo.socio.numero)]);
     filas.push(["Identidad", recibo.socio.dni || "—"]);
   }
   filas.push(["Concepto", recibo.concepto || "—"]);

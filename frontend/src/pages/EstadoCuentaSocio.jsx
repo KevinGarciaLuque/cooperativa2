@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { FaArrowLeft, FaPrint } from "react-icons/fa";
+import { numeroSocio } from "../utils/numeroSocio";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -83,7 +84,7 @@ export default function EstadoCuentaSocio({ idSocio, headers, onBack, textoVolve
               <h4 className="fw-bold mb-1">Estado de cuenta</h4>
               <div className="fw-semibold">{data.socio.nombre_completo}</div>
               <div className="text-muted small">
-                Identidad: {data.socio.dni} · Socio desde {fecha(data.socio.fecha_registro)}
+                {data.socio.numero_socio && <>Socio {numeroSocio(data.socio.numero_socio)} · </>}Identidad: {data.socio.dni} · Socio desde {fecha(data.socio.fecha_registro)}
               </div>
               <div className="text-muted small">
                 {desde || hasta

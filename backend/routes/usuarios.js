@@ -4,6 +4,7 @@ const { formatearNombre } = require("../utils/nombres");
 const pool = require("../db");
 const bcrypt = require("bcryptjs");
 const { validarPassword } = require("../utils/passwordPolicy");
+const { asignarNumeroSocio } = require("../utils/numeroSocio");
 const archivos = require("../utils/archivos");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
@@ -157,6 +158,7 @@ router.post("/login", async (req, res) => {
       usuario: {
         id_usuario: user.id_usuario,
         nombre_completo: user.nombre_completo,
+        numero_socio: user.numero_socio,
         dni: user.dni,
         telefono: user.telefono,
         correo: user.correo,
@@ -186,9 +188,11 @@ router.get("/", async (req, res) => {
     let params = [];
 
     if (search) {
-      whereClause += ` AND (u.nombre_completo LIKE ? OR u.dni LIKE ? OR u.correo LIKE ?)`;
+      // También por número de socio exacto ("15" o "#15")
+      const numero = /^#?\d{1,9}$/.test(String(search).trim()) ? parseInt(String(search).replace("#", "")) : -1;
+      whereClause += ` AND (u.nombre_completo LIKE ? OR u.dni LIKE ? OR u.correo LIKE ? OR u.numero_socio = ?)`;
       const searchParam = `%${search}%`;
-      params.push(searchParam, searchParam, searchParam);
+      params.push(searchParam, searchParam, searchParam, numero);
     }
 
     if (estado) {
@@ -422,6 +426,8 @@ router.post("/", async (req, res) => {
       [nuevoUsuarioId, "Registro de nuevo socio", `Se registró el socio: ${nombre_completo} con DNI: ${dni}`]
     );
 
+    await asignarNumeroSocio(connection, nuevoUsuarioId);
+
     // Confirmar transacción
     await connection.commit();
 
@@ -545,6 +551,8 @@ router.put("/:id", async (req, res) => {
 
     const sql = `UPDATE usuarios SET ${updateFields.join(", ")} WHERE id_usuario = ?`;
     const [result] = await pool.query(sql, values);
+    // Si pasó a ser socio (por rol o por estado), recibe su número
+    await asignarNumeroSocio(pool, req.params.id);
 
     // Registrar en bitácora
     await registrarBitacora(
@@ -783,6 +791,7 @@ router.patch("/:id/estado", async (req, res) => {
       `UPDATE usuarios SET estado = ? WHERE id_usuario = ?`,
       [estado, req.params.id]
     );
+    await asignarNumeroSocio(pool, req.params.id);
 
     // Actualizar estado de cuentas
     const estadoCuenta = estado === 'activo' ? 'activa' : 'cerrada';

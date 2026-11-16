@@ -5,6 +5,7 @@ import axios from "axios";
 import { FaBook, FaBriefcase, FaCheckCircle, FaIdCard, FaUser } from "react-icons/fa";
 import FotosIdentidad from "./FotosIdentidad";
 import { OCUPACIONES, fmt } from "../utils/solicitud";
+import { numeroSocio } from "../utils/numeroSocio";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const AZUL = "#1a2035";
@@ -79,6 +80,7 @@ export default function ExpedienteSocio({ idSocio, headers }) {
           <div className="spinner-border spinner-border-sm text-success" />
         ) : (
           <div className="row g-3">
+            <Dato etiqueta="Número de socio" valor={numeroSocio(datos.numero_socio)} />
             <Dato etiqueta="Nombre completo" valor={datos.nombre_completo} />
             <Dato etiqueta="Identidad" valor={datos.dni} />
             <Dato

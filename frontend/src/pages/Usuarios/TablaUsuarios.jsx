@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import { FaEnvelope, FaPhone, FaMapMarkerAlt, FaBirthdayCake, FaIdCard } from "react-icons/fa";
+import { numeroSocio } from "../../utils/numeroSocio";
 
 export default function TablaUsuarios({ usuarios, onEdit, onDelete, onVerPerfil }) {
 
@@ -65,6 +66,7 @@ export default function TablaUsuarios({ usuarios, onEdit, onDelete, onVerPerfil 
                     </td>
                     <td style={{ padding: "14px 12px" }}>
                       <span className="fw-semibold" style={{ color: "#2c3e50" }}>{user.nombre_completo}</span>
+                      {user.numero_socio && <div className="text-muted small">Socio {numeroSocio(user.numero_socio)}</div>}
                     </td>
                     <td style={{ padding: "14px 12px" }}>
                       <div className="d-flex align-items-center text-muted small">
@@ -173,6 +175,7 @@ export default function TablaUsuarios({ usuarios, onEdit, onDelete, onVerPerfil 
                       <div className="d-flex align-items-center gap-2">
                         <FaIdCard style={{ color: "#667eea", flexShrink: 0 }} />{user.dni}
                       </div>
+                      {user.numero_socio && <div className="text-muted">Socio {numeroSocio(user.numero_socio)}</div>}
                       {user.telefono && (
                         <div className="d-flex align-items-center gap-2">
                           <FaPhone style={{ color: "#667eea", flexShrink: 0 }} />{user.telefono}

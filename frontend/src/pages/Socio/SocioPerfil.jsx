@@ -12,6 +12,7 @@ import PoliticasSocio, { AceptarPoliticas } from "../../components/PoliticasSoci
 import { comprimirImagen } from "../../utils/imagen";
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import { numeroSocio } from "../../utils/numeroSocio";
 import {
   FaUserCircle,
   FaMoneyBillWave,
@@ -408,6 +409,12 @@ export default function SocioPerfil() {
                     {user.nombre_completo}
                   </h2>
                   <div className="d-flex flex-wrap gap-2 align-items-center">
+                    {user.numero_socio && (
+                      <>
+                        <span className="fw-semibold" style={{ fontSize: ".88rem" }}>Socio {numeroSocio(user.numero_socio)}</span>
+                        <span style={{ opacity: .4 }}>•</span>
+                      </>
+                    )}
                     <span className="d-flex align-items-center gap-1" style={{ fontSize: ".88rem", opacity: .85 }}>
                       <FaIdCard size={13} /> DNI: {user.dni}
                     </span>

@@ -6,6 +6,7 @@ import { FaPrint, FaTimes, FaWhatsapp, FaFilePdf, FaCamera, FaCheckCircle, FaSig
 import FirmaDigital from "./FirmaDigital";
 import { generarReciboPdf, nombreArchivoRecibo } from "../utils/reciboPdf";
 import { comprimirImagen } from "../utils/imagen";
+import { numeroSocio } from "../utils/numeroSocio";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -412,6 +413,12 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
                         <span className="text-muted">Socio</span>
                         <span className="fw-semibold">{recibo.socio.nombre}</span>
                       </div>
+                      {recibo.socio.numero && (
+                        <div className="d-flex justify-content-between py-1 border-bottom">
+                          <span className="text-muted">Número de socio</span>
+                          <span>{numeroSocio(recibo.socio.numero)}</span>
+                        </div>
+                      )}
                       <div className="d-flex justify-content-between py-1 border-bottom">
                         <span className="text-muted">Identidad</span>
                         <span>{recibo.socio.dni}</span>

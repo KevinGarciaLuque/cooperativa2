@@ -33,7 +33,7 @@ router.get("/:id/estado-cuenta", async (req, res) => {
     };
 
     const [socio] = await pool.query(
-      `SELECT id_usuario, nombre_completo, dni, telefono, correo, direccion, fecha_registro
+      `SELECT id_usuario, numero_socio, nombre_completo, dni, telefono, correo, direccion, fecha_registro
        FROM usuarios WHERE id_usuario = ?`,
       [id]
     );

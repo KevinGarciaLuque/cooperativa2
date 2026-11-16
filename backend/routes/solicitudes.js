@@ -9,6 +9,7 @@ const { leerRegistro, guardarRegistro } = require("../utils/registroConfig");
 const { notificarAdministradores, notificarSocio, escaparHtml } = require("../utils/notificaciones");
 const { datosCarta, generarCartaPdf, enviarCartaAprobacion, avisarAprobacion, nombreArchivoCarta } = require("../utils/cartaAprobacion");
 const { invalidarEstado } = require("../middleware/seguridad");
+const { asignarNumeroSocio } = require("../utils/numeroSocio");
 
 const num = (v) => parseFloat(v || 0);
 const esSocio = (req) => req.usuario?.rol === "Socio";
@@ -227,6 +228,7 @@ const activarSocio = async (conn, idUsuario, aprobadoPor) => {
     throw Object.assign(new Error(`El socio está en estado "${u.estado}" y no se puede aprobar.`), { codigo: 400 });
   }
   await conn.query(`UPDATE usuarios SET estado = 'activo', motivo_rechazo = NULL WHERE id_usuario = ?`, [idUsuario]);
+  await asignarNumeroSocio(conn, idUsuario);
 
   const [cuentas] = await conn.query(`SELECT COUNT(*) AS n FROM cuentas WHERE id_usuario = ?`, [idUsuario]);
   if (!cuentas[0].n) {

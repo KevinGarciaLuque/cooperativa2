@@ -139,6 +139,7 @@ router.put("/financiera", verificarToken, soloSuperAdmin, async (req, res) => {
     const clavesSol = {
       sol_tasa_mensual: [0, 30], sol_monto_max: [1, 100000000], sol_plazo_max: [1, 360], sol_pct_ingreso_max: [1, 100],
       aho_retencion_pct: [0, 50], // retención sobre los intereses de los ahorros
+      aml_umbral: [0, 1000000000], // efectivo que genera alerta de cumplimiento (0 = el del país)
     };
     for (const [k, [min, max]] of Object.entries(clavesSol)) {
       if (req.body[k] === undefined || req.body[k] === "") continue;

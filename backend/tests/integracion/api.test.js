@@ -1621,6 +1621,90 @@ test("excedentes: reservas, reparto por aportaciones e intereses, una vez por a�
   }
 });
 
+test("cumplimiento: expediente del socio, alertas de efectivo, fraccionamiento y PEP", async () => {
+  // Expediente: validaciones y guardado
+  const exp0 = await api("GET", `/socios/${ids.socio2}/expediente`, null, ids.tAdmin);
+  assert.equal(exp0.s, 200, exp0.b?.message);
+  assert.ok(exp0.b.data.faltantes.includes("beneficiarios"));
+  const perfil = { actividad_economica: "Comerciante", ingreso_mensual: "15000", origen_fondos: "Venta de ropa" };
+  const malos = await api("PUT", `/socios/${ids.socio2}/expediente`, { ...perfil, beneficiarios: [{ nombre: "Ana", porcentaje: 60 }] }, ids.tAdmin);
+  assert.equal(malos.s, 400, "los porcentajes deben sumar 100");
+  assert.equal((await api("PUT", `/socios/${ids.socio2}/expediente`, { ...perfil, es_pep: true }, ids.tAdmin)).s, 400, "PEP sin detalle");
+  const ok = await api(
+    "PUT",
+    `/socios/${ids.socio2}/expediente`,
+    { ...perfil, beneficiarios: [{ nombre: "Ana Pérez", parentesco: "Hija", porcentaje: 60 }, { nombre: "Luis Pérez", porcentaje: 40 }] },
+    ids.tAdmin
+  );
+  assert.equal(ok.s, 200, ok.b?.message);
+  assert.equal(ok.b.data.beneficiarios.length, 2);
+  assert.deepEqual(ok.b.data.faltantes, []);
+  assert.equal((await api("PUT", `/socios/${ids.socio2}/expediente`, perfil, ids.tSocio2)).s, 403, "el socio no edita su expediente");
+
+  // Umbral bajo para la prueba
+  const fin = (await api("GET", "/configuracion/financiera", null, ids.tSuper)).b.data;
+  const guardarUmbral = (v) => api("PUT", "/configuracion/financiera", { mora_tasa_anual: fin.mora_tasa_anual, mora_dias_gracia: fin.mora_dias_gracia, aml_umbral: v }, ids.tSuper);
+  assert.equal((await guardarUmbral(1000)).s, 200);
+  const resumen = await api("GET", "/cumplimiento/resumen", null, ids.tAdmin);
+  assert.equal(resumen.s, 200);
+  assert.equal(resumen.b.data.umbral, 1000);
+
+  const [[cta]] = await pool.query("SELECT id_cuenta FROM cuentas WHERE id_usuario = ? ORDER BY id_cuenta LIMIT 1", [ids.socio2]);
+  const depositar = (monto, metodo = "efectivo") =>
+    api("POST", "/movimientos", { id_cuenta: cta.id_cuenta, tipo: "abono", monto, metodo, descripcion: "Prueba cumplimiento" }, ids.tSuper);
+  const alertas = async () =>
+    (await pool.query("SELECT tipo, monto FROM alertas_cumplimiento WHERE id_socio = ? ORDER BY id_alerta", [ids.socio2]))[0];
+
+  // Un depósito grande en efectivo genera alerta; por transferencia no
+  assert.equal((await depositar(1500, "transferencia")).s, 200);
+  assert.equal((await alertas()).length, 0);
+  assert.equal((await depositar(1200)).s, 200);
+  let a = await alertas();
+  assert.equal(a.length, 1);
+  assert.equal(a[0].tipo, "efectivo_umbral");
+
+  // Fraccionamiento: varios depósitos pequeños que en 30 días suman el umbral (una sola alerta)
+  // (se apartan los ingresos en efectivo anteriores del socio para empezar el período de cero)
+  await pool.query("UPDATE caja_movimientos SET fecha = DATE_SUB(fecha, INTERVAL 60 DAY) WHERE id_socio = ? AND tipo = 'ingreso'", [ids.socio2]);
+  assert.equal((await depositar(400)).s, 200);
+  assert.equal((await depositar(400)).s, 200);
+  assert.equal((await alertas()).length, 1, "aún no llega al umbral");
+  assert.equal((await depositar(300)).s, 200);
+  assert.equal((await depositar(300)).s, 200);
+  a = await alertas();
+  assert.deepEqual(a.map((x) => x.tipo), ["efectivo_umbral", "fraccionamiento"]);
+
+  // PEP: cualquier operación desde el 10% del umbral
+  assert.equal((await api("PUT", `/socios/${ids.socio2}/expediente`, { ...perfil, es_pep: true, pep_detalle: "Regidor municipal" }, ids.tAdmin)).s, 200);
+  assert.equal((await depositar(150, "transferencia")).s, 200);
+  a = await alertas();
+  assert.equal(a.at(-1).tipo, "pep");
+
+  // Revisión: el socio y un cajero sin el módulo no las ven; la nota es obligatoria
+  assert.equal((await api("GET", "/cumplimiento/alertas", null, ids.tSocio2)).s, 403);
+  const lista = await api("GET", "/cumplimiento/alertas?estado=pendiente", null, ids.tAdmin);
+  assert.equal(lista.s, 200);
+  const [[una]] = await pool.query("SELECT id_alerta FROM alertas_cumplimiento WHERE id_socio = ? LIMIT 1", [ids.socio2]);
+  assert.equal((await api("PUT", `/cumplimiento/alertas/${una.id_alerta}`, { estado: "revisada" }, ids.tAdmin)).s, 400);
+  assert.equal((await api("PUT", `/cumplimiento/alertas/${una.id_alerta}`, { estado: "reportada", nota: "ROS enviado a la UIF" }, ids.tAdmin)).s, 200);
+  const [[rev]] = await pool.query("SELECT estado, revisado_por FROM alertas_cumplimiento WHERE id_alerta = ?", [una.id_alerta]);
+  assert.equal(rev.estado, "reportada");
+  assert.equal(rev.revisado_por, ids.admin);
+
+  // Excel
+  const r = await fetch(`${base}/api/cumplimiento/exportar`, { headers: { Authorization: `Bearer ${ids.tAdmin}` } });
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get("content-type"), /spreadsheet/);
+
+  // Estados de baja: no pueden entrar
+  assert.equal((await api("PATCH", `/usuarios/${ids.socio2}/estado`, { estado: "fallecido" }, ids.tSuper)).s, 200);
+  const [[u]] = await pool.query("SELECT estado FROM usuarios WHERE id_usuario = ?", [ids.socio2]);
+  assert.equal(u.estado, "fallecido");
+  await pool.query("UPDATE usuarios SET estado = 'activo', es_pep = 0 WHERE id_usuario = ?", [ids.socio2]);
+  await pool.query("UPDATE cuentas SET estado = 'activa' WHERE id_usuario = ?", [ids.socio2]);
+  assert.equal((await guardarUmbral(0)).s, 200);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

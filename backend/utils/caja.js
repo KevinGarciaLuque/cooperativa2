@@ -6,6 +6,7 @@
 // anulaciones (ajuste_*, anulacion_pago, anulacion_aportacion...) no: esas rutas registran
 // la partida por la diferencia con registrarCambio, porque saben cómo estaba la operación.
 const { contabilizar, registrarCambio, conSalvaguarda } = require("./contabilidad");
+const { evaluarMovimiento } = require("./cumplimiento");
 
 const METODOS = ["efectivo", "transferencia", "cheque", "deposito"];
 
@@ -76,6 +77,16 @@ const registrarCaja = async (conn, mov) => {
     console.error("No se pudo registrar el movimiento de caja:", error.message);
   }
   if (mov.contable !== false) await contabilizarMovimiento(conn, mov, id);
+  // Prevención de lavado: alertas para el oficial de cumplimiento (nunca detienen la operación)
+  if (id && mov.id_socio && !/^(anulacion|ajuste)_/.test(mov.categoria)) {
+    try {
+      await conn.query("SAVEPOINT alerta_cumplimiento");
+      await evaluarMovimiento(conn, mov, id);
+    } catch (error) {
+      await conn.query("ROLLBACK TO SAVEPOINT alerta_cumplimiento").catch(() => {});
+      console.error("No se pudo evaluar la alerta de cumplimiento:", error.message);
+    }
+  }
   return id;
 };
 

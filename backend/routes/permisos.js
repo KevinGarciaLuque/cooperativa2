@@ -16,6 +16,7 @@ const MODULOS_SISTEMA = [
   { key: "caja",          label: "Caja" },
   { key: "cobranza",      label: "Cobranza" },
   { key: "contabilidad",  label: "Contabilidad" },
+  { key: "cumplimiento",  label: "Cumplimiento (lavado de dinero)" },
   { key: "movimientos",   label: "Movimientos" },
   { key: "reportes",      label: "Reportes" },
   { key: "actividades",   label: "Actividades" },

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { FaBook, FaBriefcase, FaCheckCircle, FaIdCard, FaUser } from "react-icons/fa";
 import FotosIdentidad from "./FotosIdentidad";
+import PerfilCumplimiento, { IconoCumplimiento } from "./PerfilCumplimiento";
 import { OCUPACIONES, fmt } from "../utils/solicitud";
 import { numeroSocio } from "../utils/numeroSocio";
 import { docIdentidad } from "../utils/pais";
@@ -111,6 +112,10 @@ export default function ExpedienteSocio({ idSocio, headers }) {
             </div>
           </div>
         )}
+      </Seccion>
+
+      <Seccion icono={<IconoCumplimiento />} titulo="Perfil del socio y beneficiarios">
+        <PerfilCumplimiento idSocio={idSocio} headers={headers} />
       </Seccion>
 
       {politicas?.length > 0 && (

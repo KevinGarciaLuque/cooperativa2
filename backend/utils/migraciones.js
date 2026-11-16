@@ -817,6 +817,76 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_11_007_cumplimiento",
+    descripcion: "Expediente del socio (cumplimiento), beneficiarios y alertas de prevención de lavado",
+    async up(conn) {
+      const columnas = [
+        ["genero", "VARCHAR(20) NULL"],
+        ["estado_civil", "VARCHAR(20) NULL"],
+        ["nacionalidad", "VARCHAR(60) NULL"],
+        ["profesion", "VARCHAR(100) NULL"],
+        ["actividad_economica", "VARCHAR(150) NULL"],
+        ["lugar_trabajo", "VARCHAR(150) NULL"],
+        ["ingreso_mensual", "DECIMAL(12,2) NULL"],
+        ["origen_fondos", "VARCHAR(255) NULL"],
+        ["es_pep", "TINYINT(1) NOT NULL DEFAULT 0"],
+        ["pep_detalle", "VARCHAR(255) NULL"],
+        ["perfil_actualizado_en", "DATETIME NULL"],
+      ];
+      for (const [nombre, def] of columnas) {
+        const [[e]] = await conn.query(
+          `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND COLUMN_NAME = ?`,
+          [nombre]
+        );
+        if (!e.n) await conn.query(`ALTER TABLE usuarios ADD COLUMN ${nombre} ${def}`);
+      }
+      // Estados del socio que se retira o fallece (los existentes no cambian)
+      const [[col]] = await conn.query(
+        `SELECT COLUMN_TYPE AS tipo FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND COLUMN_NAME = 'estado'`
+      );
+      // (también "suspendido", que la pantalla de usuarios ya ofrecía)
+      if (col && col.tipo.startsWith("enum(") && !col.tipo.includes("'fallecido'")) {
+        // Se conservan todos los valores que ya tenga la columna y se agregan los nuevos
+        const actuales = [...col.tipo.matchAll(/'((?:[^']|'')*)'/g)].map((m) => m[1]);
+        const todos = [...new Set([...actuales, "activo", "inactivo", "pendiente", "rechazado", "suspendido", "retirado", "fallecido"])];
+        await conn.query(
+          `ALTER TABLE usuarios MODIFY estado ENUM(${todos.map((v) => conn.escape(v)).join(",")}) NOT NULL DEFAULT 'activo'`
+        );
+      }
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS beneficiarios (
+          id_beneficiario INT AUTO_INCREMENT PRIMARY KEY,
+          id_usuario INT NOT NULL,
+          nombre VARCHAR(100) NOT NULL,
+          parentesco VARCHAR(50) NULL,
+          identidad VARCHAR(20) NULL,
+          telefono VARCHAR(20) NULL,
+          porcentaje DECIMAL(5,2) NOT NULL,
+          INDEX idx_beneficiario_socio (id_usuario)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS alertas_cumplimiento (
+          id_alerta INT AUTO_INCREMENT PRIMARY KEY,
+          fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          id_socio INT NOT NULL,
+          tipo VARCHAR(30) NOT NULL,
+          monto DECIMAL(14,2) NOT NULL,
+          detalle VARCHAR(500) NULL,
+          id_movimiento_caja BIGINT NULL,
+          estado ENUM('pendiente','revisada','reportada') NOT NULL DEFAULT 'pendiente',
+          nota VARCHAR(500) NULL,
+          revisado_por INT NULL,
+          revisado_en DATETIME NULL,
+          INDEX idx_alerta_estado (estado, fecha),
+          INDEX idx_alerta_socio (id_socio, tipo, fecha)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

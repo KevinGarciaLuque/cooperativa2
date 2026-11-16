@@ -127,6 +127,10 @@ router.post("/login", async (req, res) => {
       return res.status(403).json({ message: "Usuario suspendido. Contacte al administrador." });
     }
 
+    if (user.estado === "retirado" || user.estado === "fallecido") {
+      return res.status(403).json({ message: "Esta cuenta está dada de baja. Comunícate con la cooperativa." });
+    }
+
     // Verificar contraseña
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
@@ -757,9 +761,9 @@ router.patch("/:id/estado", async (req, res) => {
   try {
     const { estado } = req.body;
 
-    if (!estado || !['activo', 'inactivo', 'suspendido'].includes(estado)) {
+    if (!estado || !['activo', 'inactivo', 'suspendido', 'retirado', 'fallecido'].includes(estado)) {
       return res.status(400).json({ 
-        message: "Estado inválido. Debe ser: activo, inactivo o suspendido" 
+        message: "Estado inválido. Debe ser: activo, inactivo, suspendido, retirado o fallecido" 
       });
     }
 
@@ -796,7 +800,7 @@ router.patch("/:id/estado", async (req, res) => {
 
     res.json({ 
       success: true,
-      message: `Usuario ${estado === 'activo' ? 'activado' : estado === 'suspendido' ? 'suspendido' : 'desactivado'} correctamente` 
+      message: `Usuario ${{ activo: 'activado', suspendido: 'suspendido', retirado: 'marcado como retirado', fallecido: 'marcado como fallecido' }[estado] || 'desactivado'} correctamente` 
     });
   } catch (error) {
     console.error("ERROR AL CAMBIAR ESTADO:", error);

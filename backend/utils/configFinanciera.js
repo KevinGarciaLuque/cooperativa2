@@ -21,6 +21,8 @@ const DEFAULTS = {
   rec_mora_cada: 7, // en mora, repetir cada N días (0 = solo el primer aviso)
   // Ahorro: retención de impuesto sobre los intereses que se pagan a los socios (%)
   aho_retencion_pct: 0,
+  // Prevención de lavado: monto en efectivo que genera alerta (0 = el del país)
+  aml_umbral: 0,
 };
 
 let cache = { ...DEFAULTS };

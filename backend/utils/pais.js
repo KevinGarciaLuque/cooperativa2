@@ -6,6 +6,7 @@
 const PAISES = {
   HN: {
     codigo: "HN",
+    umbral_efectivo: 250000, // reporte de efectivo (≈ US$10,000); confirmar con el regulador
     nombre: "Honduras",
     locale: "es-HN",
     zona: "America/Tegucigalpa",
@@ -24,6 +25,7 @@ const PAISES = {
   },
   GT: {
     codigo: "GT",
+    umbral_efectivo: 77000, // reporte de efectivo (≈ US$10,000); confirmar con el regulador
     nombre: "Guatemala",
     locale: "es-GT",
     zona: "America/Guatemala",
@@ -42,6 +44,7 @@ const PAISES = {
   },
   SV: {
     codigo: "SV",
+    umbral_efectivo: 10000, // reporte de efectivo (≈ US$10,000); confirmar con el regulador
     nombre: "El Salvador",
     locale: "es-SV",
     zona: "America/El_Salvador",
@@ -60,6 +63,7 @@ const PAISES = {
   },
   NI: {
     codigo: "NI",
+    umbral_efectivo: 365000, // reporte de efectivo (≈ US$10,000); confirmar con el regulador
     nombre: "Nicaragua",
     locale: "es-NI",
     zona: "America/Managua",
@@ -78,6 +82,7 @@ const PAISES = {
   },
   CR: {
     codigo: "CR",
+    umbral_efectivo: 5100000, // reporte de efectivo (≈ US$10,000); confirmar con el regulador
     nombre: "Costa Rica",
     locale: "es-CR",
     zona: "America/Costa_Rica",
@@ -96,6 +101,7 @@ const PAISES = {
   },
   PA: {
     codigo: "PA",
+    umbral_efectivo: 10000, // reporte de efectivo (≈ US$10,000); confirmar con el regulador
     nombre: "Panamá",
     locale: "es-PA",
     zona: "America/Panama",
@@ -115,6 +121,7 @@ const PAISES = {
   },
   BZ: {
     codigo: "BZ",
+    umbral_efectivo: 20000, // reporte de efectivo (≈ US$10,000); confirmar con el regulador
     nombre: "Belice",
     locale: "es-BZ",
     zona: "America/Belize",

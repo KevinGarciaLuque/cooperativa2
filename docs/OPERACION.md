@@ -174,6 +174,21 @@ El catálogo base está en `backend/utils/contabilidad.js`; el contador puede ag
   los socios por aportaciones y por intereses pagados; se acredita en su cuenta de aportaciones, con la partida de
   cierre del ejercicio. Solo años terminados y una vez por año.
 
+## Cumplimiento (prevención de lavado de dinero)
+
+- **Expediente del socio** (Ventanilla → expediente): actividad económica, ingreso mensual, origen de los
+  fondos, si es persona expuesta políticamente (PEP) y sus beneficiarios (deben sumar 100%). El módulo
+  Cumplimiento cuenta cuántos socios activos tienen el expediente incompleto.
+- **Alertas automáticas** al registrar en caja un movimiento de un socio (nunca detienen la operación):
+  efectivo igual o mayor al umbral; varios ingresos en efectivo menores que en 30 días lo superan
+  (posible fraccionamiento, una alerta por período); y cualquier operación de un PEP desde el 10% del umbral.
+- **Umbral**: Parámetros → "Umbral de efectivo". Con 0 se usa el del país (≈ US$10,000 en su moneda);
+  confirma el monto vigente con el regulador (UIF/IVE/UAF…).
+- **Revisión**: el oficial marca cada alerta como *revisada* o *reportada*, con una nota obligatoria, y
+  exporta el listado a Excel. Es información reservada: la ven el Super Administrador, el Administrador
+  (salvo que se le quite el módulo) y los roles a los que se les active "Cumplimiento" en Control de Accesos.
+- **Estados de baja**: un socio puede marcarse como *retirado* o *fallecido*; ya no puede iniciar sesión.
+
 ## Zona horaria
 
 El servidor trabaja en UTC; la cooperativa en Honduras (UTC-6). La aplicación calcula "hoy" y los

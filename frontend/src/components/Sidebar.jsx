@@ -31,6 +31,7 @@ import {
   FaPhoneAlt,
   FaBalanceScale,
   FaInbox,
+  FaUserSecret,
 } from "react-icons/fa";
 import LogoCoop from "./LogoCoop";
 
@@ -56,6 +57,7 @@ const TODOS_MODULOS = [
   { key: "prestamos",     to: "/solicitudes",    icon: <FaInbox />,          label: "Solicitudes" },
   { key: "contabilidad",  to: "/contabilidad",  icon: <FaBalanceScale />,   label: "Contabilidad" },
   { key: "contabilidad",  to: "/libros-contables", icon: <FaBook />,      label: "Libros contables" },
+  { key: "cumplimiento",  to: "/cumplimiento",  icon: <FaUserSecret />,     label: "Cumplimiento", reservado: true },
   { key: "cobranza",      to: "/cobranza",      icon: <FaPhoneAlt />,       label: "Cobranza" },
   { key: "caja",          to: "/caja",          icon: <FaCashRegister />,   label: "Caja" },
   { key: "pagos",         to: "/pagos",         icon: <FaMoneyCheckAlt />,  label: "Pagos" },
@@ -143,9 +145,13 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
     // Para cualquier otro rol (Administrador, Contador, etc.) aplicar permisos
     if (permisosRol === null) {
       // Aún cargando: mostrar todos (luego se filtrará)
-      menu = TODOS_MODULOS;
+      menu = TODOS_MODULOS.filter((m) => !m.reservado);
     } else {
-      menu = TODOS_MODULOS.filter((m) => permisosRol[m.key] !== false);
+      // Los módulos reservados (cumplimiento) se ven solo si el rol los tiene activados
+      // expresamente; el Administrador los ve salvo que se le quiten
+      const reservadoVisible = (m) =>
+        permisosRol[m.key] === true || (user.rol === "Administrador" && permisosRol[m.key] !== false);
+      menu = TODOS_MODULOS.filter((m) => (m.reservado ? reservadoVisible(m) : permisosRol[m.key] !== false));
     }
   }
 

@@ -1217,6 +1217,15 @@ test("plan de pagos: vencimientos y atraso; el socio ve el suyo sin intereses", 
     assert.equal(socio.b.resumen.capital_vencido, undefined);
 
     assert.equal((await api("GET", `/prestamos/${r.insertId}/plan`, null, ids.tSocio2)).s, 403, "otro socio no lo ve");
+
+    // Cobranza clasifica por el atraso de la cuota más antigua sin pagar
+    const cartera = await api("GET", "/cobranza/cartera", null, ids.tSuper);
+    const fila = cartera.b.data.find((f) => f.id_prestamo === r.insertId);
+    assert.equal(fila.dias_atraso, personal.b.resumen.dias_atraso);
+    assert.equal(fila.cuotas_vencidas, personal.b.resumen.cuotas_vencidas);
+    assert.equal(fila.vencimiento, personal.b.plan[1].fecha_vencimiento, "vence la cuota que debe");
+    const esperada = fila.dias_atraso > 90 ? "mora_90_mas" : fila.dias_atraso > 60 ? "mora_61_90" : "mora_31_60";
+    assert.equal(fila.categoria, esperada);
   } finally {
     await pool.query("DELETE FROM prestamos WHERE id_prestamo = ?", [r.insertId]);
   }

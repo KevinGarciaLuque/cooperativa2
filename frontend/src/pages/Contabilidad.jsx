@@ -421,7 +421,7 @@ export default function Contabilidad() {
                       <th>Socio</th>
                       <th>Préstamo</th>
                       <th>Categoría</th>
-                      <th className="text-end">Días de mora</th>
+                      <th className="text-end">Días de atraso</th>
                       <th className="text-end">Saldo</th>
                       <th className="text-end">Mora</th>
                     </tr>
@@ -432,7 +432,7 @@ export default function Contabilidad() {
                         <td>{f.socio}</td>
                         <td>#{f.id_prestamo}</td>
                         <td>{ETIQUETAS_CARTERA[f.categoria]}</td>
-                        <td className="text-end">{f.dias_mora}</td>
+                        <td className="text-end">{f.dias_atraso}</td>
                         <td className="text-end">{fmt(f.saldo)}</td>
                         <td className="text-end">{fmt(f.mora_generada)}</td>
                       </tr>

@@ -464,8 +464,8 @@ router.get("/exportar/antiguedad-cartera", async (req, res) => {
     t.font = { bold: true };
 
     ws.addRow([]);
-    estiloEncabezado(ws.addRow(["Socio", "Préstamo", "Categoría", "Días de mora", "Saldo", "Mora generada"]));
-    filas.forEach((f) => ws.addRow([f.socio, `#${f.id_prestamo}`, ETIQUETAS_CARTERA[f.categoria], f.dias_mora, f.saldo, f.mora_generada]));
+    estiloEncabezado(ws.addRow(["Socio", "Préstamo", "Categoría", "Días de atraso", "Saldo", "Mora generada"]));
+    filas.forEach((f) => ws.addRow([f.socio, `#${f.id_prestamo}`, ETIQUETAS_CARTERA[f.categoria], f.dias_atraso, f.saldo, f.mora_generada]));
 
     ws.columns = [{ width: 34 }, { width: 12 }, { width: 24 }, { width: 16 }, { width: 16 }, { width: 16 }];
     ws.getColumn(3).numFmt = "#,##0.00";

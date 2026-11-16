@@ -216,7 +216,7 @@ export default function Cobranza() {
             },
             { clave: "id_prestamo", titulo: "Préstamo", ordenable: true, render: (f) => `#${f.id_prestamo}` },
             {
-              clave: "dias_mora",
+              clave: "dias_atraso",
               titulo: "Situación",
               ordenable: true,
               render: (f) => (
@@ -228,8 +228,10 @@ export default function Cobranza() {
                     {etiquetaDe(f.categoria)}
                   </span>
                   <div className="small text-muted">
-                    {f.dias_mora > 0
-                      ? `${f.dias_mora} día(s) de atraso`
+                    {f.dias_atraso > 0
+                      ? `${f.dias_atraso} día(s) de atraso${
+                          f.cuotas_vencidas ? ` · ${f.cuotas_vencidas} cuota${f.cuotas_vencidas > 1 ? "s" : ""} vencida${f.cuotas_vencidas > 1 ? "s" : ""}` : ""
+                        }`
                       : `Vence ${f.vencimiento} (${f.dias_para_vencer} d)`}
                   </div>
                 </>

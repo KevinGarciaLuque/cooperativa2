@@ -10,6 +10,7 @@ const {
   calcularDiasMora,
   calcularInteresMoratorio,
 } = require("./calculosPrestamo");
+const { planDePrestamo } = require("./planPagos");
 
 const sumarMeses = (fecha, meses) => {
   const [y, m, d] = fecha.split("-").map(Number);
@@ -43,10 +44,16 @@ const obtenerCartera = async () => {
 
   const hoy = hoyISO();
   const filas = prestamos.map((p) => {
+    // Con plan de pagos, el vencimiento es el de la cuota más antigua sin pagar y la cartera se
+    // clasifica por sus días de atraso. Los de plazo indefinido siguen como antes (un mes desde
+    // el último pago). La mora que se cobra (dias_mora, mora_generada) no cambia.
+    const plan = planDePrestamo(p, hoy);
+    const pendiente = plan ? plan.cuotas.find((c) => c.estado !== "pagada") : null;
     const base = soloFecha(p.ultimo_pago) || soloFecha(p.fecha_otorgado) || hoy;
-    const vencimiento = sumarMeses(base, 1);
+    const vencimiento = pendiente ? pendiente.fecha_vencimiento : sumarMeses(base, 1);
     const diasParaVencer = diasEntre(hoy, vencimiento);
     const diasMora = calcularDiasMora(p.fecha_otorgado, p.ultimo_pago);
+    const diasAtraso = plan ? plan.resumen.dias_atraso : diasMora;
     const saldo = parseFloat(p.saldo_restante);
     const cuota = calcularCuotaMensual(
       parseFloat(p.monto),
@@ -67,15 +74,20 @@ const obtenerCartera = async () => {
       dias_para_vencer: diasParaVencer,
       dias_mora: diasMora,
       mora_generada: parseFloat(calcularInteresMoratorio(saldo, diasMora).toFixed(2)),
-      categoria: clasificar(diasMora, diasParaVencer),
+      // Atraso según el plan de pagos (los de plazo indefinido: igual que dias_mora)
+      con_plan: Boolean(plan),
+      dias_atraso: diasAtraso,
+      cuotas_vencidas: plan ? plan.resumen.cuotas_vencidas : null,
+      monto_vencido: plan ? plan.resumen.monto_vencido : null,
+      categoria: clasificar(diasAtraso, diasParaVencer),
       ultima_gestion: p.ultima_gestion,
       ultima_nota: p.ultima_nota,
       promesa_fecha: soloFecha(p.promesa_fecha),
-      promesa_vencida: p.promesa_fecha ? soloFecha(p.promesa_fecha) < hoy && diasMora > 0 : false,
+      promesa_vencida: p.promesa_fecha ? soloFecha(p.promesa_fecha) < hoy && (diasAtraso > 0 || diasMora > 0) : false,
     };
   });
 
-  filas.sort((a, b) => b.dias_mora - a.dias_mora || a.dias_para_vencer - b.dias_para_vencer);
+  filas.sort((a, b) => b.dias_atraso - a.dias_atraso || b.dias_mora - a.dias_mora || a.dias_para_vencer - b.dias_para_vencer);
   return filas;
 };
 

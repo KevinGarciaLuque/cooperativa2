@@ -13,6 +13,7 @@ const { registrarCaja } = require("../utils/caja");
 const { crearRecibo } = require("../utils/recibos");
 const { notificarSocio } = require("../utils/notificaciones");
 const { dinero } = require("../utils/pais");
+const { contabilizar, conSalvaguarda } = require("../utils/contabilidad");
 
 const num = (v) => parseFloat(v || 0);
 const redondear = (v) => parseFloat(num(v).toFixed(2));
@@ -172,6 +173,17 @@ router.post("/", soloSuperAdmin, async (req, res) => {
         socio.id_usuario, idNuevo, JSON.stringify(c.prestamos), c.capital, c.interes_capitalizado, c.mora_capitalizada,
         c.mora_condonada, c.adicional, c.monto_nuevo, c.tasa_mensual, c.plazo_meses, motivo.substring(0, 255), req.usuario.id_usuario,
       ]
+    );
+
+    // Partida del traspaso: el préstamo nuevo absorbe el capital de los anteriores más el
+    // interés y la mora capitalizados (el adicional sale de caja con su propia partida)
+    await conSalvaguarda(connection, { concepto: `Consolidación en el préstamo #${idNuevo}`, origen: "consolidacion", origen_id: idNuevo }, () =>
+      contabilizar(connection, "consolidacion", { capital: c.capital, interes: c.interes_capitalizado, mora: c.mora_capitalizada }, {
+        concepto: `Consolidación de préstamos en el préstamo #${idNuevo}`,
+        origen: "consolidacion",
+        origen_id: idNuevo,
+        creada_por: req.usuario?.id_usuario,
+      })
     );
 
     // Solo el dinero adicional sale de caja; lo demás es un traspaso entre préstamos

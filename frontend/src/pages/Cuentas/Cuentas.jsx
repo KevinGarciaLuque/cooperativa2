@@ -16,6 +16,7 @@ import {
 } from "react-icons/fa";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { dinero, simboloMoneda } from "../../utils/pais";
+import SelectorMedio from "../../ui/SelectorMedio";
 
 export default function Cuentas() {
   const { token } = useAuth();
@@ -800,6 +801,21 @@ function ModalCuenta({
                   }}
                 />
               </div>
+
+              {/* Medio del saldo inicial (entra a caja o al banco) */}
+              {!editCuenta && parseFloat(form.saldo_inicial) > 0 && (
+                <div className="col-md-6">
+                  <label className="form-label fw-semibold" style={{ color: "#2c3e50" }}>
+                    ¿Cómo entregó el saldo inicial?
+                  </label>
+                  <SelectorMedio
+                    value={form.metodo}
+                    onChange={handleInput}
+                    className="form-select form-select-lg"
+                    style={{ borderRadius: "10px", border: "2px solid #e9ecef", padding: "12px 16px" }}
+                  />
+                </div>
+              )}
 
               {/* Estado */}
               <div className="col-12">

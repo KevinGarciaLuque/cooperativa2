@@ -1,4 +1,5 @@
 const express = require("express");
+const { registrarCaja } = require("../utils/caja");
 const router = express.Router();
 const pool = require("../db");
 
@@ -180,6 +181,22 @@ router.get("/cierres", async (req, res) => {
 // ============================================
 // REGISTRAR UN GASTO: POST /api/caja/gasto
 // ============================================
+// Ejecuta fn(conexión) dentro de una transacción (el movimiento de caja y su partida van juntos)
+const enTransaccion = async (fn) => {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const r = await fn(conn);
+    await conn.commit();
+    return r;
+  } catch (error) {
+    await conn.rollback().catch(() => {});
+    throw error;
+  } finally {
+    conn.release();
+  }
+};
+
 const CATEGORIAS_GASTO = ["servicios", "salarios", "alquiler", "papeleria", "transporte", "otros"];
 
 router.post("/gasto", async (req, res) => {
@@ -196,11 +213,17 @@ router.post("/gasto", async (req, res) => {
     const metodoFinal = ["efectivo", "transferencia", "cheque", "deposito"].includes(metodo) ? metodo : "efectivo";
     const fechaMov = esFecha(fecha) && fecha <= hoyISO() ? `${fecha} 12:00:00` : null;
 
-    await pool.query(
-      `INSERT INTO caja_movimientos
-         (fecha, tipo, categoria, monto, metodo, descripcion, referencia_tipo, id_registrado_por)
-       VALUES (COALESCE(?, NOW()), 'egreso', ?, ?, ?, ?, 'gasto', ?)`,
-      [fechaMov, `gasto_${cat}`, valor, metodoFinal, String(concepto).trim().substring(0, 255), req.usuario?.id_usuario || null]
+    await enTransaccion((conn) =>
+      registrarCaja(conn, {
+        fecha: fechaMov,
+        tipo: "egreso",
+        categoria: `gasto_${cat}`,
+        monto: valor,
+        metodo: metodoFinal,
+        descripcion: String(concepto).trim(),
+        referencia_tipo: "gasto",
+        id_registrado_por: req.usuario?.id_usuario || null,
+      })
     );
     await pool.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
@@ -235,11 +258,17 @@ router.post("/ingreso", async (req, res) => {
     const descripcion = String(concepto || "").trim() || CATEGORIAS_INGRESO[cat];
     const fechaMov = esFecha(fecha) && fecha <= hoyISO() ? `${fecha} 12:00:00` : null;
 
-    await pool.query(
-      `INSERT INTO caja_movimientos
-         (fecha, tipo, categoria, monto, metodo, descripcion, referencia_tipo, id_registrado_por)
-       VALUES (COALESCE(?, NOW()), 'ingreso', ?, ?, ?, ?, 'ingreso_manual', ?)`,
-      [fechaMov, `ingreso_${cat}`, valor, metodoFinal, descripcion.substring(0, 255), req.usuario?.id_usuario || null]
+    await enTransaccion((conn) =>
+      registrarCaja(conn, {
+        fecha: fechaMov,
+        tipo: "ingreso",
+        categoria: `ingreso_${cat}`,
+        monto: valor,
+        metodo: metodoFinal,
+        descripcion,
+        referencia_tipo: "ingreso_manual",
+        id_registrado_por: req.usuario?.id_usuario || null,
+      })
     );
     await pool.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,

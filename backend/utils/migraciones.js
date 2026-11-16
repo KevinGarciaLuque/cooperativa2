@@ -620,6 +620,67 @@ const MIGRACIONES = [
       }
     },
   },
+  {
+    id: "2026_11_004_contabilidad",
+    descripcion: "Contabilidad de partida doble: catálogo de cuentas y partidas",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS cuentas_contables (
+          id_cuenta_contable INT AUTO_INCREMENT PRIMARY KEY,
+          codigo VARCHAR(20) NOT NULL,
+          nombre VARCHAR(120) NOT NULL,
+          tipo ENUM('activo','pasivo','patrimonio','ingreso','gasto') NOT NULL,
+          naturaleza ENUM('deudora','acreedora') NOT NULL,
+          clave VARCHAR(40) NULL,
+          id_padre INT NULL,
+          acepta_movimientos TINYINT(1) NOT NULL DEFAULT 1,
+          activa TINYINT(1) NOT NULL DEFAULT 1,
+          UNIQUE KEY uq_cuenta_codigo (codigo),
+          UNIQUE KEY uq_cuenta_clave (clave)
+        )
+      `);
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS partidas (
+          id_partida INT AUTO_INCREMENT PRIMARY KEY,
+          numero INT NOT NULL,
+          fecha DATE NOT NULL,
+          concepto VARCHAR(255) NOT NULL,
+          origen VARCHAR(30) NOT NULL,
+          origen_id INT NULL,
+          total DECIMAL(14,2) NOT NULL,
+          creada_por INT NULL,
+          creada_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_partida_numero (numero),
+          INDEX idx_partida_fecha (fecha),
+          INDEX idx_partida_origen (origen, origen_id)
+        )
+      `);
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS partida_lineas (
+          id_linea INT AUTO_INCREMENT PRIMARY KEY,
+          id_partida INT NOT NULL,
+          id_cuenta_contable INT NOT NULL,
+          debe DECIMAL(14,2) NOT NULL DEFAULT 0,
+          haber DECIMAL(14,2) NOT NULL DEFAULT 0,
+          INDEX idx_linea_partida (id_partida),
+          INDEX idx_linea_cuenta (id_cuenta_contable)
+        )
+      `);
+      // Operaciones cuya partida no se pudo registrar (las revisa el contador)
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS contabilidad_errores (
+          id_error INT AUTO_INCREMENT PRIMARY KEY,
+          fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          origen VARCHAR(30) NULL,
+          origen_id INT NULL,
+          concepto VARCHAR(255) NULL,
+          error VARCHAR(500) NOT NULL,
+          resuelto TINYINT(1) NOT NULL DEFAULT 0
+        )
+      `);
+      await require("./contabilidad").sembrarCatalogo(conn);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

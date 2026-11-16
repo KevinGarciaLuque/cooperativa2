@@ -6,6 +6,7 @@ const jwt = require("jsonwebtoken");
 const { registrarCaja } = require("../utils/caja");
 const { crearRecibo, emitirFiniquito } = require("../utils/recibos");
 const { dinero } = require("../utils/pais");
+const { registrarCambio, conSalvaguarda } = require("../utils/contabilidad");
 const {
   calcularCuotaMensual,
   calcularDiasMora,
@@ -757,6 +758,20 @@ router.put("/:id", async (req, res) => {
 
     await connection.beginTransaction();
 
+    // Foto de los pagos del préstamo antes de editar: la partida contable de ajuste cubre
+    // este pago y los posteriores que se recalculan
+    const pagosComoOperacion = async () => {
+      const [filas] = await connection.query(
+        `SELECT monto_pagado, monto_capital, monto_interes, metodo_pago FROM pagos_prestamo WHERE id_prestamo = ?`,
+        [idPrestamo]
+      );
+      return filas.map((f) => ({
+        tipo: "pago_prestamo",
+        datos: { monto: f.monto_pagado, capital: f.monto_capital, interes: f.monto_interes, metodo: f.metodo_pago },
+      }));
+    };
+    const pagosAntes = await pagosComoOperacion();
+
     if (!montoChanged) {
       // Solo actualizar método — sin tocar montos ni saldos
       await connection.query(
@@ -827,6 +842,18 @@ router.put("/:id", async (req, res) => {
         });
       }
     }
+
+    const pagosDespues = await pagosComoOperacion();
+    await conSalvaguarda(connection, { concepto: `Edición del pago #${req.params.id}`, origen: "pago", origen_id: parseInt(req.params.id) }, () =>
+      registrarCambio(connection, {
+        antes: pagosAntes,
+        despues: pagosDespues,
+        concepto: `Edición del pago #${req.params.id} (préstamo #${idPrestamo})`,
+        origen: "pago",
+        origen_id: parseInt(req.params.id),
+        creada_por: req.usuario?.id_usuario,
+      })
+    );
 
     await connection.commit();
     res.json({ success: true, message: "Pago actualizado correctamente." });
@@ -928,6 +955,21 @@ router.delete("/:id", async (req, res) => {
       `UPDATE recibos SET anulado = 1
        WHERE tipo = 'finiquito' AND referencia_tipo = 'finiquito' AND referencia_id = ?`,
       [pagoData.id_prestamo]
+    );
+
+    // Partida contable: se revierte la del pago (dinero, capital, interés y mora)
+    await conSalvaguarda(connection, { concepto: `Anulación del pago #${pagoData.id_pago}`, origen: "pago", origen_id: pagoData.id_pago }, () =>
+      registrarCambio(connection, {
+        antes: {
+          tipo: "pago_prestamo",
+          datos: { monto: pagoData.monto_pagado, capital: pagoData.monto_capital, interes: pagoData.monto_interes, metodo: pagoData.metodo_pago },
+        },
+        despues: null,
+        concepto: `Anulación del pago #${pagoData.id_pago} (préstamo #${pagoData.id_prestamo}). Motivo: ${motivo}`,
+        origen: "pago",
+        origen_id: pagoData.id_pago,
+        creada_por: req.usuario?.id_usuario,
+      })
     );
 
     // Contrapartida en caja: sale el dinero que había entrado por este pago

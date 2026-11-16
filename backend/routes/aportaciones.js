@@ -5,6 +5,7 @@ const { registrarCaja } = require("../utils/caja");
 const { crearRecibo } = require("../utils/recibos");
 const { crearNotificacion } = require("../utils/notificaciones");
 const { dinero } = require("../utils/pais");
+const { registrarCambio, conSalvaguarda } = require("../utils/contabilidad");
 
 // ============================================
 // FUNCIONES AUXILIARES
@@ -259,6 +260,7 @@ router.post("/", async (req, res) => {
       descripcion: descripcion || "Aportación mensual",
       referencia_tipo: "aportacion",
       referencia_id: nuevaAportacionId,
+      contable: { tipo_cuenta: cuentaDestino.tipo_cuenta },
       id_socio: id_usuario,
       id_registrado_por: req.usuario?.id_usuario,
     });
@@ -267,6 +269,7 @@ router.post("/", async (req, res) => {
       tipo: "aportacion",
       referencia_tipo: "aportacion",
       referencia_id: nuevaAportacionId,
+      contable: { tipo_cuenta: cuentaDestino.tipo_cuenta },
       id_socio: id_usuario,
       monto: montoNum,
       metodo: req.body.metodo_pago,
@@ -420,6 +423,17 @@ router.put("/:id", async (req, res) => {
         id_socio: aportacionActual[0].id_usuario,
         id_registrado_por: req.usuario?.id_usuario,
       });
+      const aporte = (m) => ({ tipo: "deposito_socio", datos: { monto: m, metodo: "efectivo", tipo_cuenta: "Aportaciones" } });
+      await conSalvaguarda(connection, { concepto: `Ajuste de aportación #${req.params.id}`, origen: "aportacion", origen_id: parseInt(req.params.id) }, () =>
+        registrarCambio(connection, {
+          antes: aporte(montoAnterior),
+          despues: aporte(montoNuevo),
+          concepto: `Ajuste de aportación #${req.params.id}: de ${dinero(montoAnterior)} a ${dinero(montoNuevo)}`,
+          origen: "aportacion",
+          origen_id: parseInt(req.params.id),
+          creada_por: req.usuario?.id_usuario,
+        })
+      );
     }
 
     // Registrar en bitácora
@@ -517,6 +531,16 @@ router.delete("/:id", async (req, res) => {
       id_socio: id_usuario,
       id_registrado_por: req.usuario?.id_usuario,
     });
+    await conSalvaguarda(connection, { concepto: `Eliminación de la aportación #${req.params.id}`, origen: "aportacion", origen_id: parseInt(req.params.id) }, () =>
+      registrarCambio(connection, {
+        antes: { tipo: "deposito_socio", datos: { monto: montoAportacion, metodo: "efectivo", tipo_cuenta: "Aportaciones" } },
+        despues: null,
+        concepto: `Eliminación de la aportación #${req.params.id}`,
+        origen: "aportacion",
+        origen_id: parseInt(req.params.id),
+        creada_por: req.usuario?.id_usuario,
+      })
+    );
 
     // Registrar en bitácora
     await connection.query(

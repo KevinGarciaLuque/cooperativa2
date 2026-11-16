@@ -326,3 +326,39 @@ test("plan de pagos: cuotas, vencimientos y estado según el saldo", () => {
   assert.equal(planDePrestamo({ estado: "activo", monto: 5000, tasa_interes: 24, plazo_meses: 0, fecha_otorgado: "2026-01-01", saldo_restante: 5000 }), null);
   assert.equal(planDePrestamo({ estado: "aprobado", monto: 5000, tasa_interes: 24, plazo_meses: 6, fecha_otorgado: null, saldo_restante: 5000 }), null);
 });
+
+test("contabilidad: cada operación cuadra y un cambio registra solo la diferencia", () => {
+  const { lineasDe, neto, medio, cuentaDeSocio } = require("../../utils/contabilidad");
+  const cuadra = (lineas) => {
+    const d = lineas.reduce((t, l) => t + l.debe, 0);
+    const h = lineas.reduce((t, l) => t + l.haber, 0);
+    cerca(d, h, 0.001);
+    return d;
+  };
+  assert.equal(medio("efectivo"), "caja");
+  assert.equal(medio("transferencia"), "bancos");
+  assert.equal(cuentaDeSocio("Aportaciones"), "aportaciones");
+  assert.equal(cuentaDeSocio("Vivienda"), "ahorro_vivienda");
+
+  const pago = lineasDe("pago_prestamo", { monto: 1100, capital: 800, interes: 250, metodo: "efectivo" });
+  assert.equal(cuadra(pago), 1100);
+  assert.deepEqual(pago.find((l) => l.clave === "ingreso_mora"), { clave: "ingreso_mora", debe: 0, haber: 50 });
+  cuadra(lineasDe("desembolso_prestamo", { monto: 5000, metodo: "cuenta", tipo_cuenta: "Aportaciones" }));
+  cuadra(lineasDe("deposito_socio", { monto: 300, metodo: "deposito", tipo_cuenta: "Vivienda" }));
+  cuadra(lineasDe("retiro_socio", { monto: 300, metodo: "efectivo", tipo_cuenta: "Pensiones" }));
+  cuadra(lineasDe("gasto", { monto: 75.5, categoria: "papeleria", metodo: "efectivo" }));
+  cuadra(lineasDe("consolidacion", { capital: 9000, interes: 400, mora: 60 }));
+  cuadra(lineasDe("ajuste_socio", { monto: -20, tipo_cuenta: "Aportaciones" }));
+
+  // Editar un pago de 1,100 en efectivo a 1,000 por transferencia: solo la diferencia
+  const antes = lineasDe("pago_prestamo", { monto: 1100, capital: 800, interes: 250, metodo: "efectivo" });
+  const despues = lineasDe("pago_prestamo", { monto: 1000, capital: 750, interes: 250, metodo: "transferencia" });
+  const cambio = neto([...despues, ...antes.map((l) => ({ ...l, debe: l.haber, haber: l.debe }))]);
+  cuadra(cambio);
+  const de = (c) => cambio.find((l) => l.clave === c) || { debe: 0, haber: 0 };
+  assert.equal(de("caja").haber, 1100, "sale de caja lo que había entrado");
+  assert.equal(de("bancos").debe, 1000, "entra a bancos el pago corregido");
+  assert.equal(de("cartera").debe, 50, "el capital abonado baja 50");
+  assert.equal(de("ingreso_mora").debe, 50, "la mora baja 50");
+  assert.ok(!cambio.some((l) => l.clave === "ingreso_intereses"), "el interés no cambió: no aparece");
+});

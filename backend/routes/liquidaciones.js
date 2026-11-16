@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { contabilizar, conSalvaguarda } = require("../utils/contabilidad");
 
 // ============================================
 // FUNCIÓN AUXILIAR: REGISTRAR EN BITÁCORA
@@ -30,7 +31,7 @@ async function registrarMovimiento(connection, id_cuenta, tipo, monto, descripci
 
   await connection.query(
     `INSERT INTO movimientos_cuenta 
-     (id_cuenta, tipo, monto, saldo_anterior, saldo_nuevo, descripcion)
+     (id_cuenta, tipo_movimiento, monto, saldo_anterior, saldo_nuevo, descripcion)
      VALUES (?, ?, ?, ?, ?, ?)`,
     [id_cuenta, tipo, monto, saldo_anterior, saldo_nuevo, descripcion]
   );
@@ -551,10 +552,20 @@ router.post("/:id/desembolsar/:id_usuario", async (req, res) => {
         [nuevo_saldo, id_cuenta]
       );
 
+      // Partida: el reparto de excedentes va a la cuenta de aportaciones del socio (sin caja)
+      await conSalvaguarda(connection, { concepto: `Reparto de la liquidación #${req.params.id}`, origen: "liquidacion", origen_id: parseInt(req.params.id) }, () =>
+        contabilizar(connection, "liquidacion_socio", { monto, tipo_cuenta: "Aportaciones" }, {
+          concepto: `Reparto de "${liquidacionSocio[0].nombre_actividad}" al socio #${req.params.id_usuario}`,
+          origen: "liquidacion",
+          origen_id: parseInt(req.params.id),
+          creada_por: req.usuario?.id_usuario,
+        })
+      );
+
       // Marcar como desembolsado
       await connection.query(
         `UPDATE liquidacion_socios 
-         SET desembolsado = 1
+         SET desembolsado = 1, fecha_desembolso = NOW()
          WHERE id_liquidacion = ? AND id_usuario = ?`,
         [req.params.id, req.params.id_usuario]
       );

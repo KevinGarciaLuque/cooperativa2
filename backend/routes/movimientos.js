@@ -1,6 +1,34 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { registrarCaja, normalizarMetodo } = require("../utils/caja");
+const { registrarCambio, contabilizar, conSalvaguarda } = require("../utils/contabilidad");
+
+// Efecto de un movimiento sobre el saldo: los abonos (y aportes) suman, los retiros restan
+const efecto = (tipo) => (["abono", "aporte", "deposito"].includes(tipo) ? 1 : tipo === "retiro" ? -1 : 0);
+
+// Un movimiento de cuenta como operación contable (depósito o retiro del socio)
+const operacionDe = (tipo, monto, metodo, tipoCuenta) =>
+  efecto(tipo) === 0
+    ? null
+    : { tipo: efecto(tipo) > 0 ? "deposito_socio" : "retiro_socio", datos: { monto, metodo, tipo_cuenta: tipoCuenta } };
+
+const errorCon = (codigo, mensaje) => Object.assign(new Error(mensaje), { codigo });
+
+// Solo se editan o borran aquí los abonos y retiros hechos en esta pantalla o en Cuentas.
+// Los que vienen de otra operación (aportación, desembolso, transferencia, reparto) se
+// corrigen desde su módulo: así caja, contabilidad y la operación original siguen cuadrando.
+// Devuelve el medio de pago con el que entró a caja (o efectivo si es anterior a caja).
+const medioEditable = async (conn, mov) => {
+  const [[caja]] = await conn.query(
+    `SELECT metodo FROM caja_movimientos WHERE referencia_tipo = 'movimiento_cuenta' AND referencia_id = ?
+     ORDER BY id_movimiento LIMIT 1`,
+    [mov.id_movimiento]
+  );
+  if (caja) return caja.metodo;
+  if (["abono", "retiro"].includes(mov.tipo_movimiento)) return "efectivo";
+  throw errorCon(400, "Este movimiento viene de otra operación (aportación, desembolso, transferencia o reparto). Corrígelo desde su módulo para que caja y contabilidad sigan cuadrando.");
+};
 
 // ============================================
 // OBTENER TODOS LOS MOVIMIENTOS CON FILTROS Y PAGINACIÓN
@@ -450,8 +478,20 @@ router.post("/ajuste-manual", async (req, res) => {
       );
 
       // Registrar en bitácora
+      const [[cc]] = await connection.query("SELECT tipo_cuenta FROM cuentas WHERE id_cuenta = ?", [id_cuenta]);
+      if (efecto(tipo) !== 0) {
+        await conSalvaguarda(connection, { concepto: `Ajuste manual en la cuenta ${id_cuenta}`, origen: "ajuste_cuenta", origen_id: parseInt(id_cuenta) }, () =>
+          contabilizar(connection, "ajuste_socio", { monto: efecto(tipo) * parseFloat(monto), tipo_cuenta: cc.tipo_cuenta }, {
+            concepto: `Ajuste manual en la cuenta ${cc.tipo_cuenta}: ${descripcion}`,
+            origen: "ajuste_cuenta",
+            origen_id: parseInt(id_cuenta),
+            creada_por: req.usuario?.id_usuario,
+          })
+        );
+      }
+
       await connection.query(
-        `INSERT INTO bitacora (id_usuario, accion, descripcion)
+        `INSERT INTO bitacora (id_usuario, accion, detalle)
          VALUES (?, ?, ?)`,
         [
           id_usuario_admin, 
@@ -552,6 +592,23 @@ router.post("/", async (req, res) => {
         [id_cuenta, tipo, monto, saldo_anterior, saldo_nuevo, descripcion || '', fecha || new Date()]
       );
 
+      // Los abonos y retiros entran o salen de caja (o del banco) con su partida contable
+      if (efecto(tipo) !== 0) {
+        const [[c]] = await connection.query("SELECT tipo_cuenta, id_usuario FROM cuentas WHERE id_cuenta = ?", [id_cuenta]);
+        await registrarCaja(connection, {
+          tipo: tipo === "retiro" ? "egreso" : "ingreso",
+          categoria: tipo === "retiro" ? "retiro_ahorro" : "deposito_ahorro",
+          monto: parseFloat(monto),
+          metodo: normalizarMetodo(req.body.metodo),
+          descripcion: `${tipo === "retiro" ? "Retiro de" : "Depósito en"} cuenta ${c.tipo_cuenta}${descripcion ? `: ${descripcion}` : ""}`,
+          referencia_tipo: "movimiento_cuenta",
+          referencia_id: result.insertId,
+          id_socio: c.id_usuario,
+          id_registrado_por: req.usuario?.id_usuario,
+          contable: { tipo_cuenta: c.tipo_cuenta },
+        });
+      }
+
       // Actualizar saldo de cuenta
       await connection.query(
         'UPDATE cuentas SET saldo_actual = ? WHERE id_cuenta = ?',
@@ -616,6 +673,7 @@ router.put("/:id", async (req, res) => {
       }
 
       const movimiento = movActual[0];
+      const metodoCaja = await medioEditable(connection, movimiento);
       
       // Si cambia el monto o tipo, recalcular saldos
       const nuevoTipo = tipo || movimiento.tipo_movimiento;
@@ -636,21 +694,11 @@ router.put("/:id", async (req, res) => {
       const montoAnterior = parseFloat(movimiento.monto);
       const tipoAnterior = movimiento.tipo_movimiento;
       
-      if (tipoAnterior === 'abono') {
-        saldoActual -= montoAnterior;
-      } else if (tipoAnterior === 'retiro') {
-        saldoActual += montoAnterior;
-      }
+      saldoActual -= efecto(tipoAnterior) * montoAnterior;
 
       // Aplicar nuevo movimiento
       const saldo_anterior = saldoActual;
-      let saldo_nuevo = saldoActual;
-      
-      if (nuevoTipo === 'abono') {
-        saldo_nuevo += nuevoMonto;
-      } else if (nuevoTipo === 'retiro') {
-        saldo_nuevo -= nuevoMonto;
-      }
+      const saldo_nuevo = saldoActual + efecto(nuevoTipo) * nuevoMonto;
 
       if (saldo_nuevo < 0) {
         throw new Error('El cambio resultaría en saldo negativo');
@@ -692,6 +740,33 @@ router.put("/:id", async (req, res) => {
         [saldo_nuevo, movimiento.id_cuenta]
       );
 
+      // Caja y contabilidad: solo la diferencia entre cómo estaba y cómo quedó
+      const [[c]] = await connection.query("SELECT tipo_cuenta, id_usuario FROM cuentas WHERE id_cuenta = ?", [movimiento.id_cuenta]);
+      const diferencia = efecto(nuevoTipo) * nuevoMonto - efecto(tipoAnterior) * montoAnterior;
+      if (Math.abs(diferencia) >= 0.005) {
+        await registrarCaja(connection, {
+          tipo: diferencia > 0 ? "ingreso" : "egreso",
+          categoria: "ajuste_movimiento",
+          monto: Math.abs(diferencia),
+          metodo: metodoCaja,
+          descripcion: `Ajuste por edición del movimiento #${id_movimiento} (cuenta ${c.tipo_cuenta})`,
+          referencia_tipo: "movimiento_cuenta",
+          referencia_id: parseInt(id_movimiento),
+          id_socio: c.id_usuario,
+          id_registrado_por: req.usuario?.id_usuario,
+        });
+      }
+      await conSalvaguarda(connection, { concepto: `Edición del movimiento #${id_movimiento}`, origen: "movimiento_cuenta", origen_id: parseInt(id_movimiento) }, () =>
+        registrarCambio(connection, {
+          antes: operacionDe(tipoAnterior, montoAnterior, metodoCaja, c.tipo_cuenta),
+          despues: operacionDe(nuevoTipo, nuevoMonto, metodoCaja, c.tipo_cuenta),
+          concepto: `Edición del movimiento #${id_movimiento} (cuenta ${c.tipo_cuenta})`,
+          origen: "movimiento_cuenta",
+          origen_id: parseInt(id_movimiento),
+          creada_por: req.usuario?.id_usuario,
+        })
+      );
+
       await connection.commit();
 
       res.json({
@@ -709,7 +784,7 @@ router.put("/:id", async (req, res) => {
 
   } catch (error) {
     console.error("ERROR AL ACTUALIZAR MOVIMIENTO:", error);
-    res.status(500).json({ 
+    res.status(error.codigo || 500).json({ 
       success: false,
       message: error.message || "Error al actualizar el movimiento"
     });
@@ -739,6 +814,7 @@ router.delete("/:id", async (req, res) => {
       }
 
       const mov = movimiento[0];
+      const metodoCaja = await medioEditable(connection, mov);
       
       // Obtener saldo actual de la cuenta
       const [cuenta] = await connection.query(
@@ -754,11 +830,7 @@ router.delete("/:id", async (req, res) => {
       let nuevoSaldo = parseFloat(cuenta[0].saldo_actual);
       const monto = parseFloat(mov.monto);
       
-      if (mov.tipo_movimiento === 'abono') {
-        nuevoSaldo -= monto;
-      } else if (mov.tipo_movimiento === 'retiro') {
-        nuevoSaldo += monto;
-      }
+      nuevoSaldo -= efecto(mov.tipo_movimiento) * monto;
 
       if (nuevoSaldo < 0) {
         throw new Error('Eliminar este movimiento resultaría en saldo negativo');
@@ -775,6 +847,32 @@ router.delete("/:id", async (req, res) => {
         'UPDATE cuentas SET saldo_actual = ? WHERE id_cuenta = ?',
         [nuevoSaldo, mov.id_cuenta]
       );
+
+      // Caja y contabilidad: se revierte el dinero que había entrado o salido
+      const [[c]] = await connection.query("SELECT tipo_cuenta, id_usuario FROM cuentas WHERE id_cuenta = ?", [mov.id_cuenta]);
+      if (efecto(mov.tipo_movimiento) !== 0) {
+        await registrarCaja(connection, {
+          tipo: efecto(mov.tipo_movimiento) > 0 ? "egreso" : "ingreso",
+          categoria: "anulacion_movimiento",
+          monto,
+          metodo: metodoCaja,
+          descripcion: `Eliminación del movimiento #${id_movimiento} (cuenta ${c.tipo_cuenta})`,
+          referencia_tipo: "movimiento_cuenta",
+          referencia_id: parseInt(id_movimiento),
+          id_socio: c.id_usuario,
+          id_registrado_por: req.usuario?.id_usuario,
+        });
+        await conSalvaguarda(connection, { concepto: `Eliminación del movimiento #${id_movimiento}`, origen: "movimiento_cuenta", origen_id: parseInt(id_movimiento) }, () =>
+          registrarCambio(connection, {
+            antes: operacionDe(mov.tipo_movimiento, monto, metodoCaja, c.tipo_cuenta),
+            despues: null,
+            concepto: `Eliminación del movimiento #${id_movimiento} (cuenta ${c.tipo_cuenta})`,
+            origen: "movimiento_cuenta",
+            origen_id: parseInt(id_movimiento),
+            creada_por: req.usuario?.id_usuario,
+          })
+        );
+      }
 
       await connection.commit();
 
@@ -793,7 +891,7 @@ router.delete("/:id", async (req, res) => {
 
   } catch (error) {
     console.error("ERROR AL ELIMINAR MOVIMIENTO:", error);
-    res.status(500).json({ 
+    res.status(error.codigo || 500).json({ 
       success: false,
       message: error.message || "Error al eliminar el movimiento"
     });

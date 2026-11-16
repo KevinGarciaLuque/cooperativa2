@@ -3,6 +3,8 @@ const router = express.Router();
 const pool = require("../db");
 const { verificarToken, soloAdmin } = require("../middleware/auth");
 const { dinero } = require("../utils/pais");
+const { contabilizar, conSalvaguarda } = require("../utils/contabilidad");
+const { registrarCaja, normalizarMetodo } = require("../utils/caja");
 
 // ============================================
 // FUNCIONES AUXILIARES
@@ -236,11 +238,24 @@ router.post("/", async (req, res) => {
 
     // Si hay saldo inicial, registrar movimiento
     if (saldoInicial > 0) {
-      await connection.query(
+      const [mov] = await connection.query(
         `INSERT INTO movimientos_cuenta (id_cuenta, tipo_movimiento, monto, descripcion, fecha) 
          VALUES (?, 'aporte', ?, 'Saldo inicial de la cuenta', NOW())`,
         [nuevaCuentaId, saldoInicial]
       );
+      // El saldo inicial es dinero que entrega el socio: pasa por caja
+      await registrarCaja(connection, {
+        tipo: "ingreso",
+        categoria: "deposito_ahorro",
+        monto: saldoInicial,
+        metodo: normalizarMetodo(req.body.metodo),
+        descripcion: `Saldo inicial de la cuenta ${tipo_cuenta}`,
+        referencia_tipo: "movimiento_cuenta",
+        referencia_id: mov.insertId,
+        id_socio: id_usuario,
+        id_registrado_por: req.usuario?.id_usuario,
+        contable: { tipo_cuenta },
+      });
     }
 
     // Registrar en bitácora
@@ -278,6 +293,7 @@ router.post("/:id/actualizar-saldo", async (req, res) => {
   
   try {
     const { tipo, monto, descripcion } = req.body;
+    const metodo = normalizarMetodo(req.body.metodo); // efectivo, transferencia, cheque o depósito
 
     // Validaciones
     if (!tipo || !monto) {
@@ -341,11 +357,27 @@ router.post("/:id/actualizar-saldo", async (req, res) => {
     );
 
     // Registrar movimiento
-    await connection.query(
+    const [mov] = await connection.query(
       `INSERT INTO movimientos_cuenta (id_cuenta, tipo_movimiento, monto, descripcion, fecha) 
        VALUES (?, ?, ?, ?, NOW())`,
       [req.params.id, tipo, montoNum, descripcion || `${tipo.charAt(0).toUpperCase() + tipo.slice(1)} en cuenta`]
     );
+
+    // El dinero entra o sale de caja (o del banco) y queda su partida contable
+    if (tipo === "aporte" || tipo === "retiro") {
+      await registrarCaja(connection, {
+        tipo: tipo === "aporte" ? "ingreso" : "egreso",
+        categoria: tipo === "aporte" ? "deposito_ahorro" : "retiro_ahorro",
+        monto: montoNum,
+        metodo,
+        descripcion: `${tipo === "aporte" ? "Depósito en" : "Retiro de"} cuenta ${cuenta[0].tipo_cuenta} de ${cuenta[0].nombre_completo}`,
+        referencia_tipo: "movimiento_cuenta",
+        referencia_id: mov.insertId,
+        id_socio: cuenta[0].id_usuario,
+        id_registrado_por: req.usuario?.id_usuario,
+        contable: { tipo_cuenta: cuenta[0].tipo_cuenta },
+      });
+    }
 
     // Registrar en bitácora
     await connection.query(
@@ -480,6 +512,21 @@ router.post("/transferir", async (req, res) => {
         "Transferencia entre cuentas",
         `Transferencia de ${dinero(montoNum)} de ${cuentaOrigen[0].tipo_cuenta} a ${cuentaDestino[0].tipo_cuenta}`
       ]
+    );
+
+    // Partida: pasa de una cuenta del socio a otra (por ejemplo, de ahorro a aportaciones)
+    await conSalvaguarda(connection, { concepto: "Transferencia entre cuentas", origen: "transferencia", origen_id: parseInt(id_cuenta_origen) }, () =>
+      contabilizar(
+        connection,
+        "transferencia_socio",
+        { monto: montoNum, tipo_origen: cuentaOrigen[0].tipo_cuenta, tipo_destino: cuentaDestino[0].tipo_cuenta },
+        {
+          concepto: `Transferencia de ${cuentaOrigen[0].tipo_cuenta} a ${cuentaDestino[0].tipo_cuenta}`,
+          origen: "transferencia",
+          origen_id: parseInt(id_cuenta_origen),
+          creada_por: req.usuario?.id_usuario,
+        }
+      )
     );
 
     await connection.commit();

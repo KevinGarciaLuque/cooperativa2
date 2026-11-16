@@ -1,6 +1,18 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { registrarCaja, normalizarMetodo } = require("../utils/caja");
+const { registrarCambio, conSalvaguarda } = require("../utils/contabilidad");
+
+// Medio con el que entró a caja el ingreso de una actividad, o null si es anterior a que las
+// actividades pasaran por caja (entonces sus cambios no tocan caja ni contabilidad)
+const medioEnCaja = async (conn, idActividad) => {
+  const [[c]] = await conn.query(
+    `SELECT metodo FROM caja_movimientos WHERE referencia_tipo = 'actividad' AND categoria = 'actividad' AND referencia_id = ? LIMIT 1`,
+    [idActividad]
+  );
+  return c ? c.metodo : null;
+};
 
 // ============================================
 // TIPOS DE ACTIVIDADES
@@ -250,6 +262,19 @@ router.post("/", async (req, res) => {
 
       const id_actividad = result.insertId;
 
+      // El ingreso de la actividad entra a caja (o al banco) con su partida contable
+      await registrarCaja(connection, {
+        fecha: fecha ? `${String(fecha).substring(0, 10)} 12:00:00` : null,
+        tipo: "ingreso",
+        categoria: "actividad",
+        monto: parseFloat(monto),
+        metodo: normalizarMetodo(req.body.metodo),
+        descripcion: `Ingreso de la actividad "${nombre}" (${tipo})`,
+        referencia_tipo: "actividad",
+        referencia_id: id_actividad,
+        id_registrado_por: req.usuario?.id_usuario,
+      });
+
       // Registrar en bitácora
       if (id_usuario_registro) {
         await registrarBitacora(
@@ -335,6 +360,34 @@ router.put("/:id", async (req, res) => {
     try {
       await connection.beginTransaction();
 
+      // Si cambió el monto: ajuste en caja y contabilidad por la diferencia
+      const montoAntes = parseFloat(actividad[0].monto);
+      const montoDespues = monto ? parseFloat(monto) : montoAntes;
+      const medio = await medioEnCaja(connection, req.params.id);
+      if (medio && Math.abs(montoDespues - montoAntes) >= 0.005) {
+        const dif = montoDespues - montoAntes;
+        await registrarCaja(connection, {
+          tipo: dif > 0 ? "ingreso" : "egreso",
+          categoria: "ajuste_actividad",
+          monto: Math.abs(dif),
+          metodo: medio,
+          descripcion: `Ajuste de la actividad #${req.params.id}`,
+          referencia_tipo: "actividad",
+          referencia_id: parseInt(req.params.id),
+          id_registrado_por: req.usuario?.id_usuario,
+        });
+        await conSalvaguarda(connection, { concepto: `Ajuste de la actividad #${req.params.id}`, origen: "actividad", origen_id: parseInt(req.params.id) }, () =>
+          registrarCambio(connection, {
+            antes: { tipo: "actividad", datos: { monto: montoAntes, metodo: medio } },
+            despues: { tipo: "actividad", datos: { monto: montoDespues, metodo: medio } },
+            concepto: `Ajuste de la actividad #${req.params.id}`,
+            origen: "actividad",
+            origen_id: parseInt(req.params.id),
+            creada_por: req.usuario?.id_usuario,
+          })
+        );
+      }
+
       // Actualizar actividad
       await connection.query(
         `UPDATE actividades 
@@ -390,7 +443,7 @@ router.delete("/:id", async (req, res) => {
 
     // Verificar que la actividad no esté liquidada
     const [actividad] = await pool.query(
-      `SELECT a.nombre,
+      `SELECT a.nombre, a.monto,
        EXISTS (SELECT 1 FROM liquidaciones l WHERE l.id_actividad = a.id_actividad) as liquidada
        FROM actividades a
        WHERE a.id_actividad = ?`,
@@ -421,6 +474,31 @@ router.delete("/:id", async (req, res) => {
         `DELETE FROM actividades WHERE id_actividad = ?`,
         [req.params.id]
       );
+
+      // Sale de caja lo que había entrado por esta actividad, con su partida de reversión
+      const medio = await medioEnCaja(connection, req.params.id);
+      if (medio) {
+        await registrarCaja(connection, {
+          tipo: "egreso",
+          categoria: "anulacion_actividad",
+          monto: parseFloat(actividad[0].monto),
+          metodo: medio,
+          descripcion: `Eliminación de la actividad "${actividad[0].nombre}"`,
+          referencia_tipo: "actividad",
+          referencia_id: parseInt(req.params.id),
+          id_registrado_por: req.usuario?.id_usuario,
+        });
+        await conSalvaguarda(connection, { concepto: `Eliminación de la actividad #${req.params.id}`, origen: "actividad", origen_id: parseInt(req.params.id) }, () =>
+          registrarCambio(connection, {
+            antes: { tipo: "actividad", datos: { monto: parseFloat(actividad[0].monto), metodo: medio } },
+            despues: null,
+            concepto: `Eliminación de la actividad "${actividad[0].nombre}"`,
+            origen: "actividad",
+            origen_id: parseInt(req.params.id),
+            creada_por: req.usuario?.id_usuario,
+          })
+        );
+      }
 
       // Registrar en bitácora
       if (id_usuario_elimina) {

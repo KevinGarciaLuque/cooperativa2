@@ -10,6 +10,7 @@ const { dinero } = require("../utils/pais");
 const { planDePrestamo } = require("../utils/planPagos");
 const { obtenerProducto, fueraDeProducto } = require("../utils/productos");
 const { faltaGarantia } = require("../utils/garantias");
+const { contabilizar, conSalvaguarda } = require("../utils/contabilidad");
 const {
   calcularCuotaMensual,
   generarTablaAmortizacion,
@@ -448,6 +449,15 @@ router.post("/:id/desembolsar", async (req, res) => {
         [cuenta[0].id_cuenta, monto, `Desembolso de préstamo #${req.params.id}`, cuenta[0].saldo_actual, nuevoSaldo]
       );
       detalleCuenta = `cuenta ${cuenta[0].tipo_cuenta} #${cuenta[0].id_cuenta}`;
+      // No pasa por caja: la partida va de la cartera a la cuenta del socio
+      await conSalvaguarda(connection, { concepto: `Desembolso del préstamo #${req.params.id}`, origen: "prestamo", origen_id: parseInt(req.params.id) }, () =>
+        contabilizar(connection, "desembolso_prestamo", { monto, metodo: "cuenta", tipo_cuenta: cuenta[0].tipo_cuenta }, {
+          concepto: `Desembolso del préstamo #${req.params.id} a la ${detalleCuenta}`,
+          origen: "prestamo",
+          origen_id: parseInt(req.params.id),
+          creada_por: req.usuario?.id_usuario,
+        })
+      );
     }
 
     await connection.query(

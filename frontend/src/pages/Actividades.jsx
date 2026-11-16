@@ -35,6 +35,7 @@ import {
   Cell,
 } from "recharts";
 import { dinero, simboloMoneda } from "../utils/pais";
+import SelectorMedio from "../ui/SelectorMedio";
 
 export default function Actividades() {
   const { token } = useAuth();
@@ -47,6 +48,7 @@ export default function Actividades() {
     fecha: hoyLocal(),
     monto: "",
     descripcion: "",
+    metodo: "efectivo",
   });
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState("");
@@ -1107,6 +1109,16 @@ function ModalActividad({
                   }}
                 />
               </div>
+
+              {/* Medio: el ingreso entra a caja (efectivo) o al banco */}
+              {!editAct && (
+                <div className="col-12">
+                  <label className="form-label fw-semibold" style={{ color: "#2c3e50" }}>
+                    ¿Cómo entró el dinero?
+                  </label>
+                  <SelectorMedio value={form.metodo} onChange={handleInput} className="form-select form-select-lg" style={{ borderRadius: "10px", border: "2px solid #e9ecef", padding: "12px 16px" }} />
+                </div>
+              )}
 
               {/* Descripción */}
               <div className="col-12">

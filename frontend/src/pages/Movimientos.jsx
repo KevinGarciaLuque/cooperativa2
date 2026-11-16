@@ -33,6 +33,7 @@ import {
   Tooltip,
 } from "recharts";
 import { dinero, simboloMoneda } from "../utils/pais";
+import SelectorMedio from "../ui/SelectorMedio";
 
 export default function Movimientos() {
   const { token } = useAuth();
@@ -54,6 +55,7 @@ export default function Movimientos() {
     monto: "",
     fecha: hoyLocal(),
     descripcion: "",
+    metodo: "efectivo",
   });
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -1164,6 +1166,16 @@ function ModalMovimiento({
                   }}
                 />
               </div>
+
+              {/* Medio: entra o sale de caja (efectivo) o del banco */}
+              {!editMovimiento && ["abono", "retiro"].includes(form.tipo) && (
+                <div className="col-md-6">
+                  <label className="form-label fw-semibold" style={{ color: "#2c3e50" }}>
+                    Medio de pago
+                  </label>
+                  <SelectorMedio value={form.metodo} onChange={handleInput} className="form-select form-select-lg" style={{ borderRadius: "10px", border: "2px solid #e9ecef", padding: "12px 16px" }} />
+                </div>
+              )}
 
               {/* Fecha */}
               <div className="col-12">

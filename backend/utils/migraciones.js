@@ -702,7 +702,7 @@ const MIGRACIONES = [
           activo TINYINT(1) NOT NULL DEFAULT 1,
           orden INT NOT NULL DEFAULT 0,
           UNIQUE KEY uq_producto_ahorro_nombre (nombre)
-        )
+        ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
       // Los tres tipos de cuenta de siempre, sin interés (nada cambia hasta que se configure)
       for (const [nombre, clase, orden] of [["Aportaciones", "aportacion", 1], ["Vivienda", "ahorro", 2], ["Pensiones", "ahorro", 3]]) {
@@ -716,14 +716,17 @@ const MIGRACIONES = [
         `SELECT DATA_TYPE AS tipo FROM information_schema.COLUMNS
          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cuentas' AND COLUMN_NAME = 'tipo_cuenta'`
       );
-      if (col && col.tipo === "enum") await conn.query(`ALTER TABLE cuentas MODIFY tipo_cuenta VARCHAR(60) NOT NULL`);
+      if (col && col.tipo === "enum") {
+        await conn.query(`ALTER TABLE cuentas MODIFY tipo_cuenta VARCHAR(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL`);
+      }
       const [[e]] = await conn.query(
         `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cuentas' AND COLUMN_NAME = 'id_producto_ahorro'`
       );
       if (!e.n) await conn.query(`ALTER TABLE cuentas ADD COLUMN id_producto_ahorro INT NULL`);
       await conn.query(
-        `UPDATE cuentas c INNER JOIN productos_ahorro p ON LOWER(p.nombre) = LOWER(c.tipo_cuenta)
+        `UPDATE cuentas c INNER JOIN productos_ahorro p
+           ON LOWER(p.nombre) COLLATE utf8mb4_unicode_ci = LOWER(c.tipo_cuenta) COLLATE utf8mb4_unicode_ci
          SET c.id_producto_ahorro = p.id_producto_ahorro WHERE c.id_producto_ahorro IS NULL`
       );
 

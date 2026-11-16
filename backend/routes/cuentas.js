@@ -5,6 +5,7 @@ const { verificarToken, soloAdmin } = require("../middleware/auth");
 const { dinero } = require("../utils/pais");
 const { contabilizar, conSalvaguarda } = require("../utils/contabilidad");
 const { registrarCaja, normalizarMetodo } = require("../utils/caja");
+const { impedimentoRetiro } = require("../utils/ahorro");
 
 // ============================================
 // FUNCIONES AUXILIARES
@@ -193,11 +194,13 @@ router.post("/", async (req, res) => {
     }
 
     // Validar tipo de cuenta
-    const tiposValidos = ['Aportaciones', 'Vivienda', 'Pensiones'];
-    if (!tiposValidos.includes(tipo_cuenta)) {
-      return res.status(400).json({ 
-        message: "Tipo de cuenta inválido. Debe ser: Aportaciones, Vivienda o Pensiones" 
-      });
+    // El tipo de cuenta es un producto de ahorro activo (Aportaciones, Vivienda, Pensiones u otro)
+    const [[producto]] = await connection.query(
+      "SELECT id_producto_ahorro, nombre FROM productos_ahorro WHERE nombre = ? COLLATE utf8mb4_unicode_ci AND activo = 1 AND clase <> 'plazo_fijo'",
+      [tipo_cuenta]
+    );
+    if (!producto) {
+      return res.status(400).json({ message: "Tipo de cuenta inválido: elige un producto de ahorro activo." });
     }
 
     // Verificar que el usuario existe y está activo
@@ -229,9 +232,9 @@ router.post("/", async (req, res) => {
     // Crear la cuenta
     const saldoInicial = parseFloat(saldo_inicial) || 0.00;
     const [result] = await connection.query(
-      `INSERT INTO cuentas (id_usuario, tipo_cuenta, saldo_actual, estado, fecha_apertura) 
-       VALUES (?, ?, ?, 'activa', NOW())`,
-      [id_usuario, tipo_cuenta, saldoInicial]
+      `INSERT INTO cuentas (id_usuario, tipo_cuenta, id_producto_ahorro, saldo_actual, estado, fecha_apertura) 
+       VALUES (?, ?, ?, ?, 'activa', NOW())`,
+      [id_usuario, producto.nombre, producto.id_producto_ahorro, saldoInicial]
     );
 
     const nuevaCuentaId = result.insertId;
@@ -341,11 +344,10 @@ router.post("/:id/actualizar-saldo", async (req, res) => {
     if (tipo === 'aporte') {
       nuevoSaldo += montoNum;
     } else if (tipo === 'retiro') {
-      if (nuevoSaldo < montoNum) {
+      const impide = await impedimentoRetiro(connection, req.params.id, montoNum);
+      if (impide) {
         await connection.rollback();
-        return res.status(400).json({ 
-          message: "Saldo insuficiente para realizar el retiro" 
-        });
+        return res.status(400).json({ message: impide });
       }
       nuevoSaldo -= montoNum;
     }

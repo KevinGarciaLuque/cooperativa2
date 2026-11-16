@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const { registrarCaja, normalizarMetodo } = require("../utils/caja");
+const { impedimentoRetiro } = require("../utils/ahorro");
 const { registrarCambio, contabilizar, conSalvaguarda } = require("../utils/contabilidad");
 
 // Efecto de un movimiento sobre el saldo: los abonos (y aportes) suman, los retiros restan
@@ -580,8 +581,9 @@ router.post("/", async (req, res) => {
       }
 
       // Validar saldo suficiente para retiro
-      if (tipo === 'retiro' && saldo_nuevo < 0) {
-        throw new Error('Saldo insuficiente para realizar el retiro');
+      if (tipo === 'retiro') {
+        const impide = await impedimentoRetiro(connection, id_cuenta, parseFloat(monto));
+        if (impide) throw Object.assign(new Error(impide), { codigo: 400 });
       }
 
       // Registrar movimiento
@@ -634,7 +636,7 @@ router.post("/", async (req, res) => {
 
   } catch (error) {
     console.error("ERROR AL CREAR MOVIMIENTO:", error);
-    res.status(500).json({ 
+    res.status(error.codigo || 500).json({ 
       success: false,
       message: error.message || "Error al crear el movimiento"
     });

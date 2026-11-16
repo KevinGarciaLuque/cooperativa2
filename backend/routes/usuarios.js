@@ -5,6 +5,7 @@ const pool = require("../db");
 const bcrypt = require("bcryptjs");
 const { validarPassword } = require("../utils/passwordPolicy");
 const { asignarNumeroSocio } = require("../utils/numeroSocio");
+const { abrirCuentasAutomaticas } = require("../utils/ahorro");
 const archivos = require("../utils/archivos");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
@@ -402,15 +403,8 @@ router.post("/", async (req, res) => {
 
     const nuevoUsuarioId = result.insertId;
 
-    // Crear cuentas automáticas (Aportaciones, Vivienda, Pensiones)
-    const tiposCuenta = ['Aportaciones', 'Vivienda', 'Pensiones'];
-    for (const tipo of tiposCuenta) {
-      await connection.query(
-        `INSERT INTO cuentas (id_usuario, tipo_cuenta, saldo_actual, estado, fecha_apertura) 
-         VALUES (?, ?, 0.00, 'activa', NOW())`,
-        [nuevoUsuarioId, tipo]
-      );
-    }
+    // Cuentas que se abren solas (productos de ahorro con apertura automática)
+    await abrirCuentasAutomaticas(connection, nuevoUsuarioId);
 
     // Registrar en bitácora
     await connection.query(

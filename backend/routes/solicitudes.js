@@ -10,6 +10,7 @@ const { notificarAdministradores, notificarSocio, escaparHtml } = require("../ut
 const { datosCarta, generarCartaPdf, enviarCartaAprobacion, avisarAprobacion, nombreArchivoCarta } = require("../utils/cartaAprobacion");
 const { invalidarEstado } = require("../middleware/seguridad");
 const { asignarNumeroSocio } = require("../utils/numeroSocio");
+const { abrirCuentasAutomaticas } = require("../utils/ahorro");
 const { dinero } = require("../utils/pais");
 
 const num = (v) => parseFloat(v || 0);
@@ -239,14 +240,7 @@ const activarSocio = async (conn, idUsuario, aprobadoPor) => {
   await asignarNumeroSocio(conn, idUsuario);
 
   const [cuentas] = await conn.query(`SELECT COUNT(*) AS n FROM cuentas WHERE id_usuario = ?`, [idUsuario]);
-  if (!cuentas[0].n) {
-    for (const tipo of ["Aportaciones", "Vivienda", "Pensiones"]) {
-      await conn.query(
-        `INSERT INTO cuentas (id_usuario, tipo_cuenta, saldo_actual, estado, fecha_apertura) VALUES (?, ?, 0.00, 'activa', NOW())`,
-        [idUsuario, tipo]
-      );
-    }
-  }
+  if (!cuentas[0].n) await abrirCuentasAutomaticas(conn, idUsuario);
   await conn.query(
     `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
     [idUsuario, "Socio aprobado", `${u.nombre_completo} fue aprobado como socio (usuario #${aprobadoPor})`]

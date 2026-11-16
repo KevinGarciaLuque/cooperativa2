@@ -29,6 +29,8 @@ const operacionContable = async (conn, mov) => {
   if (c === "aportacion" || c === "deposito_ahorro") return ["deposito_socio", { ...base, tipo_cuenta: tipoCuenta || "Aportaciones" }];
   if (c === "retiro_ahorro") return ["retiro_socio", { ...base, tipo_cuenta: tipoCuenta }];
   if (c === "actividad") return ["actividad", base];
+  if (c === "apertura_plazo") return ["apertura_plazo", base];
+  if (c === "pago_plazo") return ["pago_plazo", { ...base, ...mov.contable }]; // capital, interés y retención
   if (c.startsWith("gasto_")) return ["gasto", { ...base, categoria: c.substring(6) }];
   if (c.startsWith("ingreso_")) return ["ingreso_caja", { ...base, categoria: c.substring(8) }];
   return null;

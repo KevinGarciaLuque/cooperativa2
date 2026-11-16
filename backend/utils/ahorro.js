@@ -12,7 +12,7 @@ const cron = require("node-cron");
 const pool = require("../db");
 const config = require("./configFinanciera");
 const { hoyISO, zona } = require("./fechas");
-const { diasEntre } = require("./calculosPrestamo");
+const { diasEntre, soloFecha } = require("./calculosPrestamo");
 const { contabilizar, conSalvaguarda } = require("./contabilidad");
 
 const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
@@ -54,8 +54,8 @@ const interesDelMes = ({ promedio, tasaAnual, dias, retencionPct = 0 }) => {
 const liquidacionPlazo = (d, hoy = hoyISO()) => {
   const monto = num(d.monto);
   const tasa = num(d.tasa_anual);
-  const inicio = String(d.fecha_inicio).substring(0, 10);
-  const vence = String(d.fecha_vencimiento).substring(0, 10);
+  const inicio = soloFecha(d.fecha_inicio); // de MySQL llegan como Date; de las pruebas, como texto
+  const vence = soloFecha(d.fecha_vencimiento);
   const anticipado = hoy < vence;
   const dias = anticipado ? Math.max(0, diasEntre(inicio, hoy)) : parseInt(d.plazo_dias);
   const devengado = r2((monto * tasa) / 100 * dias / 365);
@@ -90,7 +90,7 @@ const previaIntereses = async (anio, mes, conn = pool) => {
     `SELECT c.id_cuenta, c.id_usuario, c.tipo_cuenta, c.saldo_actual, p.tasa_anual, u.nombre_completo,
             (SELECT COUNT(*) FROM intereses_ahorro i WHERE i.id_cuenta = c.id_cuenta AND i.anio = ? AND i.mes = ?) AS ya
      FROM cuentas c
-     INNER JOIN productos_ahorro p ON p.id_producto_ahorro = c.id_producto_ahorro
+     INNER JOIN productos_ahorro p ON (p.id_producto_ahorro = c.id_producto_ahorro OR (c.id_producto_ahorro IS NULL AND p.nombre = c.tipo_cuenta COLLATE utf8mb4_unicode_ci))
      INNER JOIN usuarios u ON u.id_usuario = c.id_usuario
      WHERE c.estado = 'activa' AND p.tasa_anual > 0 AND p.clase <> 'plazo_fijo'
      ORDER BY u.nombre_completo`,
@@ -202,7 +202,39 @@ const iniciarAhorroScheduler = () => {
   foto(); // la de hoy, por si el servidor estuvo apagado anoche
 };
 
+// Cuentas que se abren solas al nuevo socio: los productos con apertura automática
+const abrirCuentasAutomaticas = async (conn, idUsuario) => {
+  const [prods] = await conn.query(
+    `SELECT id_producto_ahorro, nombre FROM productos_ahorro WHERE apertura_automatica = 1 AND activo = 1 AND clase <> 'plazo_fijo' ORDER BY orden, nombre`
+  );
+  const lista = prods.length ? prods : [{ id_producto_ahorro: null, nombre: "Aportaciones" }, { id_producto_ahorro: null, nombre: "Vivienda" }, { id_producto_ahorro: null, nombre: "Pensiones" }];
+  for (const p of lista) {
+    await conn.query(
+      `INSERT INTO cuentas (id_usuario, tipo_cuenta, id_producto_ahorro, saldo_actual, estado, fecha_apertura) VALUES (?, ?, ?, 0.00, 'activa', NOW())`,
+      [idUsuario, p.nombre, p.id_producto_ahorro]
+    );
+  }
+};
+
+// (El producto de una cuenta: el ligado o, en cuentas antiguas sin vínculo, el de su nombre.)
+// ¿Se puede retirar ese monto de la cuenta? Devuelve el mensaje que lo impide o null
+const impedimentoRetiro = async (conn, idCuenta, monto) => {
+  const [[c]] = await conn.query(
+    `SELECT c.saldo_actual, c.tipo_cuenta, p.permite_retiros, p.saldo_minimo FROM cuentas c
+     LEFT JOIN productos_ahorro p ON (p.id_producto_ahorro = c.id_producto_ahorro OR (c.id_producto_ahorro IS NULL AND p.nombre = c.tipo_cuenta COLLATE utf8mb4_unicode_ci)) WHERE c.id_cuenta = ?`,
+    [idCuenta]
+  );
+  if (!c) return "Cuenta no encontrada";
+  if (c.permite_retiros === 0) return `La cuenta ${c.tipo_cuenta} no permite retiros.`;
+  if (num(c.saldo_actual) - num(monto) < num(c.saldo_minimo)) {
+    return num(c.saldo_minimo) > 0 ? `La cuenta ${c.tipo_cuenta} debe conservar un saldo mínimo.` : "Saldo insuficiente para realizar el retiro";
+  }
+  return null;
+};
+
 module.exports = {
+  abrirCuentasAutomaticas,
+  impedimentoRetiro,
   diasDelMes,
   saldoPromedio,
   interesDelMes,

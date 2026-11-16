@@ -1484,6 +1484,87 @@ test("contabilidad: apertura, partidas automáticas que cuadran, partidas manual
   cerca(mayor.b.saldo_final, enBalanza.saldo_final);
 });
 
+test("ahorro: productos, intereses del mes, plazo fijo y reglas de retiro", async () => {
+  const prods = (await api("GET", "/ahorro/productos", null, ids.tSuper)).b.data;
+  const viv = prods.find((p) => p.nombre === "Vivienda");
+  assert.equal(parseFloat(viv.tasa_anual), 0, "sin interés hasta configurarlo");
+  assert.equal((await api("PUT", `/ahorro/productos/${viv.id_producto_ahorro}`, { tasa_anual: 6 }, ids.tAdmin)).s, 403);
+  assert.equal((await api("PUT", `/ahorro/productos/${viv.id_producto_ahorro}`, { tasa_anual: 6 }, ids.tSuper)).s, 200);
+
+  // Intereses del mes pasado sobre el saldo promedio diario
+  const [[cv]] = await pool.query("SELECT id_cuenta, saldo_actual FROM cuentas WHERE id_usuario = ? AND tipo_cuenta = 'Vivienda'", [ids.socio]);
+  const { hoyISO } = require("../../utils/fechas");
+  const [y, m] = hoyISO().split("-").map(Number);
+  const anio = m === 1 ? y - 1 : y;
+  const mes = m === 1 ? 12 : m - 1;
+  const p2 = (n) => String(n).padStart(2, "0");
+  await pool.query("DELETE FROM saldos_diarios WHERE id_cuenta = ?", [cv.id_cuenta]);
+  await pool.query("INSERT INTO saldos_diarios (id_cuenta, fecha, saldo) VALUES (?, ?, 3000)", [cv.id_cuenta, `${anio}-${p2(mes)}-01`]);
+  const previa = await api("GET", `/ahorro/intereses/previa?anio=${anio}&mes=${mes}`, null, ids.tSuper);
+  const fila = previa.b.data.find((f) => f.id_cuenta === cv.id_cuenta);
+  assert.equal(fila.saldo_promedio, 3000);
+  const dias = new Date(Date.UTC(anio, mes, 0)).getUTCDate();
+  cerca(fila.interes_bruto, Math.round(3000 * 0.06 * dias / 365 * 100) / 100);
+  assert.equal((await api("POST", "/ahorro/intereses/liquidar", { anio, mes }, ids.tAdmin)).s, 403);
+  const liq = await api("POST", "/ahorro/intereses/liquidar", { anio, mes }, ids.tSuper);
+  assert.equal(liq.s, 200, liq.b?.message);
+  assert.ok(liq.b.cuentas >= 1);
+  const [[despues]] = await pool.query("SELECT saldo_actual FROM cuentas WHERE id_cuenta = ?", [cv.id_cuenta]);
+  cerca(parseFloat(despues.saldo_actual), parseFloat(cv.saldo_actual) + fila.interes_neto);
+  const [[pi]] = await pool.query("SELECT COUNT(*) AS n FROM partidas WHERE origen = 'interes_ahorro' AND origen_id = ?", [cv.id_cuenta]);
+  assert.equal(pi.n, 1, "con su partida contable");
+  assert.equal((await api("POST", "/ahorro/intereses/liquidar", { anio, mes }, ids.tSuper)).b.cuentas, 0, "una sola vez por mes");
+  assert.equal((await api("POST", "/ahorro/intereses/liquidar", { anio: y, mes: m }, ids.tSuper)).s, 400, "el mes en curso no");
+
+  // Plazo fijo
+  const nuevo = await api("POST", "/ahorro/productos", {
+    nombre: "Plazo fijo Prueba", clase: "plazo_fijo", tasa_anual: 8, monto_min: 1000, plazo_min_dias: 30, plazo_max_dias: 365, penalizacion_pct: 50,
+  }, ids.tSuper);
+  assert.equal(nuevo.s, 201, nuevo.b?.message);
+  const idProd = nuevo.b.id_producto_ahorro;
+  assert.equal((await api("POST", "/ahorro/plazos", { id_usuario: ids.socio, id_producto_ahorro: idProd, monto: 500, plazo_dias: 90, origen: "efectivo" }, ids.tSuper)).s, 400, "monto mínimo");
+  const dep = await api("POST", "/ahorro/plazos", { id_usuario: ids.socio, id_producto_ahorro: idProd, monto: 10000, plazo_dias: 90, origen: "efectivo" }, ids.tSuper);
+  assert.equal(dep.s, 201, dep.b?.message);
+  const [[cajaDep]] = await pool.query("SELECT categoria, monto FROM caja_movimientos WHERE referencia_tipo = 'plazo_fijo' AND referencia_id = ?", [dep.b.id_deposito]);
+  assert.equal(cajaDep.categoria, "apertura_plazo");
+  // Retiro anticipado: hay que confirmarlo; el mismo día no genera interés
+  assert.equal((await api("POST", `/ahorro/plazos/${dep.b.id_deposito}/pagar`, { destino: "efectivo" }, ids.tSuper)).s, 409);
+  const ant = await api("POST", `/ahorro/plazos/${dep.b.id_deposito}/pagar`, { destino: "efectivo", confirmar_anticipado: true }, ids.tSuper);
+  assert.equal(ant.s, 200, ant.b?.message);
+  assert.equal(ant.b.anticipado, true);
+  assert.equal(ant.b.total, 10000);
+  assert.equal((await api("POST", `/ahorro/plazos/${dep.b.id_deposito}/pagar`, { destino: "efectivo", confirmar_anticipado: true }, ids.tSuper)).s, 400, "ya pagado");
+
+  // Desde la cuenta de ahorro y pagado al vencer, a la misma cuenta, con el interés completo
+  assert.equal((await api("POST", "/movimientos", { id_cuenta: cv.id_cuenta, tipo: "abono", monto: 1500, descripcion: "Para el plazo fijo" }, ids.tSuper)).s, 200);
+  const [[antesCta]] = await pool.query("SELECT saldo_actual FROM cuentas WHERE id_cuenta = ?", [cv.id_cuenta]);
+  const dep2 = await api("POST", "/ahorro/plazos", { id_usuario: ids.socio, id_producto_ahorro: idProd, monto: 1000, plazo_dias: 180, origen: "cuenta", id_cuenta: cv.id_cuenta }, ids.tSuper);
+  assert.equal(dep2.s, 201, dep2.b?.message);
+  await pool.query("UPDATE depositos_plazo SET fecha_inicio = DATE_SUB(CURDATE(), INTERVAL 181 DAY), fecha_vencimiento = DATE_SUB(CURDATE(), INTERVAL 1 DAY) WHERE id_deposito = ?", [dep2.b.id_deposito]);
+  const alVencer = await api("POST", `/ahorro/plazos/${dep2.b.id_deposito}/pagar`, { destino: "cuenta", id_cuenta: cv.id_cuenta }, ids.tSuper);
+  assert.equal(alVencer.s, 200, alVencer.b?.message);
+  cerca(alVencer.b.interes, 39.45); // 1,000 × 8% × 180 / 365
+  const [[finCta]] = await pool.query("SELECT saldo_actual FROM cuentas WHERE id_cuenta = ?", [cv.id_cuenta]);
+  cerca(parseFloat(finCta.saldo_actual), parseFloat(antesCta.saldo_actual) + 39.45, 0.011); // sale 1,000 y vuelve 1,039.45
+  const mios = await api("GET", "/ahorro/plazos/mios", null, ids.tSocio);
+  assert.equal(mios.s, 200);
+  assert.ok(mios.b.data.length >= 2);
+
+  // Reglas de retiro del producto
+  const apo = prods.find((p) => p.nombre === "Aportaciones");
+  await api("PUT", `/ahorro/productos/${apo.id_producto_ahorro}`, { permite_retiros: false }, ids.tSuper);
+  const [[ca]] = await pool.query("SELECT id_cuenta FROM cuentas WHERE id_usuario = ? AND tipo_cuenta = 'Aportaciones'", [ids.socio]);
+  const ret = await api("POST", "/movimientos", { id_cuenta: ca.id_cuenta, tipo: "retiro", monto: 1, descripcion: "x" }, ids.tSuper);
+  assert.equal(ret.s, 400);
+  assert.match(ret.b.message, /no permite retiros/);
+  await api("PUT", `/ahorro/productos/${apo.id_producto_ahorro}`, { permite_retiros: true }, ids.tSuper);
+
+  // Todo sigue cuadrando
+  const bal = await api("GET", "/libros/balanza", null, ids.tSuper);
+  assert.equal(bal.b.cuadra, true);
+  assert.equal((await api("GET", "/libros/estado", null, ids.tSuper)).b.errores_pendientes, 0);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

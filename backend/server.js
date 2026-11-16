@@ -7,6 +7,7 @@ const pais = require("./utils/pais");
 const { iniciarScheduler } = require("./utils/backupScheduler");
 const { iniciarMoraScheduler } = require("./utils/moraScheduler");
 const { iniciarRecordatoriosScheduler } = require("./utils/recordatorios");
+const { iniciarAhorroScheduler } = require("./utils/ahorro");
 
 const PORT = process.env.PORT || 5000;
 
@@ -35,6 +36,7 @@ aplicarMigraciones()
     iniciarScheduler().catch((e) => logger.error("respaldos_no_programados", e)); // respaldos automáticos
     iniciarMoraScheduler(); // verificación diaria de mora
     iniciarRecordatoriosScheduler(); // recordatorios de pago a los socios (8:00)
+    iniciarAhorroScheduler(); // saldos de cada noche e intereses de ahorro el día 1
 
     app.listen(PORT, () => {
       logger.info("servidor_iniciado", { puerto: PORT });

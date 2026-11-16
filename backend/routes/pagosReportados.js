@@ -7,13 +7,14 @@ const multer = require("multer");
 const pool = require("../db");
 const { notificarAdministradores, notificarSocio, escaparHtml } = require("../utils/notificaciones");
 const { liquidacionAlDia } = require("../utils/calculosPrestamo");
+const { dinero } = require("../utils/pais");
 
 const METODOS = ["Transferencia", "Deposito", "Pago móvil"];
 const MIMES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 const esSocio = (req) => req.usuario?.rol === "Socio";
 const num = (v) => parseFloat(v || 0);
 const texto = (v, max) => String(v || "").trim().substring(0, max);
-const fmt = (n) => `L. ${num(n).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmt = (n) => dinero(num(n));
 
 const subida = multer({
   storage: multer.memoryStorage(),

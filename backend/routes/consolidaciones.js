@@ -12,6 +12,7 @@ const { calcularCuotaMensual, liquidacionAlDia, hoyISO } = require("../utils/cal
 const { registrarCaja } = require("../utils/caja");
 const { crearRecibo } = require("../utils/recibos");
 const { notificarSocio } = require("../utils/notificaciones");
+const { dinero } = require("../utils/pais");
 
 const num = (v) => parseFloat(v || 0);
 const redondear = (v) => parseFloat(num(v).toFixed(2));
@@ -219,7 +220,7 @@ router.post("/", soloSuperAdmin, async (req, res) => {
         socio.id_usuario,
         "Consolidación de préstamos",
         `Préstamos ${c.prestamos.map((p) => "#" + p.id_prestamo).join(", ")} consolidados en #${idNuevo}: ` +
-          `L. ${c.monto_nuevo.toFixed(2)} a ${c.plazo_meses} meses, ${c.tasa_mensual}% mensual. Motivo: ${motivo}`,
+          `${dinero(c.monto_nuevo)} a ${c.plazo_meses} meses, ${c.tasa_mensual}% mensual. Motivo: ${motivo}`,
       ]
     );
 
@@ -229,8 +230,8 @@ router.post("/", soloSuperAdmin, async (req, res) => {
       socio.id_usuario,
       "Tus préstamos fueron consolidados",
       `<p>Tus préstamos ${c.prestamos.map((p) => "#" + p.id_prestamo).join(", ")} se unieron en uno solo por ` +
-        `<strong>L. ${c.monto_nuevo.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</strong> a ${c.plazo_meses} meses. ` +
-        `Tu nueva cuota mensual es de <strong>L. ${c.cuota_nueva.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</strong>. ` +
+        `<strong>${dinero(c.monto_nuevo)}</strong> a ${c.plazo_meses} meses. ` +
+        `Tu nueva cuota mensual es de <strong>${dinero(c.cuota_nueva)}</strong>. ` +
         `Revisa y firma el convenio en tu cuenta.</p>`,
       undefined,
       { tipo: "consolidacion", idRecibo }

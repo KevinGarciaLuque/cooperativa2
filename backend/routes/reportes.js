@@ -4,6 +4,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const ExcelJS = require("exceljs");
+const { dinero, locale } = require("../utils/pais");
 
 // ============================================
 // FUNCIÓN AUXILIAR: CONFIGURAR ESTILOS DE EXCEL
@@ -20,7 +21,7 @@ function aplicarEstilosEncabezado(worksheet) {
 }
 
 function formatearMoneda(valor) {
-  return `L. ${parseFloat(valor).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
+  return dinero(valor);
 }
 
 // ============================================
@@ -64,7 +65,7 @@ router.get("/estado-cuenta/:id_usuario", async (req, res) => {
     worksheet.mergeCells('A3:F3');
     const fechaReporte = fecha_inicio && fecha_fin 
       ? `Período: ${fecha_inicio} al ${fecha_fin}` 
-      : `Fecha de generación: ${new Date().toLocaleDateString('es-HN')}`;
+      : `Fecha de generación: ${new Date().toLocaleDateString(locale())}`;
     worksheet.getCell('A3').value = fechaReporte;
 
     // Espacio
@@ -116,7 +117,7 @@ router.get("/estado-cuenta/:id_usuario", async (req, res) => {
       } else {
         movimientos.forEach((m) => {
           worksheet.addRow([
-            new Date(m.fecha).toLocaleString('es-HN'),
+            new Date(m.fecha).toLocaleString(locale()),
             m.tipo,
             formatearMoneda(m.monto),
             formatearMoneda(m.saldo_anterior),
@@ -178,7 +179,7 @@ router.get("/balance-general", async (req, res) => {
     worksheet.mergeCells('A2:C2');
     const fechaReporte = fecha_inicio && fecha_fin 
       ? `Período: ${fecha_inicio} al ${fecha_fin}` 
-      : `Al ${new Date().toLocaleDateString('es-HN')}`;
+      : `Al ${new Date().toLocaleDateString(locale())}`;
     worksheet.getCell('A2').value = fechaReporte;
     worksheet.getCell('A2').alignment = { horizontal: 'center' };
 
@@ -364,7 +365,7 @@ router.get("/prestamos-activos", async (req, res) => {
     worksheet.getCell('A1').alignment = { horizontal: 'center' };
 
     worksheet.mergeCells('A2:J2');
-    worksheet.getCell('A2').value = `Fecha de generación: ${new Date().toLocaleDateString('es-HN')}`;
+    worksheet.getCell('A2').value = `Fecha de generación: ${new Date().toLocaleDateString(locale())}`;
     worksheet.getCell('A2').alignment = { horizontal: 'center' };
 
     worksheet.addRow([]);
@@ -399,7 +400,7 @@ router.get("/prestamos-activos", async (req, res) => {
         `${parseFloat(p.tasa_interes)}%`,
         p.plazo_meses,
         p.cuota_calculada != null ? formatearMoneda(p.cuota_calculada) : "N/A",
-        new Date(p.fecha_otorgado).toLocaleDateString('es-HN'),
+        new Date(p.fecha_otorgado).toLocaleDateString(locale()),
         p.estado
       ]);
 
@@ -484,7 +485,7 @@ router.get("/morosidad", async (req, res) => {
     worksheet.getCell('A1').alignment = { horizontal: 'center' };
 
     worksheet.mergeCells('A2:K2');
-    worksheet.getCell('A2').value = `Fecha de generación: ${new Date().toLocaleDateString('es-HN')}`;
+    worksheet.getCell('A2').value = `Fecha de generación: ${new Date().toLocaleDateString(locale())}`;
     worksheet.getCell('A2').alignment = { horizontal: 'center' };
 
     worksheet.addRow([]);
@@ -525,7 +526,7 @@ router.get("/morosidad", async (req, res) => {
         diasMora,
         formatearMoneda(interesMora),
         formatearMoneda(totalAdeudado),
-        new Date(p.fecha_aprobacion).toLocaleDateString('es-HN'),
+        new Date(p.fecha_aprobacion).toLocaleDateString(locale()),
         p.estado
       ]);
 
@@ -650,7 +651,7 @@ router.get("/aportaciones", async (req, res) => {
     worksheet.mergeCells('A2:G2');
     const fechaReporte = fecha_inicio && fecha_fin 
       ? `Período: ${fecha_inicio} al ${fecha_fin}` 
-      : `Fecha de generación: ${new Date().toLocaleDateString('es-HN')}`;
+      : `Fecha de generación: ${new Date().toLocaleDateString(locale())}`;
     worksheet.getCell('A2').value = fechaReporte;
     worksheet.getCell('A2').alignment = { horizontal: 'center' };
 
@@ -680,8 +681,8 @@ router.get("/aportaciones", async (req, res) => {
         a.dni,
         a.total_aportaciones,
         formatearMoneda(a.total_aportado),
-        a.primera_aportacion ? new Date(a.primera_aportacion).toLocaleDateString('es-HN') : '',
-        a.ultima_aportacion ? new Date(a.ultima_aportacion).toLocaleDateString('es-HN') : ''
+        a.primera_aportacion ? new Date(a.primera_aportacion).toLocaleDateString(locale()) : '',
+        a.ultima_aportacion ? new Date(a.ultima_aportacion).toLocaleDateString(locale()) : ''
       ]);
 
       totalGeneral += parseFloat(a.total_aportado);
@@ -776,7 +777,7 @@ router.get("/liquidaciones", async (req, res) => {
     worksheet.mergeCells('A2:I2');
     const fechaReporte = fecha_inicio && fecha_fin 
       ? `Período: ${fecha_inicio} al ${fecha_fin}` 
-      : `Fecha de generación: ${new Date().toLocaleDateString('es-HN')}`;
+      : `Fecha de generación: ${new Date().toLocaleDateString(locale())}`;
     worksheet.getCell('A2').value = fechaReporte;
     worksheet.getCell('A2').alignment = { horizontal: 'center' };
 
@@ -812,7 +813,7 @@ router.get("/liquidaciones", async (req, res) => {
         l.total_socios_beneficiados,
         formatearMoneda(l.monto_desembolsado || 0),
         formatearMoneda(l.monto_pendiente || 0),
-        new Date(l.fecha).toLocaleDateString('es-HN')
+        new Date(l.fecha).toLocaleDateString(locale())
       ]);
 
       totalDistribuido += parseFloat(l.monto_total);
@@ -889,7 +890,7 @@ router.get("/flujo-caja", async (req, res) => {
     worksheet.mergeCells('A2:D2');
     const fechaReporte = fecha_inicio && fecha_fin 
       ? `Período: ${fecha_inicio} al ${fecha_fin}` 
-      : `Fecha de generación: ${new Date().toLocaleDateString('es-HN')}`;
+      : `Fecha de generación: ${new Date().toLocaleDateString(locale())}`;
     worksheet.getCell('A2').value = fechaReporte;
     worksheet.getCell('A2').alignment = { horizontal: 'center' };
 

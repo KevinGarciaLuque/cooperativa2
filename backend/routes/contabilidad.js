@@ -4,6 +4,7 @@ const router = express.Router();
 const ExcelJS = require("exceljs");
 const pool = require("../db");
 const { obtenerCartera, resumirCartera, CATEGORIAS } = require("../utils/cartera");
+const { dinero, locale } = require("../utils/pais");
 
 const num = (v) => parseFloat(v || 0);
 const redondear = (v) => parseFloat(num(v).toFixed(2));
@@ -312,7 +313,7 @@ router.post("/cierre-mensual", async (req, res) => {
     );
     await pool.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
-      [req.usuario?.id_usuario, "Cierre mensual", `Se cerró ${String(mes).padStart(2, "0")}/${anio}. Excedente: L. ${datos.resultados.excedente.toFixed(2)}`]
+      [req.usuario?.id_usuario, "Cierre mensual", `Se cerró ${String(mes).padStart(2, "0")}/${anio}. Excedente: ${dinero(datos.resultados.excedente)}`]
     );
     res.status(201).json({ success: true, message: "Mes cerrado correctamente." });
   } catch (error) {
@@ -452,7 +453,7 @@ router.get("/exportar/antiguedad-cartera", async (req, res) => {
     const { resumen, totales } = resumirCartera(filas);
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Antigüedad de cartera");
-    await encabezadoExcel(ws, "Antigüedad de cartera", `Al ${new Date().toLocaleDateString("es-HN")}`, 6);
+    await encabezadoExcel(ws, "Antigüedad de cartera", `Al ${new Date().toLocaleDateString(locale())}`, 6);
 
     estiloEncabezado(ws.addRow(["Categoría", "Préstamos", "Saldo", "Mora generada", "% provisión", "Provisión"]));
     CATEGORIAS.forEach((c) => {
@@ -524,7 +525,7 @@ router.get("/exportar/situacion-financiera", async (req, res) => {
     const s = await situacionFinanciera();
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Situación financiera");
-    await encabezadoExcel(ws, "Situación financiera (administrativa)", `Al ${new Date().toLocaleDateString("es-HN")}`, 2);
+    await encabezadoExcel(ws, "Situación financiera (administrativa)", `Al ${new Date().toLocaleDateString(locale())}`, 2);
 
     const seccion = (t) => {
       const row = ws.addRow([t, ""]);

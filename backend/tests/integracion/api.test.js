@@ -1083,6 +1083,41 @@ test("número de socio: correlativo, sin tocar al personal ni a los pendientes",
   assert.equal(otra.numero_socio, n.numero_socio);
 });
 
+test("país: Honduras por defecto; el Super Administrador lo cambia y valida el documento del país", async () => {
+  const cfg = await api("GET", "/configuracion");
+  assert.equal(cfg.b.data.pais, "HN");
+  assert.equal(cfg.b.data.pais_datos.moneda.simbolo, "L.");
+  assert.ok(cfg.b.data.paises.some((p) => p.codigo === "GT"));
+
+  assert.equal((await api("PUT", "/configuracion", { pais: "GT" }, ids.tAdmin)).s, 403);
+  assert.equal((await api("PUT", "/configuracion", { pais: "XX" }, ids.tSuper)).s, 400);
+  try {
+    assert.equal((await api("PUT", "/configuracion", { pais: "GT" }, ids.tSuper)).s, 200);
+    const gt = await api("GET", "/configuracion");
+    assert.equal(gt.b.data.pais_datos.identidad.nombre, "DPI");
+
+    const datos = {
+      nombre_completo: "Socia Guatemala Prueba", password: "Clave1234", rol_id: 2,
+      telefono: "55551234", correo: "guate@prueba.hn", fecha_nacimiento: "1990-01-01",
+    };
+    const malo = await api("POST", "/usuarios", { ...datos, dni: "12345" }, ids.tSuper);
+    assert.equal(malo.s, 400);
+    assert.match(malo.b.message, /DPI/);
+    // el DPI se acepta con espacios y se guarda limpio
+    const ok = await api("POST", "/usuarios", { ...datos, dni: "2547 89632 0101" }, ids.tSuper);
+    assert.equal(ok.s, 201, ok.b?.message);
+    const [[u]] = await pool.query("SELECT dni FROM usuarios WHERE id_usuario = ?", [ok.b.id_usuario]);
+    assert.equal(u.dni, "2547896320101");
+    // y se puede entrar escribiéndolo con espacios
+    const login = await api("POST", "/usuarios/login", { dni: "2547 89632 0101", password: "Clave1234" });
+    assert.equal(login.s, 200);
+  } finally {
+    assert.equal((await api("PUT", "/configuracion", { pais: "HN" }, ids.tSuper)).s, 200);
+  }
+  const hn = await api("GET", "/configuracion");
+  assert.equal(hn.b.data.pais, "HN");
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

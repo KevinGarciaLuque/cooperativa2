@@ -6,11 +6,13 @@ const pool = require("../db");
 const config = require("./configFinanciera");
 const { obtenerCartera } = require("./cartera");
 const { notificarSocio, correoConfigurado, escaparHtml } = require("./notificaciones");
+const { dinero, locale } = require("./pais");
+const { zona } = require("./fechas");
 
-const fmt = (n) => `L. ${parseFloat(n || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmt = (n) => dinero(n);
 const fechaLarga = (iso) => {
   const [y, m, d] = String(iso).split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString("es-HN", {
+  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString(locale(), {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -128,9 +130,9 @@ const iniciarRecordatoriosScheduler = () => {
       console.error("Error al enviar los recordatorios de pago:", error.message);
     }
   };
-  // Todos los días a las 8:00 de la mañana, hora de Honduras
+  // Todos los días a las 8:00 de la mañana, hora de la cooperativa
   try {
-    cron.schedule("0 8 * * *", tarea, { timezone: "America/Tegucigalpa" });
+    cron.schedule("0 8 * * *", tarea, { timezone: zona() });
   } catch {
     cron.schedule("0 14 * * *", tarea); // 8:00 en Honduras (UTC-6)
   }

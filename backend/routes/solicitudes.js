@@ -10,6 +10,7 @@ const { notificarAdministradores, notificarSocio, escaparHtml } = require("../ut
 const { datosCarta, generarCartaPdf, enviarCartaAprobacion, avisarAprobacion, nombreArchivoCarta } = require("../utils/cartaAprobacion");
 const { invalidarEstado } = require("../middleware/seguridad");
 const { asignarNumeroSocio } = require("../utils/numeroSocio");
+const { dinero } = require("../utils/pais");
 
 const num = (v) => parseFloat(v || 0);
 const esSocio = (req) => req.usuario?.rol === "Socio";
@@ -82,7 +83,7 @@ router.post("/prestamo", async (req, res) => {
       [
         req.usuario.id_usuario,
         "Solicitud de préstamo",
-        `${req.usuario.nombre_completo || "Socio"} solicitó L. ${monto.toFixed(2)} a ${plazo} meses (cuota estimada L. ${cuotaEstimada.toFixed(2)}). Préstamo #${idPrestamo}`,
+        `${req.usuario.nombre_completo || "Socio"} solicitó ${dinero(monto)} a ${plazo} meses (cuota estimada ${dinero(cuotaEstimada)}). Préstamo #${idPrestamo}`,
       ]
     );
 
@@ -90,7 +91,7 @@ router.post("/prestamo", async (req, res) => {
 
     notificarAdministradores(
       "Nueva solicitud de préstamo",
-      `<p><strong>${req.usuario.nombre_completo || "Un socio"}</strong> solicitó <strong>L. ${monto.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</strong> a ${plazo} meses.</p>`
+      `<p><strong>${req.usuario.nombre_completo || "Un socio"}</strong> solicitó <strong>${dinero(monto)}</strong> a ${plazo} meses.</p>`
     );
 
     res.status(201).json({
@@ -367,7 +368,7 @@ router.post("/prestamos/:id/aprobar", soloPersonal, async (req, res) => {
     );
     await connection.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
-      [p.id_usuario, "Préstamo aprobado", `Solicitud #${req.params.id} aprobada: L. ${monto.toFixed(2)} a ${plazo} meses, ${tasaMensual}% mensual. Pendiente de desembolso.`]
+      [p.id_usuario, "Préstamo aprobado", `Solicitud #${req.params.id} aprobada: ${dinero(monto)} a ${plazo} meses, ${tasaMensual}% mensual. Pendiente de desembolso.`]
     );
     await connection.commit();
 

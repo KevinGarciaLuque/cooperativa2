@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const configFin = require("../utils/configFinanciera");
+const paisUtil = require("../utils/pais");
 const archivos = require("../utils/archivos");
 const { verificarToken } = require("../middleware/auth");
 const multer = require("multer");
@@ -55,6 +56,7 @@ const DEFAULTS = {
     "Gestión de socios y roles",
   ]),
   logo_url: "",
+  pais: paisUtil.PREDETERMINADO, // moneda, identidad, teléfono y zona horaria (utils/pais.js)
 };
 
 // ============================================================
@@ -94,6 +96,15 @@ router.get("/", async (req, res) => {
         try { resultado[key] = JSON.parse(resultado[key]); } catch { /* mantener como string */ }
       }
     });
+
+    // Datos del país (moneda, identidad, teléfono) y la lista para elegirlo en Configuración
+    if (!paisUtil.PAISES[resultado.pais]) resultado.pais = paisUtil.PREDETERMINADO;
+    resultado.pais_datos = paisUtil.PAISES[resultado.pais];
+    resultado.paises = Object.values(paisUtil.PAISES).map(({ codigo, nombre, moneda }) => ({
+      codigo,
+      nombre,
+      moneda: `${moneda.nombre} (${moneda.simbolo})`,
+    }));
 
     res.json({ success: true, data: resultado });
   } catch (error) {
@@ -193,6 +204,10 @@ router.put("/", verificarToken, soloSuperAdmin, async (req, res) => {
       return res.status(400).json({ message: `Claves no permitidas: ${clavesInvalidas.join(", ")}` });
     }
 
+    if (campos.pais !== undefined && !paisUtil.PAISES[campos.pais]) {
+      return res.status(400).json({ message: "País no válido." });
+    }
+
     // Serializar arrays/objetos a JSON
     for (const key of claves) {
       if (typeof campos[key] === "object") {
@@ -209,6 +224,8 @@ router.put("/", verificarToken, soloSuperAdmin, async (req, res) => {
         [clave, valor]
       );
     }
+
+    if (campos.pais !== undefined) await paisUtil.refrescar();
 
     res.json({ success: true, message: "Configuración guardada correctamente." });
   } catch (error) {

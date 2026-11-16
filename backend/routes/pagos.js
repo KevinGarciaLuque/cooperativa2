@@ -5,6 +5,7 @@ const { notificarSocio, crearNotificacion } = require("../utils/notificaciones")
 const jwt = require("jsonwebtoken");
 const { registrarCaja } = require("../utils/caja");
 const { crearRecibo, emitirFiniquito } = require("../utils/recibos");
+const { dinero } = require("../utils/pais");
 const {
   calcularCuotaMensual,
   calcularDiasMora,
@@ -334,7 +335,7 @@ router.post("/", async (req, res) => {
 
     if (montoPagadoNum < interesMoratorio - 0.005) {
       return fail(400, {
-        message: `El pago no alcanza a cubrir la mora generada (L. ${interesMoratorio.toFixed(2)}).`,
+        message: `El pago no alcanza a cubrir la mora generada (${dinero(interesMoratorio)}).`,
         interes_moratorio: parseFloat(interesMoratorio.toFixed(2)),
       });
     }
@@ -343,7 +344,7 @@ router.post("/", async (req, res) => {
     const totalAdeudado = parseFloat((saldoActual + interesDelPeriodo + interesMoratorio).toFixed(2));
     if (montoPagadoNum > totalAdeudado + 0.01) {
       return fail(400, {
-        message: `El monto (L. ${montoPagadoNum.toFixed(2)}) excede el total adeudado (L. ${totalAdeudado.toFixed(2)}).`,
+        message: `El monto (${dinero(montoPagadoNum)}) excede el total adeudado (${dinero(totalAdeudado)}).`,
         total_adeudado: totalAdeudado,
       });
     }
@@ -375,7 +376,7 @@ router.post("/", async (req, res) => {
       categoria: "pago_prestamo",
       monto: montoPagadoNum,
       metodo: metodo_pago,
-      descripcion: `Pago préstamo #${id_prestamo} (capital L. ${capitalDelPeriodo.toFixed(2)}, interés L. ${interesEfectivo.toFixed(2)}${interesMoratorio > 0 ? `, mora L. ${interesMoratorio.toFixed(2)}` : ""})`,
+      descripcion: `Pago préstamo #${id_prestamo} (capital ${dinero(capitalDelPeriodo)}, interés ${dinero(interesEfectivo)}${interesMoratorio > 0 ? `, mora ${dinero(interesMoratorio)}` : ""})`,
       referencia_tipo: "pago",
       referencia_id: nuevoPagoId,
       id_socio: prestamoData.id_usuario,
@@ -429,13 +430,13 @@ router.post("/", async (req, res) => {
     }
 
     // Registrar en bitácora
-    let detalleBitacora = `Pago de L. ${montoPagadoNum.toFixed(2)} registrado en préstamo #${id_prestamo}. Saldo actualizado: L. ${nuevoSaldo.toFixed(2)}`;
+    let detalleBitacora = `Pago de ${dinero(montoPagadoNum)} registrado en préstamo #${id_prestamo}. Saldo actualizado: ${dinero(nuevoSaldo)}`;
     
     if (interesMoratorio > 0) {
-      detalleBitacora += `. Incluye interés moratorio: L. ${interesMoratorio.toFixed(2)} (${diasMora} días de mora)`;
+      detalleBitacora += `. Incluye interés moratorio: ${dinero(interesMoratorio)} (${diasMora} días de mora)`;
     }
     if (moraCondonada) {
-      detalleBitacora += `. MORA OMITIDA por Super Administrador: L. ${moraGenerada.toFixed(2)} (${diasMora} días de mora)`;
+      detalleBitacora += `. MORA OMITIDA por Super Administrador: ${dinero(moraGenerada)} (${diasMora} días de mora)`;
     }
     
     if (prestamoLiquidado) {
@@ -459,7 +460,7 @@ router.post("/", async (req, res) => {
     await connection.commit();
 
     // Aviso al socio con su recibo: por correo si reportó el pago desde la app, y siempre en su campanita
-    const lps = (n) => `L. ${n.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const lps = dinero;
     const tituloAviso = prestamoLiquidado
       ? `¡Préstamo #${id_prestamo} cancelado!`
       : reporte
@@ -818,7 +819,7 @@ router.put("/:id", async (req, res) => {
           categoria: "ajuste_pago",
           monto: Math.abs(diferenciaCaja),
           metodo: metodoNorm,
-          descripcion: `Ajuste por edición del pago #${req.params.id}: de L. ${montoAnterior.toFixed(2)} a L. ${montoPagadoNum.toFixed(2)}`,
+          descripcion: `Ajuste por edición del pago #${req.params.id}: de ${dinero(montoAnterior)} a ${dinero(montoPagadoNum)}`,
           referencia_tipo: "pago",
           referencia_id: parseInt(req.params.id),
           id_socio: pagoData.id_usuario,
@@ -949,7 +950,7 @@ router.delete("/:id", async (req, res) => {
       [
         pagoData.id_usuario,
         "Anulación de pago",
-        `Pago #${req.params.id} anulado. Monto: L. ${parseFloat(pagoData.monto_pagado).toFixed(2)}. Saldo restaurado a: L. ${nuevoSaldo.toFixed(2)}. Motivo: ${motivo}`
+        `Pago #${req.params.id} anulado. Monto: ${dinero(parseFloat(pagoData.monto_pagado))}. Saldo restaurado a: ${dinero(nuevoSaldo)}. Motivo: ${motivo}`
       ]
     );
 

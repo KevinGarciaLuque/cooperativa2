@@ -3,6 +3,7 @@
 const config = require("./configFinanciera");
 const { calcularCuotaMensual } = require("./calculosPrestamo");
 const { formatearNombre } = require("./nombres");
+const { dinero } = require("./pais");
 
 const PROPOSITOS = ["negocio", "vivienda", "educacion", "salud", "agricultura", "consumo", "otro"];
 const OCUPACIONES = ["empleado", "negocio_propio", "agricultor", "independiente", "jubilado", "otro"];
@@ -33,7 +34,7 @@ const validarSolicitud = (b = {}) => {
   const ingreso = num(b.ingreso_mensual);
 
   if (!(monto > 0) || monto > c.sol_monto_max) {
-    return { error: `El monto debe ser mayor a 0 y no superar L. ${c.sol_monto_max.toLocaleString("es-HN")}.` };
+    return { error: `El monto debe ser mayor a 0 y no superar ${dinero(c.sol_monto_max)}.` };
   }
   if (!Number.isInteger(plazo) || plazo < 1 || plazo > c.sol_plazo_max) {
     return { error: `El plazo debe estar entre 1 y ${c.sol_plazo_max} meses.` };

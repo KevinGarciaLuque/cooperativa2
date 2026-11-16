@@ -8,6 +8,7 @@ const pool = require("../db");
 const { calcularCuotaMensual } = require("./calculosPrestamo");
 const { notificarSocio, escaparHtml, correoConfigurado } = require("./notificaciones");
 const { leerFirma } = require("./firmas");
+const { dinero, locale } = require("./pais");
 
 // Estados en los que el préstamo ya fue aprobado alguna vez. Un préstamo registrado
 // directamente (sin pasar por "aprobado") no tiene fecha de aprobación: se usa la de otorgado.
@@ -15,10 +16,10 @@ const ESTADOS_APROBADOS = ["aprobado", "activo", "mora", "pagado"];
 
 const num = (v) => parseFloat(v || 0);
 const fmt = (n) =>
-  `L. ${num(n).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  dinero(num(n));
 const fechaLarga = (f) => {
   const d = new Date(f);
-  return isNaN(d) ? "" : d.toLocaleDateString("es-HN", { day: "numeric", month: "long", year: "numeric" });
+  return isNaN(d) ? "" : d.toLocaleDateString(locale(), { day: "numeric", month: "long", year: "numeric" });
 };
 
 const leerConfig = async (clave) => {

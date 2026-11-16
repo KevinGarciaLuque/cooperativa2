@@ -2,6 +2,8 @@ const cron = require("node-cron");
 const fs = require("fs");
 const path = require("path");
 const pool = require("../db");
+const { locale } = require("./pais");
+const { zona } = require("./fechas");
 
 const CONFIG_FILE = path.join(__dirname, "../backup_config.json");
 // En Railway, apunta BACKUPS_DIR a un volumen persistente (ej. /data/backups)
@@ -46,7 +48,7 @@ async function generarSQL() {
   lines.push(`-- ============================================`);
   lines.push(`-- BACKUP BASE DE DATOS: ${dbName}`);
   lines.push(
-    `-- Fecha y hora: ${now.toLocaleDateString("es-HN")} ${now.toLocaleTimeString("es-HN")}`
+    `-- Fecha y hora: ${now.toLocaleDateString(locale())} ${now.toLocaleTimeString(locale())}`
   );
   lines.push(`-- Generado por Demo`);
   lines.push(`-- ============================================`);
@@ -164,7 +166,7 @@ function iniciarScheduler() {
 
   try {
     currentTask = cron.schedule(expr, ejecutarBackup, {
-      timezone: "America/Tegucigalpa",
+      timezone: zona(),
     });
   } catch (_tzErr) {
     // Fallback si la versión de node-cron no soporta timezone

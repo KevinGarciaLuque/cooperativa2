@@ -6,6 +6,7 @@ const { crearRecibo } = require("../utils/recibos");
 const { actualizarEstadosMora } = require("../utils/moraScheduler");
 const { notificarSocio, crearNotificacion, escaparHtml } = require("../utils/notificaciones");
 const { avisarAprobacion } = require("../utils/cartaAprobacion");
+const { dinero } = require("../utils/pais");
 const {
   calcularCuotaMensual,
   generarTablaAmortizacion,
@@ -285,7 +286,7 @@ router.post("/solicitar", async (req, res) => {
       [
         id_usuario,
         "Solicitud de préstamo",
-        `Solicitud de préstamo por L. ${montoNum.toFixed(2)} a ${plazoNum} meses. Cuota mensual: L. ${cuotaMensual.toFixed(2)}`
+        `Solicitud de préstamo por ${dinero(montoNum)} a ${plazoNum} meses. Cuota mensual: ${dinero(cuotaMensual)}`
       ]
     );
 
@@ -341,7 +342,7 @@ router.patch("/:id/aprobar", async (req, res) => {
     );
     await connection.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
-      [p.id_usuario, "Préstamo aprobado", `Préstamo #${req.params.id} por L. ${parseFloat(p.monto).toFixed(2)} aprobado. Pendiente de desembolso.`]
+      [p.id_usuario, "Préstamo aprobado", `Préstamo #${req.params.id} por ${dinero(parseFloat(p.monto))} aprobado. Pendiente de desembolso.`]
     );
     await connection.commit();
     const avisoCarta = await avisarAprobacion(p.id_prestamo, p.id_usuario);
@@ -447,13 +448,13 @@ router.post("/:id/desembolsar", async (req, res) => {
 
     await connection.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
-      [p.id_usuario, "Desembolso de préstamo", `Préstamo #${req.params.id} desembolsado por L. ${monto.toFixed(2)} (${metodo}${detalleCuenta ? ", " + detalleCuenta : ""})`]
+      [p.id_usuario, "Desembolso de préstamo", `Préstamo #${req.params.id} desembolsado por ${dinero(monto)} (${metodo}${detalleCuenta ? ", " + detalleCuenta : ""})`]
     );
 
     await connection.commit();
     crearNotificacion(p.id_usuario, {
       titulo: `Préstamo #${req.params.id} desembolsado`,
-      mensaje: `Te entregamos L. ${monto.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} de tu préstamo. Puedes ver el comprobante de entrega.`,
+      mensaje: `Te entregamos ${dinero(monto)} de tu préstamo. Puedes ver el comprobante de entrega.`,
       tipo: "prestamo",
       idRecibo,
     });
@@ -494,7 +495,7 @@ router.patch("/:id/rechazar", async (req, res) => {
     notificarSocio(
       p.id_usuario,
       "Respuesta a tu solicitud de préstamo",
-      `<p>Lamentamos informarte que tu solicitud de préstamo por L. ${parseFloat(p.monto).toLocaleString("es-HN", { minimumFractionDigits: 2 })} no fue aprobada.</p>
+      `<p>Lamentamos informarte que tu solicitud de préstamo por ${dinero(parseFloat(p.monto))} no fue aprobada.</p>
        <p><strong>Motivo:</strong> ${escaparHtml(motivo)}</p>
        <p>Si tienes dudas, comunícate con la cooperativa.</p>`
     );
@@ -532,7 +533,7 @@ router.patch("/:id/estado", async (req, res) => {
     // Solo se marca como pagado un préstamo sin saldo (el saldo se salda registrando el pago)
     if (estado === 'pagado' && parseFloat(prestamo[0].saldo_restante) > 0.01) {
       return res.status(409).json({
-        message: `El préstamo aún tiene saldo (L. ${parseFloat(prestamo[0].saldo_restante).toFixed(2)}). Regístralo como pago de liquidación.`,
+        message: `El préstamo aún tiene saldo (${dinero(parseFloat(prestamo[0].saldo_restante))}). Regístralo como pago de liquidación.`,
       });
     }
 
@@ -658,7 +659,7 @@ router.post("/:id/liquidar", async (req, res) => {
       [
         c.prestamo.id_usuario,
         "Liquidación de préstamo",
-        `Préstamo #${req.params.id} liquidado. Capital: L. ${c.saldo.toFixed(2)}, interés (${c.dias} días): L. ${c.interes.toFixed(2)}, mora (${c.dias_mora} días): L. ${c.mora.toFixed(2)}, total: L. ${c.total.toFixed(2)}`,
+        `Préstamo #${req.params.id} liquidado. Capital: ${dinero(c.saldo)}, interés (${c.dias} días): ${dinero(c.interes)}, mora (${c.dias_mora} días): ${dinero(c.mora)}, total: ${dinero(c.total)}`,
       ]
     );
 
@@ -837,7 +838,7 @@ router.post("/", async (req, res) => {
 
     await connection.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
-      [id_usuario, "Registro de préstamo", `Préstamo por L. ${montoNum.toFixed(2)} a ${plazoNum} meses. Cuota: L. ${cuotaMensual.toFixed(2)}`]
+      [id_usuario, "Registro de préstamo", `Préstamo por ${dinero(montoNum)} a ${plazoNum} meses. Cuota: ${dinero(cuotaMensual)}`]
     );
 
     await connection.commit();
@@ -919,7 +920,7 @@ router.put("/:id", async (req, res) => {
     if (nuevoEstado === 'pagado' && actual.estado !== 'pagado' && saldoActual > 0.01) {
       await connection.rollback();
       return res.status(409).json({
-        message: `El préstamo aún tiene saldo (L. ${saldoActual.toFixed(2)}). Regístralo como pago de liquidación en Pagos.`,
+        message: `El préstamo aún tiene saldo (${dinero(saldoActual)}). Regístralo como pago de liquidación en Pagos.`,
       });
     }
 
@@ -953,7 +954,7 @@ router.put("/:id", async (req, res) => {
 
     // Bitácora de los cambios relevantes
     const cambios = [];
-    if (Math.abs(montoNum - parseFloat(actual.monto)) >= 0.01) cambios.push(`monto L. ${parseFloat(actual.monto).toFixed(2)} → L. ${montoNum.toFixed(2)}`);
+    if (Math.abs(montoNum - parseFloat(actual.monto)) >= 0.01) cambios.push(`monto ${dinero(parseFloat(actual.monto))} → ${dinero(montoNum)}`);
     if (Math.abs(tasaNum - parseFloat(actual.tasa_interes)) >= 0.0001) cambios.push(`tasa anual ${parseFloat(actual.tasa_interes)}% → ${tasaNum}%`);
     if (plazoNum !== actual.plazo_meses) cambios.push(`plazo ${actual.plazo_meses} → ${plazoNum} meses`);
     if (nuevoEstado !== actual.estado) cambios.push(`estado ${actual.estado} → ${nuevoEstado}`);
@@ -1034,7 +1035,7 @@ router.delete("/:id", async (req, res) => {
       [
         p.id_usuario,
         "Eliminación de préstamo",
-        `Préstamo #${id} por L. ${parseFloat(p.monto).toFixed(2)} eliminado (estado: ${p.estado})`,
+        `Préstamo #${id} por ${dinero(parseFloat(p.monto))} eliminado (estado: ${p.estado})`,
       ]
     );
 

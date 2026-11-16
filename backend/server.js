@@ -3,6 +3,7 @@ const app = require("./app");
 const logger = require("./utils/logger");
 const { aplicarMigraciones } = require("./utils/migraciones");
 const configFinanciera = require("./utils/configFinanciera");
+const pais = require("./utils/pais");
 const { iniciarScheduler } = require("./utils/backupScheduler");
 const { iniciarMoraScheduler } = require("./utils/moraScheduler");
 const { iniciarRecordatoriosScheduler } = require("./utils/recordatorios");
@@ -21,6 +22,8 @@ aplicarMigraciones()
     // Un fallo de migración no debe impedir que el sistema siga funcionando
     logger.error("migraciones_fallidas", error);
   })
+  // El país se lee antes de programar tareas: define la zona horaria de los procesos diarios
+  .then(() => pais.iniciar())
   .finally(() => {
     // Copia a la base de datos las fotos y logos que existan en disco
     require("./utils/archivos")

@@ -13,8 +13,9 @@ const { parametrosSolicitud, validarSolicitud, insertarSolicitud } = require("..
 const { subidaIdentidad, mensajeErrorSubida, guardarLado } = require("../utils/identidad");
 const { formatearNombre } = require("../utils/nombres");
 
-const validarDNI = (v) => /^\d{13}$/.test(v);
-const { validarTelefono, limpiarTelefono } = require("../utils/telefono");
+const { validarIdentidad: validarDNI, normalizarIdentidad, mensajeIdentidad } = require("../utils/pais");
+const { validarTelefono, limpiarTelefono, mensajeTelefono } = require("../utils/telefono");
+const { dinero } = require("../utils/pais");
 const validarEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 const mayorDeEdad = (fecha) => {
   const f = new Date(fecha);
@@ -75,6 +76,7 @@ const recibirFormulario = (req, res, next) =>
 router.post("/", recibirFormulario, async (req, res) => {
   let connection;
   try {
+    if (req.body?.dni) req.body.dni = normalizarIdentidad(req.body.dni);
     const {
       nombre_completo,
       dni,
@@ -103,12 +105,12 @@ router.post("/", recibirFormulario, async (req, res) => {
       return res.status(400).json({ message: "Escribe tu nombre completo (nombre y apellido)." });
     }
     if (!validarDNI(String(dni || ""))) {
-      return res.status(400).json({ message: "La identidad debe tener 13 dígitos, sin guiones." });
+      return res.status(400).json({ message: mensajeIdentidad() });
     }
     const tel = limpiarTelefono(telefono);
     if (!validarTelefono(tel)) {
       return res.status(400).json({
-        message: tel.startsWith("+") ? "Revisa el número de teléfono y el código del país." : "El teléfono debe tener 8 dígitos.",
+        message: mensajeTelefono(tel),
       });
     }
     if (!correo || !validarEmail(String(correo).trim())) {
@@ -182,7 +184,7 @@ router.post("/", recibirFormulario, async (req, res) => {
         "Registro por enlace",
         `Nueva solicitud de socio: ${nombre} (DNI ${dni}). Pendiente de aprobación.` +
           (creada
-            ? ` Solicita L. ${solicitud.monto.toFixed(2)} a ${solicitud.plazo} meses (cuota estimada L. ${creada.cuota_estimada.toFixed(2)}). Préstamo #${creada.id_prestamo}`
+            ? ` Solicita ${dinero(solicitud.monto)} a ${solicitud.plazo} meses (cuota estimada ${dinero(creada.cuota_estimada)}). Préstamo #${creada.id_prestamo}`
             : " Sin solicitud de préstamo."),
       ]
     );
@@ -193,7 +195,7 @@ router.post("/", recibirFormulario, async (req, res) => {
       creada ? "Nueva solicitud de socio y préstamo" : "Nueva solicitud de socio",
       `<p><strong>${escaparHtml(nombre)}</strong> (identidad ${dni}) se registró por el enlace de la cooperativa y espera aprobación.</p>` +
         (creada
-          ? `<p>Solicita un préstamo de <strong>L. ${solicitud.monto.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</strong> a ${solicitud.plazo} meses.</p>`
+          ? `<p>Solicita un préstamo de <strong>${dinero(solicitud.monto)}</strong> a ${solicitud.plazo} meses.</p>`
           : "")
     );
 

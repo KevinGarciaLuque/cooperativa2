@@ -4,6 +4,7 @@ const pool = require("../db");
 const { registrarCaja } = require("../utils/caja");
 const { crearRecibo } = require("../utils/recibos");
 const { crearNotificacion } = require("../utils/notificaciones");
+const { dinero } = require("../utils/pais");
 
 // ============================================
 // FUNCIONES AUXILIARES
@@ -285,7 +286,7 @@ router.post("/", async (req, res) => {
       [
         id_usuario, 
         "Registro de aportación", 
-        `Aportación de L. ${montoNum.toFixed(2)} registrada en cuenta ${cuentaDestino.tipo_cuenta}. Saldo actualizado: L. ${nuevoSaldo.toFixed(2)}`
+        `Aportación de ${dinero(montoNum)} registrada en cuenta ${cuentaDestino.tipo_cuenta}. Saldo actualizado: ${dinero(nuevoSaldo)}`
       ]
     );
 
@@ -293,7 +294,7 @@ router.post("/", async (req, res) => {
 
     crearNotificacion(id_usuario, {
       titulo: "Aportación registrada",
-      mensaje: `Registramos tu aportación de L. ${montoNum.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} en tu cuenta ${cuentaDestino.tipo_cuenta}. Ya puedes ver tu recibo.`,
+      mensaje: `Registramos tu aportación de ${dinero(montoNum)} en tu cuenta ${cuentaDestino.tipo_cuenta}. Ya puedes ver tu recibo.`,
       tipo: "aportacion",
       idRecibo,
     });
@@ -413,7 +414,7 @@ router.put("/:id", async (req, res) => {
         categoria: "ajuste_aportacion",
         monto: Math.abs(dif),
         metodo: "efectivo",
-        descripcion: `Ajuste de aportación #${req.params.id}: de L. ${montoAnterior.toFixed(2)} a L. ${montoNuevo.toFixed(2)}`,
+        descripcion: `Ajuste de aportación #${req.params.id}: de ${dinero(montoAnterior)} a ${dinero(montoNuevo)}`,
         referencia_tipo: "aportacion",
         referencia_id: parseInt(req.params.id),
         id_socio: aportacionActual[0].id_usuario,
@@ -521,7 +522,7 @@ router.delete("/:id", async (req, res) => {
     await connection.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) 
        VALUES (?, ?, ?, NOW())`,
-      [id_usuario, "Eliminación de aportación", `Se eliminó la aportación ID: ${req.params.id} de L. ${montoAportacion.toFixed(2)}`]
+      [id_usuario, "Eliminación de aportación", `Se eliminó la aportación ID: ${req.params.id} de ${dinero(montoAportacion)}`]
     );
 
     await connection.commit();

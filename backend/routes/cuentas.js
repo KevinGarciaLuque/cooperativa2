@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const { verificarToken, soloAdmin } = require("../middleware/auth");
+const { dinero } = require("../utils/pais");
 
 // ============================================
 // FUNCIONES AUXILIARES
@@ -246,7 +247,7 @@ router.post("/", async (req, res) => {
     await connection.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) 
        VALUES (?, ?, ?, NOW())`,
-      [id_usuario, "Apertura de cuenta", `Se abrió cuenta de ${tipo_cuenta} con saldo inicial de L. ${saldoInicial.toFixed(2)}`]
+      [id_usuario, "Apertura de cuenta", `Se abrió cuenta de ${tipo_cuenta} con saldo inicial de ${dinero(saldoInicial)}`]
     );
 
     await connection.commit();
@@ -353,7 +354,7 @@ router.post("/:id/actualizar-saldo", async (req, res) => {
       [
         cuenta[0].id_usuario, 
         `${tipo.charAt(0).toUpperCase() + tipo.slice(1)} en cuenta`,
-        `${tipo.charAt(0).toUpperCase() + tipo.slice(1)} de L. ${montoNum.toFixed(2)} en cuenta ${cuenta[0].tipo_cuenta}. Saldo actual: L. ${nuevoSaldo.toFixed(2)}`
+        `${tipo.charAt(0).toUpperCase() + tipo.slice(1)} de ${dinero(montoNum)} en cuenta ${cuenta[0].tipo_cuenta}. Saldo actual: ${dinero(nuevoSaldo)}`
       ]
     );
 
@@ -477,7 +478,7 @@ router.post("/transferir", async (req, res) => {
       [
         cuentaOrigen[0].id_usuario,
         "Transferencia entre cuentas",
-        `Transferencia de L. ${montoNum.toFixed(2)} de ${cuentaOrigen[0].tipo_cuenta} a ${cuentaDestino[0].tipo_cuenta}`
+        `Transferencia de ${dinero(montoNum)} de ${cuentaOrigen[0].tipo_cuenta} a ${cuentaDestino[0].tipo_cuenta}`
       ]
     );
 

@@ -4,6 +4,7 @@ const pool = require("../db");
 
 const esFecha = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v));
 const { hoyISO } = require("./../utils/fechas");
+const { dinero } = require("../utils/pais");
 const num = (v) => parseFloat(v || 0);
 
 // Resumen del efectivo de un día: saldo inicial (último cierre previo) + ingresos - egresos
@@ -113,7 +114,7 @@ router.post("/cierre", async (req, res) => {
 
     if (Math.abs(diferencia) > 0.005 && !String(observacion || "").trim()) {
       return res.status(400).json({
-        message: `Hay una diferencia de L. ${diferencia.toFixed(2)}. Explica el motivo en la observación para cerrar.`,
+        message: `Hay una diferencia de ${dinero(diferencia)}. Explica el motivo en la observación para cerrar.`,
         diferencia,
       });
     }
@@ -135,7 +136,7 @@ router.post("/cierre", async (req, res) => {
       [
         req.usuario?.id_usuario,
         "Cierre de caja",
-        `Caja del ${fecha} cerrada. Esperado: L. ${e.efectivo_esperado.toFixed(2)}, contado: L. ${contado.toFixed(2)}, diferencia: L. ${diferencia.toFixed(2)}`,
+        `Caja del ${fecha} cerrada. Esperado: ${dinero(e.efectivo_esperado)}, contado: ${dinero(contado)}, diferencia: ${dinero(diferencia)}`,
       ]
     );
 
@@ -203,7 +204,7 @@ router.post("/gasto", async (req, res) => {
     );
     await pool.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
-      [req.usuario?.id_usuario, "Registro de gasto", `Gasto (${cat}) de L. ${valor.toFixed(2)}: ${String(concepto).trim().substring(0, 120)}`]
+      [req.usuario?.id_usuario, "Registro de gasto", `Gasto (${cat}) de ${dinero(valor)}: ${String(concepto).trim().substring(0, 120)}`]
     );
     res.status(201).json({ success: true, message: "Gasto registrado" });
   } catch (error) {
@@ -242,7 +243,7 @@ router.post("/ingreso", async (req, res) => {
     );
     await pool.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
-      [req.usuario?.id_usuario, "Ingreso manual a caja", `${CATEGORIAS_INGRESO[cat]}: L. ${valor.toFixed(2)} (${metodoFinal})`]
+      [req.usuario?.id_usuario, "Ingreso manual a caja", `${CATEGORIAS_INGRESO[cat]}: ${dinero(valor)} (${metodoFinal})`]
     );
     res.status(201).json({ success: true, message: "Ingreso registrado" });
   } catch (error) {

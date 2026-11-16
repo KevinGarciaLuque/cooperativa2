@@ -29,14 +29,10 @@ const uploadFoto = multer({
 // FUNCIONES AUXILIARES DE VALIDACIÓN
 // ============================================
 
-// Validar DNI hondureño (13 dígitos)
-const validarDNI = (dni) => {
-  const dniRegex = /^\d{13}$/;
-  return dniRegex.test(dni);
-};
-
-// Validar teléfono hondureño (8 dígitos)
-const { validarTelefono } = require("../utils/telefono");
+// Documento de identidad y teléfono según el país de la cooperativa (utils/pais.js)
+const { validarIdentidad, normalizarIdentidad, mensajeIdentidad } = require("../utils/pais");
+const validarDNI = (dni) => validarIdentidad(dni);
+const { validarTelefono, mensajeTelefono } = require("../utils/telefono");
 
 // Validar email
 const validarEmail = (email) => {
@@ -106,9 +102,9 @@ router.post("/login", async (req, res) => {
       `SELECT u.*, r.nombre AS rol 
        FROM usuarios u 
        INNER JOIN roles r ON u.rol_id = r.id_rol 
-       WHERE u.dni = ? 
+       WHERE u.dni IN (?, ?) 
        LIMIT 1`,
-      [dni]
+      [String(dni).trim(), normalizarIdentidad(dni)]
     );
 
     if (rows.length === 0) {
@@ -315,6 +311,7 @@ router.post("/", async (req, res) => {
   
   try {
     if (req.body.nombre_completo) req.body.nombre_completo = formatearNombre(req.body.nombre_completo);
+    if (req.body.dni) req.body.dni = normalizarIdentidad(req.body.dni);
     const {
       nombre_completo,
       dni,
@@ -338,17 +335,13 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ message: errorPassword });
     }
 
-    // Validar DNI hondureño (13 dígitos)
     if (!validarDNI(dni)) {
-      return res.status(400).json({ 
-        message: "DNI inválido. Debe contener 13 dígitos." 
-      });
+      return res.status(400).json({ message: mensajeIdentidad() });
     }
 
-    // Validar teléfono hondureño (8 dígitos)
     if (telefono && !validarTelefono(telefono)) {
       return res.status(400).json({ 
-        message: "Teléfono inválido. Debe contener 8 dígitos." 
+        message: mensajeTelefono(telefono) 
       });
     }
 
@@ -480,7 +473,7 @@ router.put("/:id", async (req, res) => {
     // Validar teléfono si se proporciona
     if (telefono && !validarTelefono(telefono)) {
       return res.status(400).json({ 
-        message: "Teléfono inválido. Debe contener 8 dígitos." 
+        message: mensajeTelefono(telefono) 
       });
     }
 

@@ -11,21 +11,52 @@ export function AuthProvider({ children }) {
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
+  const guardarSesion = (data) => {
+    setUser(data.usuario);
+    setToken(data.token);
+    localStorage.setItem("user", JSON.stringify(data.usuario));
+    localStorage.setItem("token", data.token);
+  };
+
+  // Mensaje del servidor que vale la pena mostrar (bloqueo, cuenta inactiva, correo caído...)
+  const mensajeDe = (error) => {
+    const status = error.response?.status;
+    return [403, 429, 503].includes(status) ? error.response.data?.message || false : false;
+  };
+
+  // Devuelve true (sesión abierta), { requiere_codigo, token_temporal, correo } (falta el código
+  // del correo), un texto con el motivo o false
   const login = async (dni, password) => {
     try {
       const res = await axios.post(`${API_URL}/usuarios/login`, {
         dni,
         password,
       });
-      setUser(res.data.usuario);
-      setToken(res.data.token);
-      localStorage.setItem("user", JSON.stringify(res.data.usuario));
-      localStorage.setItem("token", res.data.token);
+      if (res.data.requiere_codigo) return res.data;
+      guardarSesion(res.data);
       return true;
     } catch (error) {
-      // Mensaje del servidor (por ejemplo, bloqueo temporal por demasiados intentos)
-      const status = error.response?.status;
-      return status === 429 ? error.response.data?.message || false : false;
+      return mensajeDe(error);
+    }
+  };
+
+  // Segundo paso: el código que llegó al correo. Devuelve true o el mensaje de error
+  const verificarCodigo = async (token_temporal, codigo) => {
+    try {
+      const res = await axios.post(`${API_URL}/usuarios/login/verificar`, { token_temporal, codigo });
+      guardarSesion(res.data);
+      return true;
+    } catch (error) {
+      return error.response?.data?.message || "No se pudo verificar el código.";
+    }
+  };
+
+  const reenviarCodigo = async (token_temporal) => {
+    try {
+      const res = await axios.post(`${API_URL}/usuarios/login/reenviar`, { token_temporal });
+      return res.data;
+    } catch (error) {
+      return error.response?.data?.message || "No se pudo reenviar el código.";
     }
   };
 
@@ -62,7 +93,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, token, login, verificarCodigo, reenviarCodigo, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

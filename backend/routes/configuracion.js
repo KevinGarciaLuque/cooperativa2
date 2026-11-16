@@ -118,8 +118,22 @@ router.get("/", async (req, res) => {
 // GET/PUT /api/configuracion/financiera  (requiere sesión; PUT solo Super Admin)
 // Parámetros de mora que usa todo el sistema
 // ============================================================
-router.get("/financiera", verificarToken, (req, res) => {
-  res.json({ success: true, data: configFin.obtener() });
+router.get("/financiera", verificarToken, async (req, res) => {
+  const respuesta = { success: true, data: configFin.obtener() };
+  // Para la verificación en dos pasos: si hay correo configurado y qué personal no tiene correo
+  if (req.usuario?.rol === "Super Administrador") {
+    try {
+      const [sinCorreo] = await pool.query(
+        `SELECT u.nombre_completo FROM usuarios u JOIN roles r ON r.id_rol = u.rol_id
+         WHERE r.nombre <> 'Socio' AND u.estado = 'activo' AND (u.correo IS NULL OR u.correo NOT LIKE '%@%')`
+      );
+      respuesta.seguridad = {
+        correo_configurado: require("../utils/verificacion").correoConfigurado(),
+        personal_sin_correo: sinCorreo.map((u) => u.nombre_completo),
+      };
+    } catch {}
+  }
+  res.json(respuesta);
 });
 
 router.put("/financiera", verificarToken, soloSuperAdmin, async (req, res) => {
@@ -143,6 +157,7 @@ router.put("/financiera", verificarToken, soloSuperAdmin, async (req, res) => {
       aprob_monto_admin: [0, 1000000000], // préstamos mayores van al comité de crédito (0 = sin comité)
       aprob_votos_comite: [1, 15], // votos a favor del comité para aprobar
       caja_exigir_turno: [0, 1], // efectivo solo con turno de caja abierto
+      seg_2fa_personal: [0, 1], // verificación en dos pasos por correo para el personal
     };
     for (const [k, [min, max]] of Object.entries(clavesSol)) {
       if (req.body[k] === undefined || req.body[k] === "") continue;

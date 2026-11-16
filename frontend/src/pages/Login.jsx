@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
-import { FaIdCard, FaLock, FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaIdCard, FaLock, FaEye, FaEyeSlash, FaKey } from "react-icons/fa";
 import LogoCoop from "../components/LogoCoop";
 import { useConfigSitio } from "../hooks/useConfigSitio";
 import { docIdentidad } from "../utils/pais";
@@ -11,7 +11,7 @@ const DARK = "#1a2035";
 const DARK2 = "#222d45";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, verificarCodigo, reenviarCodigo } = useAuth();
   const navigate = useNavigate();
   const { config } = useConfigSitio();
   const BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace("/api", "");
@@ -21,6 +21,41 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [paso2, setPaso2] = useState(null); // { token_temporal, correo } mientras falta el código
+  const [codigo, setCodigo] = useState("");
+  const [aviso, setAviso] = useState(null);
+
+  const entrar = () => {
+    const storedUser = JSON.parse(localStorage.getItem("user"));
+    navigate(storedUser?.rol === "Socio" ? "/perfil" : "/dashboard");
+  };
+
+  const enviarCodigo = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    const r = await verificarCodigo(paso2.token_temporal, codigo);
+    setLoading(false);
+    if (r === true) return entrar();
+    setError(r);
+    setCodigo("");
+    // Si el código venció o se agotaron los intentos, hay que empezar de nuevo
+    if (/Vuelve a iniciar sesión/.test(r)) {
+      setPaso2(null);
+      setPassword("");
+    }
+  };
+
+  const pedirOtro = async () => {
+    setError(null);
+    setAviso(null);
+    const r = await reenviarCodigo(paso2.token_temporal);
+    if (typeof r === "string") setError(r);
+    else {
+      setPaso2(r);
+      setAviso(`Te enviamos un código nuevo a ${r.correo}.`);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,12 +64,11 @@ export default function Login() {
     const ok = await login(dni, password);
     setLoading(false);
     if (ok === true) {
-      const storedUser = JSON.parse(localStorage.getItem("user"));
-      if (storedUser?.rol === "Socio") {
-        navigate("/perfil");
-      } else {
-        navigate("/dashboard");
-      }
+      entrar();
+    } else if (ok && ok.requiere_codigo) {
+      setPaso2(ok);
+      setCodigo("");
+      setAviso(null);
     } else {
       setError(typeof ok === "string" ? ok : `${docIdentidad().nombre} o contraseña incorrectos`);
     }
@@ -376,6 +410,59 @@ export default function Login() {
           <div className="login-title">Bienvenido</div>
           <div className="login-desc">Ingresa tus credenciales para continuar</div>
 
+          {paso2 ? (
+            <form onSubmit={enviarCodigo} autoComplete="off">
+              <div className="login-field">
+                <label>Código de verificación</label>
+                <div className="login-desc" style={{ marginBottom: 12 }}>
+                  Enviamos un código de 6 dígitos a <strong>{paso2.correo}</strong>. Vence en 10 minutos.
+                </div>
+                <div className="login-input-wrap">
+                  <FaKey className="login-input-icon" />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    className="login-input"
+                    style={{ letterSpacing: 6, fontSize: "1.2rem" }}
+                    maxLength={6}
+                    value={codigo}
+                    onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ""))}
+                    required
+                    autoFocus
+                    placeholder="000000"
+                  />
+                </div>
+              </div>
+              {aviso && <div className="login-desc" style={{ color: ACCENT }}>{aviso}</div>}
+              {error && (
+                <div className="login-error">
+                  <span style={{ fontSize: "1rem" }}>⚠</span>
+                  {error}
+                </div>
+              )}
+              <button type="submit" className="login-btn" disabled={loading || codigo.length !== 6}>
+                {loading && <span className="login-spinner" />}
+                {loading ? "Verificando..." : "Confirmar"}
+              </button>
+              <div className="d-flex justify-content-between mt-4">
+                <button type="button" className="btn btn-link login-link p-0" onClick={pedirOtro}>
+                  Enviar otro código
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-link login-link p-0"
+                  onClick={() => {
+                    setPaso2(null);
+                    setError(null);
+                    setPassword("");
+                  }}
+                >
+                  Volver
+                </button>
+              </div>
+            </form>
+          ) : (
           <form onSubmit={handleSubmit} autoComplete="off">
             {/* DNI */}
             <div className="login-field">
@@ -441,6 +528,7 @@ export default function Login() {
               </Link>
             </div>
           </form>
+          )}
 
           {/* Créditos */}
           <div className="text-center mt-4" style={{ color: "rgba(255,255,255,0.2)", fontSize: "0.75rem" }}>

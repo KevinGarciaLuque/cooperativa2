@@ -17,7 +17,8 @@ export default function ParametrosFinancieros() {
   const [tasa, setTasa] = useState("");
   const [gracia, setGracia] = useState("");
   const [prov, setProv] = useState({ prov_al_dia: "", prov_1_30: "", prov_31_60: "", prov_61_90: "", prov_90_mas: "" });
-  const [sol, setSol] = useState({ sol_tasa_mensual: "", sol_monto_max: "", sol_plazo_max: "", sol_pct_ingreso_max: "", aho_retencion_pct: "0", aml_umbral: "0", aprob_monto_admin: "0", aprob_votos_comite: "2", caja_exigir_turno: "0" });
+  const [sol, setSol] = useState({ sol_tasa_mensual: "", sol_monto_max: "", sol_plazo_max: "", sol_pct_ingreso_max: "", aho_retencion_pct: "0", aml_umbral: "0", aprob_monto_admin: "0", aprob_votos_comite: "2", caja_exigir_turno: "0", seg_2fa_personal: "0" });
+  const [seguridad, setSeguridad] = useState(null);
   const [rec, setRec] = useState({ rec_activo: true, rec_dias_antes: "3", rec_mora_cada: "7" });
   const [enviando, setEnviando] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -39,7 +40,9 @@ export default function ParametrosFinancieros() {
           aprob_monto_admin: String(res.data.data.aprob_monto_admin ?? 0),
           aprob_votos_comite: String(res.data.data.aprob_votos_comite ?? 2),
           caja_exigir_turno: String(res.data.data.caja_exigir_turno ?? 0),
+          seg_2fa_personal: String(res.data.data.seg_2fa_personal ?? 0),
         });
+        setSeguridad(res.data.seguridad || null);
         setRec({
           rec_activo: parseInt(res.data.data.rec_activo) === 1,
           rec_dias_antes: String(res.data.data.rec_dias_antes ?? 3),
@@ -198,6 +201,30 @@ export default function ParametrosFinancieros() {
             <input type="number" step="1" min="1" max="15" className="form-control" value={sol.aprob_votos_comite}
               onChange={(e) => setSol({ ...sol, aprob_votos_comite: e.target.value })} disabled={cargando} />
           </div>
+        </div>
+
+        <h5 className="fw-bold mt-4 mb-1" style={{ color: AZUL }}>Verificación en dos pasos</h5>
+        <p className="text-muted small">
+          Al iniciar sesión, el personal (no los socios) recibe en su correo un código de 6 dígitos que vence en 10
+          minutos. Protege las cuentas aunque alguien conozca la contraseña.
+        </p>
+        {seguridad && !seguridad.correo_configurado && (
+          <div className="alert alert-warning py-2 small">
+            El servidor no tiene configurado el envío de correos (EMAIL_HOST): mientras tanto se entra solo con la contraseña.
+          </div>
+        )}
+        {seguridad?.personal_sin_correo?.length > 0 && (
+          <div className="alert alert-warning py-2 small">
+            Sin correo registrado (entrarán solo con la contraseña hasta que se les agregue):{" "}
+            {seguridad.personal_sin_correo.join(", ")}.
+          </div>
+        )}
+        <div className="form-check form-switch mb-2">
+          <input id="dos-pasos" type="checkbox" className="form-check-input" checked={sol.seg_2fa_personal === "1"}
+            onChange={(e) => setSol({ ...sol, seg_2fa_personal: e.target.checked ? "1" : "0" })} disabled={cargando} />
+          <label htmlFor="dos-pasos" className="form-check-label">
+            Pedir código por correo al personal
+          </label>
         </div>
 
         <h5 className="fw-bold mt-4 mb-1" style={{ color: AZUL }}>Turnos de caja</h5>

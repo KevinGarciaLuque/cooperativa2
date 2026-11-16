@@ -1833,6 +1833,70 @@ test("turnos de caja: abrir, registrar en el turno, exigir turno y cerrar con ar
   assert.equal((await exigir(0)).s, 200);
 });
 
+test("verificación en dos pasos: el personal confirma con el código del correo", async () => {
+  const sendEmail = require("../../utils/sendEmail");
+  const original = sendEmail.transporter;
+  const enviados = [];
+  sendEmail.transporter = { sendMail: async (m) => enviados.push(m) };
+  process.env.EMAIL_HOST = "smtp.prueba.hn";
+  process.env.EMAIL_USER = "sistema@prueba.hn";
+  const fin = (await api("GET", "/configuracion/financiera", null, ids.tSuper)).b.data;
+  const activar = (v) => api("PUT", "/configuracion/financiera", { mora_tasa_anual: fin.mora_tasa_anual, mora_dias_gracia: fin.mora_dias_gracia, seg_2fa_personal: v }, ids.tSuper);
+  const entrar = (dni) => api("POST", "/usuarios/login", { dni, password: "Clave1234" });
+  try {
+    // Desactivada (lo predeterminado): entra directo
+    assert.ok((await entrar("0801000000002")).b.token);
+
+    assert.equal((await activar(1)).s, 200);
+    const paso1 = await entrar("0801000000002");
+    assert.equal(paso1.s, 200);
+    assert.equal(paso1.b.requiere_codigo, true);
+    assert.equal(paso1.b.token, undefined, "sin sesión todavía");
+    assert.match(paso1.b.correo, /@prueba\.hn$/);
+    const codigo = enviados.at(-1).subject.match(/(\d{6})/)[1];
+
+    // El token temporal no sirve como sesión
+    assert.equal((await api("GET", "/dashboard", null, paso1.b.token_temporal)).s, 401);
+
+    // Código equivocado, luego el correcto; no se puede usar dos veces
+    const malo = codigo === "000000" ? "111111" : "000000";
+    assert.equal((await api("POST", "/usuarios/login/verificar", { token_temporal: paso1.b.token_temporal, codigo: malo })).s, 400);
+    const ok = await api("POST", "/usuarios/login/verificar", { token_temporal: paso1.b.token_temporal, codigo });
+    assert.equal(ok.s, 200, ok.b?.message);
+    assert.ok(ok.b.token);
+    assert.equal(ok.b.usuario.rol, "Administrador");
+    assert.equal((await api("POST", "/usuarios/login/verificar", { token_temporal: paso1.b.token_temporal, codigo })).s, 401);
+
+    // Cinco intentos fallidos bloquean el código
+    const paso2 = await entrar("0801000000002");
+    const codigo2 = enviados.at(-1).subject.match(/(\d{6})/)[1];
+    const otro = codigo2 === "000000" ? "111111" : "000000";
+    for (let i = 0; i < 4; i++) {
+      assert.equal((await api("POST", "/usuarios/login/verificar", { token_temporal: paso2.b.token_temporal, codigo: otro })).s, 400);
+    }
+    assert.equal((await api("POST", "/usuarios/login/verificar", { token_temporal: paso2.b.token_temporal, codigo: otro })).s, 429);
+    assert.equal((await api("POST", "/usuarios/login/verificar", { token_temporal: paso2.b.token_temporal, codigo: codigo2 })).s, 429);
+
+    // Reenviar: una vez por minuto
+    const paso3 = await entrar("0801000000002");
+    assert.equal((await api("POST", "/usuarios/login/reenviar", { token_temporal: paso3.b.token_temporal })).s, 429);
+
+    // Los socios entran como siempre
+    const socio = await entrar("0801000000003");
+    assert.ok(socio.b.token);
+    assert.equal(socio.b.requiere_codigo, undefined);
+
+    // Si el correo falla, no se abre la sesión
+    sendEmail.transporter = { sendMail: async () => { throw new Error("SMTP caído"); } };
+    assert.equal((await entrar("0801000000002")).s, 503);
+  } finally {
+    sendEmail.transporter = original;
+    process.env.EMAIL_HOST = "";
+    process.env.EMAIL_USER = "";
+    await activar(0);
+  }
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

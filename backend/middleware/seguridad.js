@@ -6,6 +6,7 @@ const SUPER_ADMIN = "Super Administrador";
 // ── Rutas públicas (no requieren sesión) ──────────────────────────────────
 const PUBLICAS = [
   { metodo: "POST", re: /^\/usuarios\/login$/ },
+  { metodo: "POST", re: /^\/usuarios\/login\/(verificar|reenviar)$/ }, // segundo paso (con token temporal)
   { metodo: "*", re: /^\/recuperar(\/.*)?$/ },
   { metodo: "GET", re: /^\/configuracion$/ }, // logo y nombre para la pantalla de login
   { metodo: "GET", re: /^\/registro\/estado$/ },

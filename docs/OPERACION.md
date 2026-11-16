@@ -174,6 +174,16 @@ El catálogo base está en `backend/utils/contabilidad.js`; el contador puede ag
   los socios por aportaciones y por intereses pagados; se acredita en su cuenta de aportaciones, con la partida de
   cierre del ejercicio. Solo años terminados y una vez por año.
 
+## Verificación en dos pasos
+
+- En **Parámetros → Verificación en dos pasos** (desactivada por defecto). Activada, el personal recibe al
+  iniciar sesión un código de 6 dígitos en su correo: vence en 10 minutos, admite 5 intentos y se puede
+  pedir otro una vez por minuto. Los socios entran como siempre.
+- Necesita el envío de correos configurado (EMAIL_HOST, EMAIL_USER, EMAIL_PASS). Sin eso, o para un
+  usuario sin correo registrado, se entra solo con la contraseña (Parámetros lo advierte).
+- Si el correo falla al enviar, no se abre la sesión: revisa el servidor de correo antes de activarla.
+- En el ambiente de pruebas solo se pide si existe CORREO_PRUEBAS (los códigos llegan a esa dirección).
+
 ## Sucursales y turnos de caja
 
 - Se crea una sucursal "Oficina principal"; el Super Administrador agrega más en **Caja → Mi turno → Sucursales**.

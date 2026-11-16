@@ -8,6 +8,7 @@ const { asignarNumeroSocio } = require("../utils/numeroSocio");
 const { abrirCuentasAutomaticas } = require("../utils/ahorro");
 const archivos = require("../utils/archivos");
 const jwt = require("jsonwebtoken");
+const verificacion = require("../utils/verificacion");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
@@ -89,6 +90,80 @@ const crearCuentasAutomaticas = async (id_usuario) => {
 // AUTENTICACIÓN Y SEGURIDAD
 // ============================================
 
+// Abre la sesión: bitácora, token de 8 horas y datos del usuario
+const emitirSesion = async (user, res) => {
+  // Registrar en bitácora
+  await registrarBitacora(user.id_usuario, "Inicio de sesión", `Usuario ${user.nombre_completo} inició sesión`);
+
+  // Generar JWT
+  const token = jwt.sign(
+    {
+      id_usuario: user.id_usuario,
+      rol_id: user.rol_id,
+      nombre_completo: user.nombre_completo,
+      rol: user.rol,
+      dni: user.dni,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "8h" }
+  );
+
+  res.json({
+    success: true,
+    token,
+    usuario: {
+      id_usuario: user.id_usuario,
+      nombre_completo: user.nombre_completo,
+      numero_socio: user.numero_socio,
+      dni: user.dni,
+      telefono: user.telefono,
+      correo: user.correo,
+      rol_id: user.rol_id,
+      rol: user.rol,
+      foto: user.foto,
+      estado: user.estado,
+      fecha_registro: user.fecha_registro,
+    },
+  });
+};
+
+// Datos del usuario para iniciar sesión (con su rol)
+const usuarioParaSesion = async (idUsuario) => {
+  const [[u]] = await pool.query(
+    `SELECT u.*, r.nombre AS rol FROM usuarios u INNER JOIN roles r ON u.rol_id = r.id_rol WHERE u.id_usuario = ?`,
+    [idUsuario]
+  );
+  return u;
+};
+
+// POST /api/usuarios/login/verificar  { token_temporal, codigo }
+router.post("/login/verificar", async (req, res) => {
+  try {
+    const id = await verificacion.verificar(req.body?.token_temporal, req.body?.codigo);
+    const user = await usuarioParaSesion(id);
+    if (!user || user.estado !== "activo") return res.status(403).json({ message: "Tu cuenta no está activa." });
+    await emitirSesion(user, res);
+  } catch (error) {
+    if (error.codigo) return res.status(error.codigo).json({ message: error.message });
+    console.error("ERROR AL VERIFICAR CÓDIGO:", error);
+    res.status(500).json({ message: "No se pudo verificar el código" });
+  }
+});
+
+// POST /api/usuarios/login/reenviar  { token_temporal }
+router.post("/login/reenviar", async (req, res) => {
+  try {
+    const d = verificacion.leerToken(req.body?.token_temporal);
+    const user = d && (await usuarioParaSesion(d.id_usuario));
+    if (!user || user.estado !== "activo") return res.status(401).json({ message: "Vuelve a iniciar sesión." });
+    res.json({ success: true, requiere_codigo: true, ...(await verificacion.reenviar(req.body.token_temporal, user)) });
+  } catch (error) {
+    if (error.codigo) return res.status(error.codigo).json({ message: error.message });
+    console.error("ERROR AL REENVIAR CÓDIGO:", error);
+    res.status(503).json({ message: "No se pudo enviar el código. Intenta de nuevo en unos minutos." });
+  }
+});
+
 // LOGIN (con JOIN de roles y registro en bitácora)
 router.post("/login", async (req, res) => {
   const { dni, password } = req.body;
@@ -137,39 +212,19 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Credenciales incorrectas" });
     }
 
-    // Registrar en bitácora
-    await registrarBitacora(user.id_usuario, "Inicio de sesión", `Usuario ${user.nombre_completo} inició sesión`);
+    // Verificación en dos pasos (personal, si está activada): primero el código del correo
+    if (verificacion.requiere(user)) {
+      try {
+        const paso = await verificacion.enviarCodigo(user);
+        await registrarBitacora(user.id_usuario, "Código de acceso enviado", `Se envió un código de verificación a ${paso.correo}`);
+        return res.json({ success: true, requiere_codigo: true, ...paso });
+      } catch (e) {
+        console.error("ERROR AL ENVIAR CÓDIGO DE ACCESO:", e.message);
+        return res.status(503).json({ message: "No se pudo enviar el código de acceso a tu correo. Intenta de nuevo en unos minutos." });
+      }
+    }
 
-    // Generar JWT
-    const token = jwt.sign(
-      {
-        id_usuario: user.id_usuario,
-        rol_id: user.rol_id,
-        nombre_completo: user.nombre_completo,
-        rol: user.rol,
-        dni: user.dni,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "8h" }
-    );
-
-    res.json({
-      success: true,
-      token,
-      usuario: {
-        id_usuario: user.id_usuario,
-        nombre_completo: user.nombre_completo,
-        numero_socio: user.numero_socio,
-        dni: user.dni,
-        telefono: user.telefono,
-        correo: user.correo,
-        rol_id: user.rol_id,
-        rol: user.rol,
-        foto: user.foto,
-        estado: user.estado,
-        fecha_registro: user.fecha_registro,
-      },
-    });
+    await emitirSesion(user, res);
   } catch (error) {
     console.error("ERROR LOGIN:", error);
     res.status(500).json({ message: "Error al autenticar", error: error.message });

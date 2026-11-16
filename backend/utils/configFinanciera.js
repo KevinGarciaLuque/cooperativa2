@@ -29,6 +29,8 @@ const DEFAULTS = {
   aprob_votos_comite: 2,
   // Caja: 1 = para recibir o entregar efectivo, el usuario debe tener su turno de caja abierto
   caja_exigir_turno: 0,
+  // Seguridad: 1 = el personal confirma su inicio de sesión con un código enviado a su correo
+  seg_2fa_personal: 0,
 };
 
 let cache = { ...DEFAULTS };

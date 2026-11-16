@@ -967,6 +967,24 @@ const MIGRACIONES = [
       if (!idx.n) await conn.query("ALTER TABLE caja_movimientos ADD INDEX idx_caja_turno (id_turno)");
     },
   },
+  {
+    id: "2026_11_010_verificacion_dos_pasos",
+    descripcion: "Códigos de verificación en dos pasos",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS codigos_verificacion (
+          id_codigo INT AUTO_INCREMENT PRIMARY KEY,
+          id_usuario INT NOT NULL,
+          codigo_hash CHAR(64) NOT NULL,
+          creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          expira_en DATETIME NOT NULL,
+          intentos INT NOT NULL DEFAULT 0,
+          usado TINYINT(1) NOT NULL DEFAULT 0,
+          INDEX idx_codigo_usuario (id_usuario, usado)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

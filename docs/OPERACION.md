@@ -140,6 +140,27 @@ El catálogo de países está en `backend/utils/pais.js`.
 3. Al primer arranque se crean las tablas. Crea el primer usuario (Super Administrador) directamente en la base.
 4. Entra, elige el país en Configuración y sube el logo y el nombre de la cooperativa.
 
+## Contabilidad de partida doble
+
+Pantalla **Libros contables** (permiso de Contabilidad; la apertura y el catálogo, solo el Super Administrador).
+
+1. **Apertura (una sola vez):** el sistema propone los saldos de hoy (caja según el último cierre de caja,
+   bancos, cartera vigente, cuentas de los socios) y la diferencia queda en resultados acumulados. Revísalos con
+   el contador (caja contra el efectivo contado, bancos contra el estado de cuenta) y abre la contabilidad,
+   idealmente el primer día del mes.
+2. Desde ahí **cada operación registra su partida sola**, en la misma transacción: pagos (capital, interés, mora),
+   desembolsos, aportaciones (capital social), depósitos y retiros de ahorro (Vivienda y Pensiones son pasivo),
+   gastos e ingresos de caja, transferencias, consolidaciones, actividades y repartos. El efectivo va a Caja; las
+   transferencias, cheques y depósitos bancarios, a Bancos.
+3. Las ediciones y anulaciones registran una partida por la diferencia: **nunca se borran partidas**.
+4. **Partidas manuales** del contador (depósitos de caja al banco, estimación de incobrables, reclasificaciones):
+   deben cuadrar, no pueden caer en un mes con cierre mensual y se anulan con su partida inversa.
+5. Si una partida no se puede registrar (por ejemplo, una cuenta del sistema mal configurada), la operación igual
+   se guarda y el caso aparece en Inicio para que el contador la registre a mano.
+
+Reportes con Excel: libro diario, libro mayor, balanza de comprobación, balance general y estado de resultados.
+El catálogo base está en `backend/utils/contabilidad.js`; el contador puede agregar cuentas y renombrarlas.
+
 ## Zona horaria
 
 El servidor trabaja en UTC; la cooperativa en Honduras (UTC-6). La aplicación calcula "hoy" y los

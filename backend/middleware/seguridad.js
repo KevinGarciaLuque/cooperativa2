@@ -33,6 +33,7 @@ const MODULO_POR_PREFIJO = {
   consolidaciones: "prestamos",
   productos: "prestamos",
   garantias: "prestamos",
+  libros: "contabilidad",
   solicitudes: "prestamos",
   contabilidad: "contabilidad",
   recibos: "pagos",

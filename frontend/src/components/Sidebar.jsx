@@ -54,6 +54,7 @@ const TODOS_MODULOS = [
   { key: "aportaciones",  to: "/aportaciones",  icon: <FaPiggyBank />,      label: "Aportaciones" },
   { key: "prestamos",     to: "/solicitudes",    icon: <FaInbox />,          label: "Solicitudes" },
   { key: "contabilidad",  to: "/contabilidad",  icon: <FaBalanceScale />,   label: "Contabilidad" },
+  { key: "contabilidad",  to: "/libros-contables", icon: <FaBook />,      label: "Libros contables" },
   { key: "cobranza",      to: "/cobranza",      icon: <FaPhoneAlt />,       label: "Cobranza" },
   { key: "caja",          to: "/caja",          icon: <FaCashRegister />,   label: "Caja" },
   { key: "pagos",         to: "/pagos",         icon: <FaMoneyCheckAlt />,  label: "Pagos" },

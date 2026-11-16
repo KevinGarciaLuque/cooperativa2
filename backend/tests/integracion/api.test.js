@@ -1366,6 +1366,124 @@ test("garantías: la migración copia el aval de las solicitudes existentes sin 
   assert.deepEqual(g.map((x) => x.tipo), ["aval"]);
 });
 
+test("contabilidad: apertura, partidas automáticas que cuadran, partidas manuales y estados", async () => {
+  const sumaPartidas = async () => {
+    const [[t]] = await pool.query("SELECT IFNULL(SUM(debe),0) AS d, IFNULL(SUM(haber),0) AS h, COUNT(DISTINCT id_partida) AS n FROM partida_lineas");
+    return { d: parseFloat(t.d), h: parseFloat(t.h), n: t.n };
+  };
+  const ultima = async (origen) => {
+    const [[p]] = await pool.query("SELECT * FROM partidas WHERE origen = ? ORDER BY id_partida DESC LIMIT 1", [origen]);
+    if (!p) return null;
+    const [l] = await pool.query(
+      `SELECT c.clave, l.debe, l.haber FROM partida_lineas l JOIN cuentas_contables c ON c.id_cuenta_contable = l.id_cuenta_contable WHERE l.id_partida = ?`,
+      [p.id_partida]
+    );
+    return { ...p, lineas: Object.fromEntries(l.map((x) => [x.clave, parseFloat(x.debe) - parseFloat(x.haber)])) };
+  };
+
+  // Antes de abrir: las operaciones no generan partidas
+  assert.equal((await api("GET", "/libros/estado", null, ids.tSuper)).b.iniciada, false);
+  assert.equal((await sumaPartidas()).n, 0);
+  assert.equal((await api("GET", "/libros/estado", null, ids.tSocio)).s, 403, "el socio no ve la contabilidad");
+
+  // Apertura con los saldos que propone el sistema
+  const prop = await api("GET", "/libros/apertura/propuesta", null, ids.tSuper);
+  assert.equal(prop.s, 200);
+  assert.ok(prop.b.lineas.some((l) => l.clave === "cartera" && l.debe > 0), "propone la cartera vigente");
+  assert.equal((await api("POST", "/libros/apertura", { lineas: prop.b.lineas }, ids.tAdmin)).s, 403);
+  const descuadrada = prop.b.lineas.map((l) => (l.clave === "caja" ? { ...l, debe: l.debe + 100 } : l));
+  assert.equal((await api("POST", "/libros/apertura", { lineas: descuadrada }, ids.tSuper)).s, 400, "no cuadra");
+  const ap = await api("POST", "/libros/apertura", { lineas: prop.b.lineas }, ids.tSuper);
+  assert.equal(ap.s, 201, ap.b?.message);
+  assert.equal((await api("POST", "/libros/apertura", { lineas: prop.b.lineas }, ids.tSuper)).s, 409, "una sola vez");
+
+  // Un pago en efectivo: caja contra cartera, intereses y mora
+  const [[pr]] = await pool.query("SELECT id_prestamo FROM prestamos WHERE id_usuario = ? AND estado IN ('activo','mora') LIMIT 1", [ids.socio]);
+  let idPrestamo = pr?.id_prestamo;
+  if (!idPrestamo) {
+    const [r] = await pool.query(
+      `INSERT INTO prestamos (id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado) VALUES (?, 3000, 24, 6, 3000, 'activo', NOW())`,
+      [ids.socio]
+    );
+    idPrestamo = r.insertId;
+  }
+  const pago = await api("POST", "/pagos", { id_prestamo: idPrestamo, monto_pagado: 200, metodo_pago: "efectivo", condonar_mora: true }, ids.tSuper);
+  assert.equal(pago.s, 201, pago.b?.message);
+  const pPago = await ultima("pago");
+  const [[pg]] = await pool.query("SELECT * FROM pagos_prestamo WHERE id_pago = ?", [pago.b.id_pago]);
+  cerca(pPago.lineas.caja, 200);
+  cerca(-pPago.lineas.cartera, parseFloat(pg.monto_capital));
+  cerca(-(pPago.lineas.ingreso_intereses || 0), parseFloat(pg.monto_interes));
+
+  // Aportación por transferencia: bancos contra capital social
+  const apo = await api("POST", "/aportaciones", { id_usuario: ids.socio, monto: 150, metodo_pago: "transferencia" }, ids.tSuper);
+  assert.equal(apo.s, 201, apo.b?.message);
+  const pApo = await ultima("aportacion");
+  cerca(pApo.lineas.bancos, 150);
+  cerca(pApo.lineas.aportaciones, -150);
+
+  // Gasto de caja
+  assert.equal((await api("POST", "/caja/gasto", { categoria: "papeleria", monto: 35, concepto: "Resmas de papel" }, ids.tSuper)).s, 201);
+  const pGasto = await ultima("gasto");
+  cerca(pGasto.lineas.gasto_papeleria, 35);
+  cerca(pGasto.lineas.caja, -35);
+
+  // Depósito de ahorro desde Movimientos: pasa por caja y genera su partida
+  const [[vivienda]] = await pool.query("SELECT id_cuenta FROM cuentas WHERE id_usuario = ? AND tipo_cuenta = 'Vivienda'", [ids.socio]);
+  const dep = await api("POST", "/movimientos", { id_cuenta: vivienda.id_cuenta, tipo: "abono", monto: 80, metodo: "efectivo", descripcion: "Ahorro" }, ids.tSuper);
+  assert.equal(dep.s, 200, dep.b?.message);
+  const [[cajaDep]] = await pool.query("SELECT * FROM caja_movimientos WHERE referencia_tipo = 'movimiento_cuenta' AND referencia_id = ?", [dep.b.id_movimiento]);
+  assert.equal(cajaDep.categoria, "deposito_ahorro");
+  const pDep = await ultima("movimiento_cuenta");
+  cerca(pDep.lineas.ahorro_vivienda, -80);
+  // Editarlo deja solo la diferencia; borrarlo lo revierte
+  assert.equal((await api("PUT", `/movimientos/${dep.b.id_movimiento}`, { monto: 100 }, ids.tSuper)).s, 200);
+  cerca((await ultima("movimiento_cuenta")).lineas.ahorro_vivienda, -20);
+  assert.equal((await api("DELETE", `/movimientos/${dep.b.id_movimiento}`, null, ids.tSuper)).s, 200);
+  cerca((await ultima("movimiento_cuenta")).lineas.ahorro_vivienda, 100);
+  // Un movimiento que viene de una aportación no se edita desde Movimientos
+  const [[movApo]] = await pool.query("SELECT id_movimiento FROM movimientos_cuenta WHERE tipo_movimiento = 'aporte' ORDER BY id_movimiento DESC LIMIT 1");
+  assert.equal((await api("DELETE", `/movimientos/${movApo.id_movimiento}`, null, ids.tSuper)).s, 400);
+
+  // Anular el pago: se revierte exactamente su partida
+  const anula = await api("DELETE", `/pagos/${pago.b.id_pago}`, { motivo: "Prueba de reversión contable" }, ids.tSuper);
+  assert.equal(anula.s, 200, anula.b?.message);
+  const pAnula = await ultima("pago");
+  cerca(pAnula.lineas.caja, -200);
+
+  // Todo cuadra y no hubo partidas fallidas
+  const t = await sumaPartidas();
+  cerca(t.d, t.h);
+  assert.equal((await api("GET", "/libros/estado", null, ids.tSuper)).b.errores_pendientes, 0);
+  const bal = await api("GET", "/libros/balanza", null, ids.tSuper);
+  assert.equal(bal.b.cuadra, true);
+  const est = await api("GET", "/libros/estados", null, ids.tSuper);
+  assert.equal(est.b.balance.cuadra, true, "activo = pasivo + patrimonio");
+  cerca(est.b.resultados.total_gastos, 35);
+
+  // Partidas manuales: deben cuadrar; se anulan con la partida inversa
+  const cat = (await api("GET", "/libros/catalogo", null, ids.tSuper)).b.data;
+  const idDe = (clave) => cat.find((c) => c.clave === clave).id_cuenta_contable;
+  const mala = await api("POST", "/libros/partidas", {
+    concepto: "Partida que no cuadra",
+    lineas: [{ id_cuenta_contable: idDe("bancos"), debe: 10 }, { id_cuenta_contable: idDe("caja"), haber: 9 }],
+  }, ids.tSuper);
+  assert.equal(mala.s, 400);
+  const man = await api("POST", "/libros/partidas", {
+    concepto: "Depósito del efectivo de caja en el banco",
+    lineas: [{ id_cuenta_contable: idDe("bancos"), debe: 50 }, { id_cuenta_contable: idDe("caja"), haber: 50 }],
+  }, ids.tSuper);
+  assert.equal(man.s, 201, man.b?.message);
+  assert.equal((await api("POST", `/libros/partidas/${man.b.id_partida}/anular`, { motivo: "Se registró dos veces" }, ids.tSuper)).s, 200);
+  assert.equal((await api("POST", `/libros/partidas/${man.b.id_partida}/anular`, { motivo: "Otra vez" }, ids.tSuper)).s, 400);
+  assert.equal((await api("POST", `/libros/partidas/${pAnula.id_partida}/anular`, { motivo: "No se puede" }, ids.tSuper)).s, 400, "las automáticas no");
+
+  // Libro mayor de caja: saldo final = saldo de la balanza
+  const mayor = await api("GET", `/libros/mayor/${idDe("caja")}`, null, ids.tSuper);
+  const enBalanza = (await api("GET", "/libros/balanza", null, ids.tSuper)).b.filas.find((f) => f.codigo === mayor.b.cuenta.codigo);
+  cerca(mayor.b.saldo_final, enBalanza.saldo_final);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

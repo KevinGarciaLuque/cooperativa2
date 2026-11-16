@@ -43,6 +43,7 @@ export default function BaseDatos() {
     dia_semana: 1, max_backups: 10, ultimo_backup: null,
   });
   const [guardandoConfig, setGuardandoConfig] = useState(false);
+  const [externo, setExterno] = useState(null); // copia de los respaldos fuera del servidor
   const [backups, setBackups] = useState([]);
   const [loadingBackups, setLoadingBackups] = useState(false);
   const [ejecutandoAuto, setEjecutandoAuto] = useState(false);
@@ -173,6 +174,7 @@ export default function BaseDatos() {
     try {
       const res = await axios.get(`${API_URL}/basedatos/config-backup`, { headers });
       setConfig(res.data.config);
+      setExterno(res.data.externo || null);
     } catch (err) { /* silencioso */ }
   };
 
@@ -193,7 +195,7 @@ export default function BaseDatos() {
     try {
       setEjecutandoAuto(true);
       const res = await axios.post(`${API_URL}/basedatos/ejecutar-backup`, {}, { headers });
-      mostrarAlerta(res.data.message, "success");
+      mostrarAlerta(res.data.message, res.data.externo_ok === false ? "warning" : "success");
       cargarBackups();
       cargarConfig();
     } catch (err) {
@@ -430,6 +432,40 @@ export default function BaseDatos() {
               )}
             </span>
           </div>
+
+          {/* Copia fuera del servidor */}
+          {externo && (
+            <div
+              className={`alert py-2 px-3 mb-3 d-flex align-items-start gap-2 ${
+                !externo.configurado ? "alert-warning" : externo.error ? "alert-danger" : "alert-success"
+              }`}
+              style={{ borderRadius: 10, fontSize: "0.87rem" }}
+            >
+              {externo.configurado && !externo.error ? (
+                <FaCheckCircle className="mt-1 flex-shrink-0" />
+              ) : (
+                <FaExclamationTriangle className="mt-1 flex-shrink-0" />
+              )}
+              <span>
+                {!externo.configurado ? (
+                  <>
+                    <strong>Los respaldos solo se guardan en el servidor.</strong> En Railway ese disco se borra en cada
+                    despliegue. Configura el almacenamiento externo (variables <code>RESPALDO_S3_*</code>, ver la guía de
+                    operación) o descarga los respaldos y guárdalos fuera del servidor.
+                  </>
+                ) : externo.error ? (
+                  <>
+                    <strong>Falló la última copia externa.</strong> {externo.error}
+                  </>
+                ) : (
+                  <>
+                    <strong>Copia externa activa</strong> en <code>{externo.destino}</code>
+                    {externo.ultimo && <> · última: {formatearFechaISO(externo.ultimo)}</>}
+                  </>
+                )}
+              </span>
+            </div>
+          )}
 
           <div className="row g-3">
             {/* Frecuencia */}

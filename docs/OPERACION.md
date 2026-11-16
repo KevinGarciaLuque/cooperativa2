@@ -11,7 +11,10 @@ Guía para quien administra el servidor: variables, despliegue, respaldos y recu
 | `FRONTEND_URL` | Sí | URL del sitio (CORS y enlaces de los correos) |
 | `CORS_ORIGINS` | No | Orígenes extra permitidos, separados por coma |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USER`, `EMAIL_PASS` | No | Correo de recuperación y avisos al administrador |
-| `APP_TIMEZONE` | No | Zona de la cooperativa. Por defecto `America/Tegucigalpa` |
+| `APP_TIMEZONE` | No | Fija la zona horaria. Sin ella se usa la del país elegido en Configuración (Honduras: `America/Tegucigalpa`) |
+| `RESPALDO_S3_BUCKET`, `RESPALDO_S3_ACCESS_KEY`, `RESPALDO_S3_SECRET_KEY` | Recomendadas | Copia de cada respaldo fuera del servidor. Ver "Respaldos" |
+| `RESPALDO_S3_ENDPOINT`, `RESPALDO_S3_REGION`, `RESPALDO_S3_PREFIJO` | No | Servicio, región (`auto` en R2) y carpeta (`respaldos/`) de esa copia |
+| `BACKUPS_DIR` | No | Carpeta de los respaldos en el servidor. Por defecto `backend/backups` |
 | `DB_TIMEZONE` | No | Fija la zona de cada sesión MySQL (ej. `-06:00`). Ver "Zona horaria" |
 | `LOG_LEVEL` | No | `debug`, `info`, `warn` o `error` |
 
@@ -46,12 +49,27 @@ Así sobreviven a los despliegues de Railway, que borran el disco, y viajan con 
 
 ## Respaldos
 
-- **Automáticos y manuales:** pantalla Base de Datos (Super Administrador). Se guardan en `backend/backups/`.
+- **Automáticos:** vienen activados (todos los días a las 2:00 a. m., hora de la cooperativa). Se cambian en la
+  pantalla Base de Datos (Super Administrador); la configuración se guarda en la base de datos, así que ya no
+  se pierde con cada despliegue.
+- **Manuales:** "Ejecutar backup ahora" o "Descargar Backup Ahora" en la misma pantalla.
+- **Copia fuera del servidor (muy recomendada):** el disco de Railway es temporal y un redespliegue puede borrar
+  `backend/backups/`. Con un almacenamiento compatible con S3, cada respaldo se sube además comprimido
+  (`.sql.gz`). La pantalla Base de Datos muestra si la copia externa está activa y avisa si falla.
+
+  Con **Cloudflare R2** (incluye 10 GB gratis):
+  1. En Cloudflare → R2, crea un bucket (por ejemplo `cooperativa-respaldos`).
+  2. En R2 → *Manage API tokens*, crea un token con permiso **Object Read & Write** solo para ese bucket.
+     Anota el *Access Key ID*, el *Secret Access Key* y el *endpoint* (`https://<cuenta>.r2.cloudflarestorage.com`).
+  3. En Railway, en las variables del backend: `RESPALDO_S3_BUCKET`, `RESPALDO_S3_ACCESS_KEY`,
+     `RESPALDO_S3_SECRET_KEY`, `RESPALDO_S3_ENDPOINT` y `RESPALDO_S3_REGION=auto`.
+  4. En la pantalla Base de Datos, pulsa "Ejecutar backup ahora": debe decir "Copia externa: respaldos/...".
+  5. (Opcional) En el bucket, una regla de ciclo de vida que borre los archivos de más de 90 días.
+
+  Con **Amazon S3** es igual, sin `RESPALDO_S3_ENDPOINT` y con la región del bucket (`RESPALDO_S3_REGION=us-east-1`).
 - **Carpeta persistente (opcional):** crea un *Volume* en Railway (Settings → Volumes), móntalo en
   `/data` y define `BACKUPS_DIR=/data/backups`. Así los respaldos guardados en el servidor no se borran al desplegar.
-- **Importante:** el disco de Railway es temporal. Un redespliegue puede borrar `backend/backups/`.
-  Descarga respaldos periódicamente desde la pantalla Base de Datos y guárdalos fuera del servidor
-  (Google Drive, correo, disco externo).
+- Para restaurar una copia externa, descárgala y descomprímela primero: `gunzip DBcooperativa_....sql.gz`.
 - **Prueba de restauración (hazla cada mes):**
 
   ```bash
@@ -69,6 +87,30 @@ Así sobreviven a los despliegues de Railway, que borran el disco, y viajan con 
 2. Carga el último respaldo: `mysql -u USUARIO -p BASE < respaldo.sql`.
 3. Apunta las variables `DB_*` del backend a esa base y reinicia el servicio.
 4. Entra como Super Administrador, revisa Caja y el último cierre mensual para confirmar los saldos.
+
+## País de la cooperativa
+
+Cada cooperativa tiene su propia instalación (su servicio en Railway y su propia base de datos). El país se
+elige en **Configuración → País de la cooperativa** (Super Administrador) y define:
+
+- la moneda y el formato de los montos (L. 1,234.50 en Honduras, Q en Guatemala, $ en El Salvador,
+  C$ en Nicaragua, ₡ 1 234,50 en Costa Rica, B/. en Panamá, BZ$ en Belice);
+- el documento de identidad que se pide y se valida (DNI, DPI, DUI, cédula...);
+- el código telefónico de los números locales (para WhatsApp) y cuántos dígitos tienen;
+- la zona horaria de los procesos diarios (respaldos, mora, recordatorios), salvo que `APP_TIMEZONE` la fije.
+
+Sin elegir, es Honduras. **Cambiar el país no convierte los montos ya registrados**: se elige al instalar.
+Después de cambiarlo, reinicia el servicio para que los procesos programados tomen la zona horaria nueva.
+El catálogo de países está en `backend/utils/pais.js`.
+
+### Instalar para otra cooperativa
+
+1. En Railway, crea un proyecto nuevo con una base MySQL y los servicios del backend y del frontend
+   (mismo repositorio, mismas raíces que la instalación actual).
+2. Variables del backend: las de la tabla de arriba (con un `JWT_SECRET` nuevo) y las de `RESPALDO_S3_*`
+   apuntando a un bucket o carpeta propia de esa cooperativa (`RESPALDO_S3_PREFIJO=nombre-coop/`).
+3. Al primer arranque se crean las tablas. Crea el primer usuario (Super Administrador) directamente en la base.
+4. Entra, elige el país en Configuración y sube el logo y el nombre de la cooperativa.
 
 ## Zona horaria
 

@@ -5,6 +5,8 @@ frontend/node_modules/
 backend/.env
 dist/
 backend/backups/
+# La configuración de respaldos ahora vive en la base de datos
+backend/backup_config.json
 build/
 
 # Archivos con datos sensibles

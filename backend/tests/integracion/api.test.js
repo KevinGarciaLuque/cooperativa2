@@ -7,6 +7,9 @@ const jwt = require("jsonwebtoken");
 
 const { crearBaseDeDatos } = require("../../scripts/crear_bd");
 
+// Los respaldos de las pruebas van a una carpeta temporal, nunca a backend/backups
+process.env.BACKUPS_DIR = require("path").join(require("os").tmpdir(), `coop_respaldos_${process.pid}`);
+
 let app;
 let servidor;
 let base;
@@ -1116,6 +1119,72 @@ test("país: Honduras por defecto; el Super Administrador lo cambia y valida el 
   }
   const hn = await api("GET", "/configuracion");
   assert.equal(hn.b.data.pais, "HN");
+});
+
+test("respaldos: activados por defecto, configuración en la base y copia externa", async () => {
+  const http = require("http");
+  const zlib = require("zlib");
+
+  // Por defecto: activados, diario, y la configuración queda guardada en la base
+  const cfg = await api("GET", "/basedatos/config-backup", null, ids.tSuper);
+  assert.equal(cfg.s, 200);
+  assert.equal(cfg.b.config.activo, true);
+  assert.equal(cfg.b.externo.configurado, false);
+  const cambio = await api("POST", "/basedatos/config-backup", { hora: "03:30", max_backups: 5 }, ids.tSuper);
+  assert.equal(cambio.s, 200);
+  const [[fila]] = await pool.query("SELECT valor FROM configuracion_sitio WHERE clave = 'respaldo_config'");
+  assert.equal(JSON.parse(fila.valor).hora, "03:30", "sobrevive a un redespliegue: está en la base");
+
+  // Almacenamiento externo de mentira: recibe la subida y la revisa
+  const recibidos = [];
+  let responder = 200;
+  const s3 = http.createServer((req, res) => {
+    const partes = [];
+    req.on("data", (c) => partes.push(c));
+    req.on("end", () => {
+      recibidos.push({ metodo: req.method, url: req.url, auth: req.headers.authorization, cuerpo: Buffer.concat(partes) });
+      res.statusCode = responder;
+      res.end(responder === 200 ? "" : "<Error><Code>AccessDenied</Code></Error>");
+    });
+  });
+  await new Promise((ok) => s3.listen(0, "127.0.0.1", ok));
+  const anteriores = { ...process.env };
+  Object.assign(process.env, {
+    RESPALDO_S3_ENDPOINT: `http://127.0.0.1:${s3.address().port}`,
+    RESPALDO_S3_BUCKET: "coop-respaldos",
+    RESPALDO_S3_ACCESS_KEY: "CLAVEPRUEBA",
+    RESPALDO_S3_SECRET_KEY: "secreto-de-prueba",
+    RESPALDO_S3_REGION: "auto",
+  });
+  try {
+    const ok = await api("POST", "/basedatos/ejecutar-backup", null, ids.tSuper);
+    assert.equal(ok.s, 200, ok.b?.message);
+    assert.equal(ok.b.externo_ok, true);
+    assert.equal(recibidos.length, 1);
+    const r = recibidos[0];
+    assert.equal(r.metodo, "PUT");
+    assert.match(r.url, /^\/coop-respaldos\/respaldos\/DBcooperativa_.*\.sql\.gz$/);
+    assert.match(r.auth, /^AWS4-HMAC-SHA256 Credential=CLAVEPRUEBA\/\d{8}\/auto\/s3\/aws4_request/);
+    const sql = zlib.gunzipSync(r.cuerpo).toString("utf8");
+    assert.match(sql, /CREATE TABLE `usuarios`/);
+    assert.match(sql, /INSERT INTO `usuarios`/);
+    const estado = await api("GET", "/basedatos/config-backup", null, ids.tSuper);
+    assert.equal(estado.b.externo.configurado, true);
+    assert.equal(estado.b.externo.error, null);
+    assert.ok(estado.b.externo.ultimo);
+
+    // si el almacenamiento falla, el respaldo igual queda en el servidor y se avisa
+    responder = 403;
+    const falla = await api("POST", "/basedatos/ejecutar-backup", null, ids.tSuper);
+    assert.equal(falla.s, 200);
+    assert.equal(falla.b.externo_ok, false);
+    assert.match(falla.b.message, /No se pudo subir la copia externa/);
+    const tras = await api("GET", "/basedatos/config-backup", null, ids.tSuper);
+    assert.match(tras.b.externo.error, /403/);
+  } finally {
+    for (const k of Object.keys(process.env)) if (k.startsWith("RESPALDO_S3_") && !(k in anteriores)) delete process.env[k];
+    await new Promise((ok) => s3.close(ok));
+  }
 });
 
 test("monitoreo: el estado del servicio responde", async () => {

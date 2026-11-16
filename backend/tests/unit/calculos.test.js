@@ -213,3 +213,26 @@ test("país: moneda, montos, identidad y teléfono de cada país", () => {
     pais.establecer("HN");
   }
 });
+
+test("respaldo externo: firma S3 (ejemplos oficiales de AWS)", () => {
+  const { firmar } = require("../../utils/respaldoExterno");
+  const base = {
+    region: "us-east-1",
+    accessKey: "AKIAIOSFODNN7EXAMPLE",
+    secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    fecha: new Date("2013-05-24T00:00:00Z"),
+  };
+  const firma = (h) => h.authorization.split("Signature=")[1];
+  const get = firmar({
+    ...base, metodo: "GET", url: "https://examplebucket.s3.amazonaws.com/test.txt",
+    encabezados: { Range: "bytes=0-9" },
+    hashCuerpo: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  });
+  assert.equal(firma(get), "f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41");
+  const put = firmar({
+    ...base, metodo: "PUT", url: "https://examplebucket.s3.amazonaws.com/test$file.text",
+    encabezados: { Date: "Fri, 24 May 2013 00:00:00 GMT", "x-amz-storage-class": "REDUCED_REDUNDANCY" },
+    hashCuerpo: require("crypto").createHash("sha256").update("Welcome to Amazon S3.").digest("hex"),
+  });
+  assert.equal(firma(put), "98ad721746da40c64f1a55b78f14c238d841ea1380cd77a1b5971af0ece108bd");
+});

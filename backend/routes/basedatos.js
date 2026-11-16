@@ -9,11 +9,12 @@ const { verificarToken, soloAdmin } = require("../middleware/auth");
 const {
   ejecutarBackup,
   generarSQL,
-  leerConfig,
+  obtenerConfig,
   guardarConfig,
   iniciarScheduler,
   BACKUPS_DIR,
 } = require("../utils/backupScheduler");
+const respaldoExterno = require("../utils/respaldoExterno");
 
 // Multer: guarda en carpeta temporal del SO, solo acepta .sql
 const upload = multer({
@@ -88,15 +89,28 @@ router.get("/backup", verificarToken, soloAdmin, async (req, res) => {
 // ============================================
 // GET /api/basedatos/config-backup
 // ============================================
-router.get("/config-backup", verificarToken, soloAdmin, (req, res) => {
-  res.json({ success: true, config: leerConfig() });
+router.get("/config-backup", verificarToken, soloAdmin, async (req, res) => {
+  try {
+    const config = await obtenerConfig();
+    // Estado de la copia fuera del servidor (sin mostrar claves)
+    const externo = {
+      configurado: respaldoExterno.configurado(),
+      destino: respaldoExterno.configurado() ? `${respaldoExterno.cfg().bucket}/${respaldoExterno.cfg().prefijo}` : null,
+      ultimo: config.ultimo_externo,
+      archivo: config.archivo_externo,
+      error: config.error_externo,
+    };
+    res.json({ success: true, config, externo });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
 // ============================================
 // POST /api/basedatos/config-backup
 // Guarda configuración y reinicia el cron
 // ============================================
-router.post("/config-backup", verificarToken, soloAdmin, (req, res) => {
+router.post("/config-backup", verificarToken, soloAdmin, async (req, res) => {
   try {
     const { activo, frecuencia, hora, dia_semana, max_backups } = req.body;
 
@@ -114,7 +128,7 @@ router.post("/config-backup", verificarToken, soloAdmin, (req, res) => {
       return res.status(400).json({ success: false, message: "max_backups debe ser entre 1 y 100" });
     }
 
-    const current = leerConfig();
+    const current = await obtenerConfig();
     const updated = {
       ...current,
       ...(activo !== undefined && { activo: Boolean(activo) }),
@@ -124,8 +138,8 @@ router.post("/config-backup", verificarToken, soloAdmin, (req, res) => {
       ...(max_backups !== undefined && { max_backups: Number(max_backups) }),
     };
 
-    guardarConfig(updated);
-    iniciarScheduler();
+    await guardarConfig(updated);
+    await iniciarScheduler();
 
     res.json({ success: true, message: "Configuración guardada", config: updated });
   } catch (error) {
@@ -140,9 +154,19 @@ router.post("/config-backup", verificarToken, soloAdmin, (req, res) => {
 // ============================================
 router.post("/ejecutar-backup", verificarToken, soloAdmin, async (req, res) => {
   try {
+    await obtenerConfig();
     const filename = await ejecutarBackup();
     if (!filename) throw new Error("No se pudo generar el backup");
-    res.json({ success: true, message: `Backup guardado en el servidor: ${filename}`, filename });
+    const config = await obtenerConfig();
+    let message = `Backup guardado en el servidor: ${filename}.`;
+    if (respaldoExterno.configurado()) {
+      message += config.error_externo
+        ? ` ¡Atención! No se pudo subir la copia externa: ${config.error_externo.split(" — ").slice(1).join(" — ")}`
+        : ` Copia externa: ${config.archivo_externo}.`;
+    } else {
+      message += " No hay almacenamiento externo configurado: descarga este respaldo y guárdalo fuera del servidor.";
+    }
+    res.json({ success: true, message, filename, externo_ok: respaldoExterno.configurado() && !config.error_externo });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

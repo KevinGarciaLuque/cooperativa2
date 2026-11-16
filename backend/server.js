@@ -32,7 +32,7 @@ aplicarMigraciones()
       .catch((e) => logger.error("archivos_importacion_fallida", e));
 
     configFinanciera.iniciar();
-    iniciarScheduler(); // respaldos automáticos
+    iniciarScheduler().catch((e) => logger.error("respaldos_no_programados", e)); // respaldos automáticos
     iniciarMoraScheduler(); // verificación diaria de mora
     iniciarRecordatoriosScheduler(); // recordatorios de pago a los socios (8:00)
 

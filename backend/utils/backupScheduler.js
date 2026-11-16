@@ -5,34 +5,73 @@ const pool = require("../db");
 const { locale } = require("./pais");
 const { zona } = require("./fechas");
 
-const CONFIG_FILE = path.join(__dirname, "../backup_config.json");
+const respaldoExterno = require("./respaldoExterno");
+
+// Archivo donde antes se guardaba la configuración (se borraba en cada despliegue de Railway).
+// Ahora vive en la base de datos (configuracion_sitio, clave "respaldo_config").
+const CONFIG_FILE_ANTERIOR = path.join(__dirname, "../backup_config.json");
+const CLAVE_CONFIG = "respaldo_config";
 // En Railway, apunta BACKUPS_DIR a un volumen persistente (ej. /data/backups)
 const BACKUPS_DIR = process.env.BACKUPS_DIR || path.join(__dirname, "../backups");
 
+// Activados por defecto: un respaldo diario a las 2:00 a. m. (hora de la cooperativa)
 const DEFAULT_CONFIG = {
-  activo: false,
+  activo: true,
   frecuencia: "diario",
   hora: "02:00",
   dia_semana: 1,
   max_backups: 10,
   ultimo_backup: null,
+  // Copia fuera del servidor (utils/respaldoExterno.js)
+  ultimo_externo: null, // fecha de la última copia externa que salió bien
+  archivo_externo: null,
+  error_externo: null, // mensaje del último intento fallido (null si el último salió bien)
 };
 
+let cache = null;
 let currentTask = null;
 
-function leerConfig() {
+// Lee la configuración guardada en la base de datos. La primera vez toma la frecuencia y la
+// hora del archivo anterior, si existe, pero deja los respaldos activados.
+async function cargarConfig() {
   try {
-    if (fs.existsSync(CONFIG_FILE)) {
-      return { ...DEFAULT_CONFIG, ...JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")) };
+    const [[fila]] = await pool.query("SELECT valor FROM configuracion_sitio WHERE clave = ?", [CLAVE_CONFIG]);
+    if (fila) {
+      cache = { ...DEFAULT_CONFIG, ...JSON.parse(fila.valor) };
+      return cache;
     }
+    let anterior = {};
+    try {
+      if (fs.existsSync(CONFIG_FILE_ANTERIOR)) anterior = JSON.parse(fs.readFileSync(CONFIG_FILE_ANTERIOR, "utf8"));
+    } catch {
+      anterior = {};
+    }
+    const { frecuencia, hora, dia_semana, max_backups, ultimo_backup } = anterior;
+    cache = { ...DEFAULT_CONFIG, ...JSON.parse(JSON.stringify({ frecuencia, hora, dia_semana, max_backups, ultimo_backup })) };
+    await guardarConfig(cache);
   } catch (err) {
-    console.error("Error al leer config de backup:", err.message);
+    console.error("Error al leer la configuración de respaldos:", err.message);
+    cache = cache || { ...DEFAULT_CONFIG };
   }
-  return { ...DEFAULT_CONFIG };
+  return cache;
 }
 
-function guardarConfig(config) {
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+// La configuración ya cargada, o la carga de la base de datos
+async function obtenerConfig() {
+  return cache ? leerConfig() : { ...(await cargarConfig()) };
+}
+
+function leerConfig() {
+  return { ...(cache || DEFAULT_CONFIG) };
+}
+
+async function guardarConfig(config) {
+  cache = { ...DEFAULT_CONFIG, ...config };
+  await pool.query(
+    "INSERT INTO configuracion_sitio (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)",
+    [CLAVE_CONFIG, JSON.stringify(cache)]
+  );
+  return cache;
 }
 
 async function generarSQL() {
@@ -50,7 +89,7 @@ async function generarSQL() {
   lines.push(
     `-- Fecha y hora: ${now.toLocaleDateString(locale())} ${now.toLocaleTimeString(locale())}`
   );
-  lines.push(`-- Generado por Demo`);
+  lines.push(`-- Generado por SmartCoop`);
   lines.push(`-- ============================================`);
   lines.push(``);
   lines.push(`SET FOREIGN_KEY_CHECKS=0;`);
@@ -99,38 +138,63 @@ async function generarSQL() {
   return { filename, content: lines.join("\n") };
 }
 
+// Genera el respaldo, lo guarda en el servidor y, si está configurado, sube una copia
+// comprimida al almacenamiento externo. Devuelve el nombre del archivo, o null si no se pudo
+// guardar en ningún lado.
 async function ejecutarBackup() {
-  if (!fs.existsSync(BACKUPS_DIR))
-    fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+  let generado;
+  try {
+    generado = await generarSQL();
+  } catch (err) {
+    console.error("❌ Error al generar backup:", err.message);
+    return null;
+  }
+  const { filename, content } = generado;
+  const config = leerConfig();
+  let guardado = false;
 
   try {
-    const config = leerConfig();
-    const { filename, content } = await generarSQL();
+    if (!fs.existsSync(BACKUPS_DIR)) fs.mkdirSync(BACKUPS_DIR, { recursive: true });
     fs.writeFileSync(path.join(BACKUPS_DIR, filename), content, "utf8");
+    guardado = true;
     console.log(`✅ Backup generado: ${filename}`);
 
     // Limpiar backups más viejos si se supera el límite
     const archivos = fs
       .readdirSync(BACKUPS_DIR)
-      .filter(
-        (f) => f.startsWith("DBcooperativa_") && f.endsWith(".sql")
-      )
+      .filter((f) => f.startsWith("DBcooperativa_") && f.endsWith(".sql"))
       .sort();
-
     const maxB = config.max_backups || 10;
     while (archivos.length > maxB) {
       const oldest = archivos.shift();
       fs.unlinkSync(path.join(BACKUPS_DIR, oldest));
       console.log(`🗑️  Backup eliminado (límite alcanzado): ${oldest}`);
     }
-
-    config.ultimo_backup = new Date().toISOString();
-    guardarConfig(config);
-    return filename;
   } catch (err) {
-    console.error("❌ Error al generar backup:", err.message);
-    return null;
+    console.error("❌ No se pudo guardar el backup en el servidor:", err.message);
   }
+
+  if (respaldoExterno.configurado()) {
+    try {
+      const subido = await respaldoExterno.subirRespaldo(filename, content);
+      config.ultimo_externo = new Date().toISOString();
+      config.archivo_externo = subido.nombre;
+      config.error_externo = null;
+      guardado = true;
+      console.log(`☁️  Copia externa del backup: ${subido.nombre} (${subido.bytes} bytes)`);
+    } catch (err) {
+      config.error_externo = `${new Date().toISOString()} — ${err.message}`;
+      console.error("❌ No se pudo subir la copia externa del backup:", err.message);
+    }
+  }
+
+  if (guardado) config.ultimo_backup = new Date().toISOString();
+  try {
+    await guardarConfig(config);
+  } catch (err) {
+    console.error("No se pudo registrar el respaldo:", err.message);
+  }
+  return guardado ? filename : null;
 }
 
 function buildCronExpr(config) {
@@ -149,7 +213,8 @@ function buildCronExpr(config) {
   }
 }
 
-function iniciarScheduler() {
+async function iniciarScheduler() {
+  if (!cache) await cargarConfig();
   if (currentTask) {
     currentTask.stop();
     currentTask = null;
@@ -184,6 +249,8 @@ module.exports = {
   generarSQL,
   leerConfig,
   guardarConfig,
+  cargarConfig,
+  obtenerConfig,
   buildCronExpr,
   BACKUPS_DIR,
 };

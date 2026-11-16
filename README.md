@@ -67,5 +67,13 @@ frontend/
 - **Mora:** tasa anual y días de gracia configurables (Parámetros). Solo el Super Administrador puede omitirla.
 - **Anulaciones:** nunca se borra un pago; se archiva con su motivo y se revierte en caja.
 - **Socio:** no ve intereses ni tasas; sí ve su mora y su cuota.
+- **Plan de pagos:** cada préstamo con plazo tiene sus cuotas con fecha de vencimiento (desde el desembolso,
+  sistema francés). Se calcula con las condiciones pactadas; una cuota está pagada cuando su capital ya se abonó.
+  La cartera (Cobranza, Contabilidad, provisiones) se clasifica por los días de atraso de la cuota más antigua
+  sin pagar. La mora que se cobra no depende del plan (ver "Mora").
+- **Productos de crédito:** tasa referencial, montos, plazos y garantía exigida (Super Administrador). Sin productos
+  activos, las solicitudes usan los parámetros generales.
+- **Garantías:** no se desembolsa un préstamo cuyo producto exige garantía si no está registrada.
+- **País:** moneda, documento de identidad, teléfono y zona horaria según el país elegido en Configuración.
 
 Para operación, respaldos y despliegue, ver [docs/OPERACION.md](docs/OPERACION.md).

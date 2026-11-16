@@ -32,6 +32,7 @@ const ProductosCredito = lazy(() => import("../pages/SuperAdmin/ProductosCredito
 const LibrosContables = lazy(() => import("../pages/LibrosContables"));
 const Ahorro = lazy(() => import("../pages/Ahorro"));
 const Cumplimiento = lazy(() => import("../pages/Cumplimiento"));
+const ComiteCredito = lazy(() => import("../pages/ComiteCredito"));
 const Politicas = lazy(() => import("../pages/SuperAdmin/Politicas"));
 // Vistas de usuario socio
 const SocioPerfil = lazy(() => import("../pages/Socio/SocioPerfil"));
@@ -133,6 +134,14 @@ export default function Rutas() {
             element={
               <PrivateRoute>
                 <ParametrosFinancieros />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/comite-credito"
+            element={
+              <PrivateRoute>
+                <ComiteCredito />
               </PrivateRoute>
             }
           />

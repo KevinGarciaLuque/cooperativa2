@@ -23,6 +23,10 @@ const DEFAULTS = {
   aho_retencion_pct: 0,
   // Prevención de lavado: monto en efectivo que genera alerta (0 = el del país)
   aml_umbral: 0,
+  // Aprobación de préstamos por niveles: hasta este monto aprueba el personal; por encima, el
+  // comité de crédito con el número de votos indicado (0 = sin comité, como siempre)
+  aprob_monto_admin: 0,
+  aprob_votos_comite: 2,
 };
 
 let cache = { ...DEFAULTS };

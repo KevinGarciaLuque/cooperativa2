@@ -32,6 +32,7 @@ import {
   FaBalanceScale,
   FaInbox,
   FaUserSecret,
+  FaGavel,
 } from "react-icons/fa";
 import LogoCoop from "./LogoCoop";
 
@@ -55,6 +56,7 @@ const TODOS_MODULOS = [
   { key: "prestamos",     to: "/prestamos",     icon: <FaHandHoldingUsd />, label: "Préstamos" },
   { key: "aportaciones",  to: "/aportaciones",  icon: <FaPiggyBank />,      label: "Aportaciones" },
   { key: "prestamos",     to: "/solicitudes",    icon: <FaInbox />,          label: "Solicitudes" },
+  { key: "prestamos",     to: "/comite-credito", icon: <FaGavel />,         label: "Comité de crédito" },
   { key: "contabilidad",  to: "/contabilidad",  icon: <FaBalanceScale />,   label: "Contabilidad" },
   { key: "contabilidad",  to: "/libros-contables", icon: <FaBook />,      label: "Libros contables" },
   { key: "cumplimiento",  to: "/cumplimiento",  icon: <FaUserSecret />,     label: "Cumplimiento", reservado: true },

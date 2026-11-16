@@ -887,6 +887,32 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_11_008_comite_credito",
+    descripcion: "Comité de crédito: miembros y votos por préstamo",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS comite_credito (
+          id_usuario INT PRIMARY KEY,
+          cargo VARCHAR(60) NULL,
+          agregado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS prestamo_votos (
+          id_voto INT AUTO_INCREMENT PRIMARY KEY,
+          id_prestamo INT NOT NULL,
+          id_usuario INT NOT NULL,
+          voto ENUM('aprobar','rechazar') NOT NULL,
+          comentario VARCHAR(500) NULL,
+          monto DECIMAL(14,2) NOT NULL,
+          fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_voto (id_prestamo, id_usuario),
+          INDEX idx_voto_prestamo (id_prestamo)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

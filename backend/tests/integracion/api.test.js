@@ -1705,6 +1705,78 @@ test("cumplimiento: expediente del socio, alertas de efectivo, fraccionamiento y
   assert.equal((await guardarUmbral(0)).s, 200);
 });
 
+test("comité de crédito: por encima del límite se aprueba por votos", async () => {
+  const fin = (await api("GET", "/configuracion/financiera", null, ids.tSuper)).b.data;
+  const parametros = (extra) => api("PUT", "/configuracion/financiera", { mora_tasa_anual: fin.mora_tasa_anual, mora_dias_gracia: fin.mora_dias_gracia, ...extra }, ids.tSuper);
+  const nuevo = async (monto, estado = "pendiente", token = ids.tAdmin) =>
+    api("POST", "/prestamos", { id_usuario: ids.socio, monto, tasa_interes: 24, plazo_meses: 12, estado }, token);
+  const idDe = (r) => r.b.id_prestamo || r.b.data?.id_prestamo || r.b.prestamo?.id_prestamo;
+  const estadoDe = async (id) => (await pool.query("SELECT estado FROM prestamos WHERE id_prestamo = ?", [id]))[0][0].estado;
+
+  // Sin límite (lo predeterminado) todo sigue igual
+  const libre = await nuevo(9000);
+  assert.equal((await api("PATCH", `/prestamos/${idDe(libre)}/aprobar`, {}, ids.tAdmin)).s, 200);
+
+  assert.equal((await parametros({ aprob_monto_admin: 5000, aprob_votos_comite: 2 })).s, 200);
+  const info = await api("GET", "/comite", null, ids.tAdmin);
+  assert.equal(info.s, 200);
+  assert.equal(info.b.data.activo, true);
+
+  // Hasta el límite aprueba el personal
+  const chico = await nuevo(3000);
+  assert.equal((await api("PATCH", `/prestamos/${idDe(chico)}/aprobar`, {}, ids.tAdmin)).s, 200);
+
+  // Por encima: no se crea ya aprobado ni se cambia el estado a mano
+  assert.equal((await nuevo(10000, "aprobado")).s, 409);
+  const grande = await nuevo(10000);
+  const idG = idDe(grande);
+  assert.equal((await api("PATCH", `/prestamos/${idG}/estado`, { estado: "aprobado" }, ids.tAdmin)).s, 409);
+  assert.equal((await api("PATCH", `/prestamos/${idG}/aprobar`, {}, ids.tAdmin)).s, 409, "aún no es miembro");
+
+  // Solo el Super Administrador define el comité, y solo con personal
+  assert.equal((await api("PUT", "/comite/miembros", { miembros: [{ id_usuario: ids.admin }] }, ids.tAdmin)).s, 403);
+  assert.equal((await api("PUT", "/comite/miembros", { miembros: [{ id_usuario: ids.socio }] }, ids.tSuper)).s, 400);
+  const def = await api("PUT", "/comite/miembros", { miembros: [{ id_usuario: ids.super, cargo: "Presidente" }, { id_usuario: ids.admin }] }, ids.tSuper);
+  assert.equal(def.s, 200, def.b?.message);
+  assert.equal(def.b.data.length, 2);
+
+  // Primer voto: queda pendiente
+  const v1 = await api("PATCH", `/prestamos/${idG}/aprobar`, {}, ids.tAdmin);
+  assert.equal(v1.s, 202);
+  assert.equal(v1.b.comite.a_favor, 1);
+  assert.equal(await estadoDe(idG), "pendiente");
+  const pend = await api("GET", "/comite/pendientes", null, ids.tSuper);
+  assert.ok(pend.b.data.some((p) => p.id_prestamo === idG));
+  assert.equal((await api("GET", "/comite/pendientes", null, ids.tSocio)).s, 403);
+
+  // Segundo voto: aprobado
+  const v2 = await api("POST", `/comite/prestamos/${idG}/votar`, { voto: "aprobar" }, ids.tSuper);
+  assert.equal(v2.s, 200, v2.b?.message);
+  assert.equal(v2.b.resultado, "aprobado");
+  assert.equal(await estadoDe(idG), "aprobado");
+
+  // Si cambia el monto, los votos anteriores no cuentan
+  const otro = await nuevo(8000);
+  const idO = idDe(otro);
+  assert.equal((await api("POST", `/comite/prestamos/${idO}/votar`, { voto: "aprobar" }, ids.tAdmin)).s, 200);
+  await pool.query("UPDATE prestamos SET monto = 8500 WHERE id_prestamo = ?", [idO]);
+  const tras = await api("POST", `/comite/prestamos/${idO}/votar`, { voto: "aprobar" }, ids.tSuper);
+  assert.equal(tras.b.resultado, "pendiente");
+  assert.equal(tras.b.comite.a_favor, 1);
+
+  // Rechazo: el voto en contra necesita motivo
+  assert.equal((await api("POST", `/comite/prestamos/${idO}/votar`, { voto: "rechazar" }, ids.tAdmin)).s, 400);
+  assert.equal((await api("POST", `/comite/prestamos/${idO}/votar`, { voto: "rechazar", comentario: "Capacidad de pago insuficiente" }, ids.tAdmin)).s, 200);
+  const r2 = await api("POST", `/comite/prestamos/${idO}/votar`, { voto: "rechazar", comentario: "Sin garantía suficiente" }, ids.tSuper);
+  assert.equal(r2.b.resultado, "rechazado");
+  assert.equal(await estadoDe(idO), "rechazado");
+
+  // Limpieza
+  await pool.query("UPDATE prestamos SET estado = 'rechazado' WHERE id_prestamo IN (?)", [[idDe(libre), idDe(chico), idG]]);
+  assert.equal((await parametros({ aprob_monto_admin: 0 })).s, 200);
+  assert.equal((await api("PUT", "/comite/miembros", { miembros: [] }, ids.tSuper)).s, 200);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

@@ -12,6 +12,7 @@ const { invalidarEstado } = require("../middleware/seguridad");
 const { asignarNumeroSocio } = require("../utils/numeroSocio");
 const { abrirCuentasAutomaticas } = require("../utils/ahorro");
 const { dinero } = require("../utils/pais");
+const comite = require("../utils/comite");
 
 const num = (v) => parseFloat(v || 0);
 const esSocio = (req) => req.usuario?.rol === "Socio";
@@ -358,6 +359,27 @@ router.post("/prestamos/:id/aprobar", soloPersonal, async (req, res) => {
     if (!(tasaMensual >= 0) || tasaMensual > 30) {
       await connection.rollback();
       return res.status(400).json({ message: "Tasa mensual inválida." });
+    }
+
+    // Por encima del límite del personal decide el comité de crédito: esta aprobación es un voto
+    // sobre las condiciones propuestas (si cambian, los votos anteriores dejan de contar)
+    if (comite.requiere(monto)) {
+      await connection.query(
+        `UPDATE prestamos
+         SET monto = ?, saldo_restante = ?, plazo_meses = ?, tasa_interes = ?, tasa_original = ?, tipo_tasa = 'nominal_mensual'
+         WHERE id_prestamo = ?`,
+        [monto, monto, plazo, parseFloat((tasaMensual * 12).toFixed(4)), tasaMensual, req.params.id]
+      );
+      const r = await comite.votar(connection, { id_prestamo: p.id_prestamo, monto }, req.usuario.id_usuario, "aprobar", req.body.comentario);
+      if (!r.aprobado) {
+        await connection.commit();
+        return res.status(202).json({
+          success: true,
+          en_comite: true,
+          comite: { a_favor: r.a_favor, en_contra: r.en_contra, requeridos: r.requeridos },
+          message: `Voto registrado. El comité lleva ${r.a_favor} de ${r.requeridos} votos a favor.`,
+        });
+      }
     }
 
     await connection.query(

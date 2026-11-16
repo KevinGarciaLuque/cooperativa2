@@ -36,6 +36,7 @@ const MODULO_POR_PREFIJO = {
   libros: "contabilidad",
   ahorro: "cuentas",
   solicitudes: "prestamos",
+  comite: "prestamos",
   contabilidad: "contabilidad",
   recibos: "pagos",
   "pagos-reportados": "pagos",

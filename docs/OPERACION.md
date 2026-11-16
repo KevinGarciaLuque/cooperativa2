@@ -174,6 +174,18 @@ El catálogo base está en `backend/utils/contabilidad.js`; el contador puede ag
   los socios por aportaciones y por intereses pagados; se acredita en su cuenta de aportaciones, con la partida de
   cierre del ejercicio. Solo años terminados y una vez por año.
 
+## Comité de crédito (aprobación por niveles de monto)
+
+- En **Parámetros → Aprobación de préstamos** se indica el monto máximo que aprueba el personal y cuántos
+  votos a favor necesita el comité. Con 0 (lo predeterminado) no hay comité y todo funciona como antes.
+- Los miembros los elige el Super Administrador en **Comité de crédito** (solo personal activo).
+- Por encima del límite, "Aprobar" (en Préstamos o en Solicitudes) cuenta como el voto a favor de quien lo
+  pulsa; quien no es miembro recibe un aviso. Con los votos necesarios el préstamo pasa a *aprobado*; con el
+  mismo número de votos en contra (cada uno con su motivo) queda *rechazado* y se avisa al socio.
+- Los votos valen para el monto votado: si se cambia el monto, hay que volver a votar.
+- Un préstamo que requiere comité no se puede crear ya aprobado ni cambiar a aprobado a mano (salvo el
+  Super Administrador, para registrar préstamos históricos).
+
 ## Cumplimiento (prevención de lavado de dinero)
 
 - **Expediente del socio** (Ventanilla → expediente): actividad económica, ingreso mensual, origen de los

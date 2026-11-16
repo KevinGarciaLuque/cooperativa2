@@ -178,6 +178,7 @@ app.use("/api/garantias", require("./routes/garantias"));
 app.use("/api/libros", require("./routes/libros"));
 app.use("/api/ahorro", require("./routes/ahorro"));
 app.use("/api/cumplimiento", require("./routes/cumplimiento"));
+app.use("/api/comite", ocultarInteresSocio, require("./routes/comite"));
 app.use("/api/aportaciones", require("./routes/aportaciones"));
 app.use("/api/pagos", ocultarInteresSocio, require("./routes/pagos"));
 app.use("/api/movimientos", require("./routes/movimientos"));

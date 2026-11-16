@@ -17,7 +17,7 @@ export default function ParametrosFinancieros() {
   const [tasa, setTasa] = useState("");
   const [gracia, setGracia] = useState("");
   const [prov, setProv] = useState({ prov_al_dia: "", prov_1_30: "", prov_31_60: "", prov_61_90: "", prov_90_mas: "" });
-  const [sol, setSol] = useState({ sol_tasa_mensual: "", sol_monto_max: "", sol_plazo_max: "", sol_pct_ingreso_max: "", aho_retencion_pct: "0", aml_umbral: "0" });
+  const [sol, setSol] = useState({ sol_tasa_mensual: "", sol_monto_max: "", sol_plazo_max: "", sol_pct_ingreso_max: "", aho_retencion_pct: "0", aml_umbral: "0", aprob_monto_admin: "0", aprob_votos_comite: "2" });
   const [rec, setRec] = useState({ rec_activo: true, rec_dias_antes: "3", rec_mora_cada: "7" });
   const [enviando, setEnviando] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -36,6 +36,8 @@ export default function ParametrosFinancieros() {
           sol_pct_ingreso_max: String(res.data.data.sol_pct_ingreso_max),
           aho_retencion_pct: String(res.data.data.aho_retencion_pct ?? 0),
           aml_umbral: String(res.data.data.aml_umbral ?? 0),
+          aprob_monto_admin: String(res.data.data.aprob_monto_admin ?? 0),
+          aprob_votos_comite: String(res.data.data.aprob_votos_comite ?? 2),
         });
         setRec({
           rec_activo: parseInt(res.data.data.rec_activo) === 1,
@@ -176,6 +178,24 @@ export default function ParametrosFinancieros() {
             <label className="form-label fw-semibold small">Retención sobre intereses (%)</label>
             <input type="number" step="0.01" min="0" max="50" className="form-control" value={sol.aho_retencion_pct}
               onChange={(e) => setSol({ ...sol, aho_retencion_pct: e.target.value })} disabled={cargando} />
+          </div>
+        </div>
+
+        <h5 className="fw-bold mt-4 mb-1" style={{ color: AZUL }}>Aprobación de préstamos</h5>
+        <p className="text-muted small">
+          Hasta este monto, el personal con acceso a Préstamos aprueba directamente. Por encima, decide el comité de
+          crédito por votos (los miembros se eligen en <em>Comité de crédito</em>). Con 0, no hay comité.
+        </p>
+        <div className="row g-3">
+          <div className="col-12 col-md-6">
+            <label className="form-label fw-semibold small">Monto máximo que aprueba el personal ({simboloMoneda()})</label>
+            <input type="number" step="1" min="0" className="form-control" value={sol.aprob_monto_admin}
+              onChange={(e) => setSol({ ...sol, aprob_monto_admin: e.target.value })} disabled={cargando} />
+          </div>
+          <div className="col-12 col-md-6">
+            <label className="form-label fw-semibold small">Votos a favor que necesita el comité</label>
+            <input type="number" step="1" min="1" max="15" className="form-control" value={sol.aprob_votos_comite}
+              onChange={(e) => setSol({ ...sol, aprob_votos_comite: e.target.value })} disabled={cargando} />
           </div>
         </div>
 

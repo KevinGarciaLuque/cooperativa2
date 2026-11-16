@@ -10,6 +10,7 @@ const { dinero } = require("../utils/pais");
 const { planDePrestamo } = require("../utils/planPagos");
 const { obtenerProducto, fueraDeProducto } = require("../utils/productos");
 const { faltaGarantia } = require("../utils/garantias");
+const comite = require("../utils/comite");
 const { contabilizar, conSalvaguarda } = require("../utils/contabilidad");
 const {
   calcularCuotaMensual,
@@ -371,6 +372,20 @@ router.patch("/:id/aprobar", async (req, res) => {
       });
     }
 
+    // Por encima del límite del personal decide el comité de crédito: esta aprobación es un voto
+    if (comite.requiere(p.monto)) {
+      const r = await comite.votar(connection, p, req.usuario.id_usuario, "aprobar", req.body?.comentario);
+      if (!r.aprobado) {
+        await connection.commit();
+        return res.status(202).json({
+          success: true,
+          en_comite: true,
+          comite: { a_favor: r.a_favor, en_contra: r.en_contra, requeridos: r.requeridos },
+          message: `Voto registrado. El comité lleva ${r.a_favor} de ${r.requeridos} votos a favor.`,
+        });
+      }
+    }
+
     await connection.query(
       `UPDATE prestamos SET estado = 'aprobado', aprobado_por = ?, fecha_aprobacion = NOW() WHERE id_prestamo = ?`,
       [req.usuario?.id_usuario || null, req.params.id]
@@ -384,6 +399,7 @@ router.patch("/:id/aprobar", async (req, res) => {
     res.json({ success: true, message: `Préstamo aprobado. Falta registrar el desembolso.${avisoCarta}` });
   } catch (error) {
     await connection.rollback().catch(() => {});
+    if (error.codigo) return res.status(error.codigo).json({ message: error.message });
     console.error("ERROR AL APROBAR PRÉSTAMO:", error);
     res.status(500).json({ message: "Error al aprobar el préstamo" });
   } finally {
@@ -579,6 +595,10 @@ router.patch("/:id/estado", async (req, res) => {
 
     if (prestamo.length === 0) {
       return res.status(404).json({ message: "Préstamo no encontrado" });
+    }
+
+    if (comite.bloqueaCambioDirecto(req.usuario, prestamo[0].monto, prestamo[0].estado, estado)) {
+      return res.status(409).json({ message: `${comite.mensajeBloqueo()} Usa "Aprobar" para votar.` });
     }
 
     // Solo se marca como pagado un préstamo sin saldo (el saldo se salda registrando el pago)
@@ -876,6 +896,9 @@ router.post("/", async (req, res) => {
     const cuotaMensual = calcularCuotaMensual(montoNum, tasaNum, plazoNum);
     const estadosPermitidos = ['pendiente', 'aprobado', 'activo', 'mora', 'pagado', 'rechazado'];
     const estadoPrestamo = (estado && estadosPermitidos.includes(estado)) ? estado : 'pendiente';
+    if (comite.bloqueaCambioDirecto(req.usuario, montoNum, null, estadoPrestamo)) {
+      return res.status(409).json({ message: `${comite.mensajeBloqueo()} Regístralo como pendiente.` });
+    }
     const fechaOtorgado = fecha_otorgado || null;
     const tipoTasaGuardar = tipo_tasa || "nominal_anual";
     const tasaOriginalGuardar = tasa_original != null ? parseFloat(tasa_original) : tasaNum;
@@ -981,6 +1004,10 @@ router.put("/:id", async (req, res) => {
     const nuevoEstado = (estado && estadosPermitidosPut.includes(estado))
       ? estado
       : actual.estado;
+    if (comite.bloqueaCambioDirecto(req.usuario, montoNum, actual.estado, nuevoEstado)) {
+      await connection.rollback();
+      return res.status(409).json({ message: `${comite.mensajeBloqueo()} Usa "Aprobar" para votar.` });
+    }
 
     // Un préstamo solo pasa a "pagado" cuando su saldo ya es cero (se salda registrando el pago)
     const saldoActual = parseFloat(actual.saldo_restante);

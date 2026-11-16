@@ -681,6 +681,104 @@ const MIGRACIONES = [
       await require("./contabilidad").sembrarCatalogo(conn);
     },
   },
+  {
+    id: "2026_11_005_ahorro",
+    descripcion: "Productos de ahorro, intereses sobre ahorros y depósitos a plazo fijo",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS productos_ahorro (
+          id_producto_ahorro INT AUTO_INCREMENT PRIMARY KEY,
+          nombre VARCHAR(60) NOT NULL,
+          descripcion VARCHAR(300) NULL,
+          clase ENUM('aportacion','ahorro','plazo_fijo') NOT NULL,
+          tasa_anual DECIMAL(6,3) NOT NULL DEFAULT 0,
+          saldo_minimo DECIMAL(12,2) NOT NULL DEFAULT 0,
+          permite_retiros TINYINT(1) NOT NULL DEFAULT 1,
+          apertura_automatica TINYINT(1) NOT NULL DEFAULT 0,
+          monto_min DECIMAL(12,2) NOT NULL DEFAULT 0,
+          plazo_min_dias INT NOT NULL DEFAULT 30,
+          plazo_max_dias INT NOT NULL DEFAULT 1825,
+          penalizacion_pct DECIMAL(5,2) NOT NULL DEFAULT 50,
+          activo TINYINT(1) NOT NULL DEFAULT 1,
+          orden INT NOT NULL DEFAULT 0,
+          UNIQUE KEY uq_producto_ahorro_nombre (nombre)
+        )
+      `);
+      // Los tres tipos de cuenta de siempre, sin interés (nada cambia hasta que se configure)
+      for (const [nombre, clase, orden] of [["Aportaciones", "aportacion", 1], ["Vivienda", "ahorro", 2], ["Pensiones", "ahorro", 3]]) {
+        await conn.query(
+          `INSERT IGNORE INTO productos_ahorro (nombre, clase, apertura_automatica, orden) VALUES (?, ?, 1, ?)`,
+          [nombre, clase, orden]
+        );
+      }
+      // El tipo de cuenta deja de ser una lista fija (los valores existentes se conservan)
+      const [[col]] = await conn.query(
+        `SELECT DATA_TYPE AS tipo FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cuentas' AND COLUMN_NAME = 'tipo_cuenta'`
+      );
+      if (col && col.tipo === "enum") await conn.query(`ALTER TABLE cuentas MODIFY tipo_cuenta VARCHAR(60) NOT NULL`);
+      const [[e]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cuentas' AND COLUMN_NAME = 'id_producto_ahorro'`
+      );
+      if (!e.n) await conn.query(`ALTER TABLE cuentas ADD COLUMN id_producto_ahorro INT NULL`);
+      await conn.query(
+        `UPDATE cuentas c INNER JOIN productos_ahorro p ON LOWER(p.nombre) = LOWER(c.tipo_cuenta)
+         SET c.id_producto_ahorro = p.id_producto_ahorro WHERE c.id_producto_ahorro IS NULL`
+      );
+
+      // Foto diaria del saldo de cada cuenta (para el interés sobre el saldo promedio diario)
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS saldos_diarios (
+          id_cuenta INT NOT NULL,
+          fecha DATE NOT NULL,
+          saldo DECIMAL(14,2) NOT NULL,
+          PRIMARY KEY (id_cuenta, fecha)
+        )
+      `);
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS intereses_ahorro (
+          id_interes INT AUTO_INCREMENT PRIMARY KEY,
+          id_cuenta INT NOT NULL,
+          anio SMALLINT NOT NULL,
+          mes TINYINT NOT NULL,
+          saldo_promedio DECIMAL(14,2) NOT NULL,
+          tasa_anual DECIMAL(6,3) NOT NULL,
+          dias INT NOT NULL,
+          interes_bruto DECIMAL(12,2) NOT NULL,
+          retencion DECIMAL(12,2) NOT NULL DEFAULT 0,
+          interes_neto DECIMAL(12,2) NOT NULL,
+          acreditado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_interes_cuenta_mes (id_cuenta, anio, mes)
+        )
+      `);
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS depositos_plazo (
+          id_deposito INT AUTO_INCREMENT PRIMARY KEY,
+          id_usuario INT NOT NULL,
+          id_producto_ahorro INT NOT NULL,
+          monto DECIMAL(14,2) NOT NULL,
+          tasa_anual DECIMAL(6,3) NOT NULL,
+          plazo_dias INT NOT NULL,
+          penalizacion_pct DECIMAL(5,2) NOT NULL,
+          fecha_inicio DATE NOT NULL,
+          fecha_vencimiento DATE NOT NULL,
+          origen VARCHAR(20) NOT NULL,
+          estado ENUM('vigente','pagado','cancelado') NOT NULL DEFAULT 'vigente',
+          interes_pagado DECIMAL(12,2) NULL,
+          retencion DECIMAL(12,2) NULL,
+          pagado_en DATETIME NULL,
+          destino_pago VARCHAR(20) NULL,
+          creado_por INT NULL,
+          creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_plazo_socio (id_usuario),
+          INDEX idx_plazo_estado (estado, fecha_vencimiento)
+        )
+      `);
+      // Cuentas contables nuevas (plazo fijo, retenciones, reservas) si la contabilidad ya existía
+      await require("./contabilidad").sembrarCatalogo(conn);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

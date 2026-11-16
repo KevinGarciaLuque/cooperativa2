@@ -362,3 +362,37 @@ test("contabilidad: cada operación cuadra y un cambio registra solo la diferenc
   assert.equal(de("ingreso_mora").debe, 50, "la mora baja 50");
   assert.ok(!cambio.some((l) => l.clave === "ingreso_intereses"), "el interés no cambió: no aparece");
 });
+
+test("ahorro: saldo promedio diario, interés del mes y plazo fijo", () => {
+  const { saldoPromedio, interesDelMes, liquidacionPlazo, diasDelMes } = require("../../utils/ahorro");
+  assert.equal(diasDelMes(2026, 2), 28);
+  assert.equal(diasDelMes(2028, 2), 29);
+
+  // Noviembre (30 días): 1,000 los primeros 10 días y 4,000 desde el 11 → promedio 3,000
+  const fotos = [
+    { fecha: "2026-10-31", saldo: 1000 }, // la última del mes anterior cubre los primeros días
+    { fecha: "2026-11-11", saldo: 4000 },
+  ];
+  const p = saldoPromedio(fotos, 2026, 11, 0);
+  assert.equal(p.promedio, 3000);
+  assert.equal(p.dias, 30);
+  // Sin fotos: se usa el saldo de respaldo
+  assert.equal(saldoPromedio([], 2026, 11, 500).promedio, 500);
+
+  // 3,000 al 6% anual por 30 días = 14.79; con 10% de retención: 1.48 y neto 13.31
+  const i = interesDelMes({ promedio: 3000, tasaAnual: 6, dias: 30, retencionPct: 10 });
+  assert.deepEqual(i, { bruto: 14.79, retencion: 1.48, neto: 13.31 });
+  assert.equal(interesDelMes({ promedio: -50, tasaAnual: 6, dias: 30 }).bruto, 0);
+
+  // Plazo fijo de 10,000 al 8% por 180 días
+  const dep = { monto: 10000, tasa_anual: 8, plazo_dias: 180, penalizacion_pct: 50, fecha_inicio: "2026-01-01", fecha_vencimiento: "2026-06-30" };
+  const alVencer = liquidacionPlazo(dep, "2026-07-02");
+  assert.equal(alVencer.anticipado, false);
+  assert.equal(alVencer.interes, 394.52); // 10,000 × 8% × 180 / 365
+  // Retiro anticipado a los 90 días: la mitad del interés devengado
+  const antes = liquidacionPlazo(dep, "2026-04-01");
+  assert.equal(antes.anticipado, true);
+  assert.equal(antes.dias, 90);
+  assert.equal(antes.interes_devengado, 197.26);
+  assert.equal(antes.interes, 98.63);
+});

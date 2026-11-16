@@ -30,12 +30,21 @@ const CATALOGO_BASE = [
   ["2101", "Ahorro para vivienda", "pasivo", "ahorro_vivienda", "21"],
   ["2102", "Ahorro para pensiones", "pasivo", "ahorro_pensiones", "21"],
   ["2109", "Otros depósitos de socios", "pasivo", "ahorro_otros", "21"],
+  ["2110", "Depósitos a plazo fijo", "pasivo", "depositos_plazo", "21"],
+  ["22", "Otras obligaciones", "pasivo", null, "2"],
+  ["2201", "Retenciones de impuestos por pagar", "pasivo", "retenciones_por_pagar", "22"],
   ["3", "PATRIMONIO", "patrimonio", null, null],
   ["31", "Capital social", "patrimonio", null, "3"],
   ["3101", "Aportaciones de socios", "patrimonio", "aportaciones", "31"],
   ["3102", "Capital institucional", "patrimonio", "capital_institucional", "31"],
   ["33", "Resultados", "patrimonio", null, "3"],
   ["3301", "Resultados acumulados", "patrimonio", "resultados_acumulados", "33"],
+  ["3302", "Excedente del ejercicio", "patrimonio", "resultado_ejercicio", "33"],
+  ["32", "Reservas", "patrimonio", null, "3"],
+  ["3201", "Reserva legal", "patrimonio", "reserva_legal", "32"],
+  ["3202", "Fondo de educación", "patrimonio", "fondo_educacion", "32"],
+  ["3203", "Fondo de previsión social", "patrimonio", "fondo_prevision", "32"],
+  ["3209", "Otras reservas", "patrimonio", "otras_reservas", "32"],
   ["3303", "Excedentes distribuidos a socios", "patrimonio", "distribucion_excedentes", "33"],
   ["4", "INGRESOS", "ingreso", null, null],
   ["41", "Ingresos financieros", "ingreso", null, "4"],
@@ -134,6 +143,27 @@ const lineasDe = (tipo, d) => {
       const interes = r2(d.interes);
       const mora = r2(d.mora);
       return [L("cartera", capital + interes + mora), L("cartera", 0, capital), L("ingreso_intereses", 0, interes), L("ingreso_mora", 0, mora)];
+    }
+    case "interes_ahorro": {
+      // Interés del mes acreditado a la cuenta del socio (menos la retención, si la hay)
+      const interes = r2(d.interes);
+      const retencion = r2(d.retencion || 0);
+      return [L("gasto_intereses_ahorro", interes), L(cuentaDeSocio(d.tipo_cuenta), 0, interes - retencion), L("retenciones_por_pagar", 0, retencion)];
+    }
+    case "apertura_plazo": // el socio entrega el dinero (caja, banco o desde su cuenta de ahorro)
+      return [L(d.metodo === "cuenta" ? cuentaDeSocio(d.tipo_cuenta) : medio(d.metodo), monto), L("depositos_plazo", 0, monto)];
+    case "pago_plazo": {
+      // Se devuelve el capital más el interés (menos la retención), en efectivo, banco o a su cuenta
+      const capital = r2(d.capital);
+      const interes = r2(d.interes);
+      const retencion = r2(d.retencion || 0);
+      const destino = d.metodo === "cuenta" ? cuentaDeSocio(d.tipo_cuenta) : medio(d.metodo);
+      return [
+        L("depositos_plazo", capital),
+        L("gasto_intereses_ahorro", interes),
+        L(destino, 0, capital + interes - retencion),
+        L("retenciones_por_pagar", 0, retencion),
+      ];
     }
     case "ajuste_socio": // ajuste manual de saldo de una cuenta del socio (sin dinero de por medio)
       return monto >= 0

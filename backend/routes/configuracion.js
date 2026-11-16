@@ -136,7 +136,10 @@ router.put("/financiera", verificarToken, soloSuperAdmin, async (req, res) => {
       ["fin_mora_tasa_anual", String(tasa)],
       ["fin_mora_dias_gracia", String(gracia)],
     ];
-    const clavesSol = { sol_tasa_mensual: [0, 30], sol_monto_max: [1, 100000000], sol_plazo_max: [1, 360], sol_pct_ingreso_max: [1, 100] };
+    const clavesSol = {
+      sol_tasa_mensual: [0, 30], sol_monto_max: [1, 100000000], sol_plazo_max: [1, 360], sol_pct_ingreso_max: [1, 100],
+      aho_retencion_pct: [0, 50], // retención sobre los intereses de los ahorros
+    };
     for (const [k, [min, max]] of Object.entries(clavesSol)) {
       if (req.body[k] === undefined || req.body[k] === "") continue;
       const v = parseFloat(req.body[k]);

@@ -19,6 +19,8 @@ const DEFAULTS = {
   rec_activo: 1, // 1 = se envían solos cada mañana
   rec_dias_antes: 3, // días antes del vencimiento para el aviso previo
   rec_mora_cada: 7, // en mora, repetir cada N días (0 = solo el primer aviso)
+  // Ahorro: retención de impuesto sobre los intereses que se pagan a los socios (%)
+  aho_retencion_pct: 0,
 };
 
 let cache = { ...DEFAULTS };

@@ -396,3 +396,12 @@ test("ahorro: saldo promedio diario, interés del mes y plazo fijo", () => {
   assert.equal(antes.interes_devengado, 197.26);
   assert.equal(antes.interes, 98.63);
 });
+
+test("excedentes: el reparto proporcional cuadra al centavo", () => {
+  const { repartir } = require("../../utils/excedentes");
+  const partes = repartir(100, [1, 1, 1]);
+  cerca(partes.reduce((t, p) => t + p, 0), 100, 0.0001);
+  assert.deepEqual(repartir(1000, [3000, 1000, 0]), [750, 250, 0]);
+  assert.deepEqual(repartir(50, [0, 0]), [0, 0], "sin base no se reparte");
+  assert.deepEqual(repartir(10, [-5, 5]), [0, 10], "saldos negativos no cuentan");
+});

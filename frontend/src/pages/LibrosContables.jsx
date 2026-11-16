@@ -19,6 +19,7 @@ const TABS = [
   ["estados", "Estados financieros"],
   ["partida", "Nueva partida"],
   ["catalogo", "Catálogo"],
+  ["excedentes", "Excedentes"],
 ];
 const fecha = (v) => (v ? String(v).substring(0, 10) : "");
 const primerDiaDelAnio = () => `${hoyLocal().substring(0, 4)}-01-01`;
@@ -71,7 +72,7 @@ export default function LibrosContables() {
       <ul className="nav nav-tabs mb-3 flex-nowrap overflow-auto">
         {TABS.map(([k, t]) => (
           <li className="nav-item" key={k}>
-            <button className={`nav-link ${tab === k ? "active fw-semibold" : ""}`} onClick={() => setTab(k)} disabled={k !== "inicio" && k !== "catalogo" && !estado?.iniciada}>
+            <button className={`nav-link ${tab === k ? "active fw-semibold" : ""}`} onClick={() => setTab(k)} disabled={!["inicio", "catalogo", "excedentes"].includes(k) && !estado?.iniciada}>
               {t}
             </button>
           </li>
@@ -84,6 +85,7 @@ export default function LibrosContables() {
       {tab === "balanza" && <Balanza headers={headers} error={error} exportar={exportar} />}
       {tab === "estados" && <Estados headers={headers} error={error} exportar={exportar} />}
       {tab === "partida" && <NuevaPartida headers={headers} error={error} catalogo={catalogo} mostrarAlerta={mostrarAlerta} />}
+      {tab === "excedentes" && <Excedentes headers={headers} error={error} esSuper={esSuper} mostrarAlerta={mostrarAlerta} />}
       {tab === "catalogo" && <Catalogo headers={headers} error={error} catalogo={catalogo} setCatalogo={setCatalogo} esSuper={esSuper} />}
     </div>
   );
@@ -516,5 +518,118 @@ function Catalogo({ headers, error, catalogo, setCatalogo, esSuper }) {
         </tbody>
       </table>
     </Tarjeta>
+  );
+}
+
+// ── Distribución de excedentes del ejercicio ───────────────────────────────
+function Excedentes({ headers, error, esSuper, mostrarAlerta }) {
+  const [historial, setHistorial] = useState([]);
+  const [params, setParams] = useState(null);
+  const [sim, setSim] = useState(null);
+  const [aplicando, setAplicando] = useState(false);
+
+  const cargar = useCallback(() => {
+    axios.get(`${API_URL}/libros/excedentes`, { headers }).then((r) => {
+      setHistorial(r.data.data || []);
+      setParams((p) => p || { anio: new Date().getFullYear() - 1, pct_aportaciones: 50, monto_manual: "", reservas: r.data.reservas_base });
+    });
+  }, [headers]);
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const cuerpo = () => ({ ...params, monto_manual: params.monto_manual === "" ? undefined : params.monto_manual });
+  const simular = async () => {
+    setSim(null);
+    try {
+      const r = await axios.post(`${API_URL}/libros/excedentes/simular`, cuerpo(), { headers });
+      setSim(r.data);
+    } catch (e) {
+      error(e, "No se pudo calcular.");
+    }
+  };
+  const aplicar = async () => {
+    if (!window.confirm(`¿Distribuir los excedentes de ${params.anio}? Se acredita a cada socio en su cuenta de aportaciones y no se puede repetir.`)) return;
+    setAplicando(true);
+    try {
+      const r = await axios.post(`${API_URL}/libros/excedentes/aplicar`, cuerpo(), { headers });
+      mostrarAlerta(r.data.message, "success");
+      setSim(null);
+      cargar();
+    } catch (e) {
+      error(e, "No se pudo aplicar.");
+    } finally {
+      setAplicando(false);
+    }
+  };
+  if (!params) return <div className="spinner-border spinner-border-sm text-success" />;
+  const ponerReserva = (i, k, v) => setParams((p) => ({ ...p, reservas: p.reservas.map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
+  const yaAplicado = historial.some((h) => h.anio === parseInt(params.anio));
+
+  return (
+    <>
+      <Tarjeta className="mb-3">
+        <p className="small text-muted">
+          Al cerrar un año: del excedente (ingresos − gastos según la contabilidad) se separan las reservas de los estatutos y
+          el resto se reparte entre los socios activos, una parte según el saldo de sus aportaciones y otra según los intereses
+          que pagaron ese año. Cada socio lo recibe en su cuenta de aportaciones. Revisa la vista previa con la junta directiva;
+          se aplica una sola vez por año.
+        </p>
+        <div className="row g-2 align-items-end">
+          <div className="col-6 col-md-2"><label className="form-label small mb-1">Año</label><input type="number" className="form-control form-control-sm" value={params.anio} onChange={(e) => setParams({ ...params, anio: e.target.value })} /></div>
+          <div className="col-6 col-md-3"><label className="form-label small mb-1">Por aportaciones (%)</label><input type="number" min="0" max="100" className="form-control form-control-sm" value={params.pct_aportaciones} onChange={(e) => setParams({ ...params, pct_aportaciones: e.target.value })} /><div className="form-text">El resto, por intereses pagados.</div></div>
+          <div className="col-12 col-md-4"><label className="form-label small mb-1">Excedente a mano (solo si la contabilidad no cubre ese año)</label><input type="number" step="0.01" className="form-control form-control-sm" value={params.monto_manual} onChange={(e) => setParams({ ...params, monto_manual: e.target.value })} /></div>
+        </div>
+        <div className="mt-3">
+          <div className="small fw-semibold mb-1">Reservas</div>
+          {params.reservas.map((r, i) => (
+            <div key={i} className="d-flex gap-2 mb-1">
+              <input className="form-control form-control-sm" style={{ maxWidth: 260 }} value={r.nombre} onChange={(e) => ponerReserva(i, "nombre", e.target.value)} />
+              <input type="number" min="0" max="100" className="form-control form-control-sm" style={{ maxWidth: 90 }} value={r.pct} onChange={(e) => ponerReserva(i, "pct", e.target.value)} />
+              <span className="small align-self-center">%</span>
+              <button className="btn btn-sm btn-link text-danger" onClick={() => setParams((p) => ({ ...p, reservas: p.reservas.filter((_, j) => j !== i) }))}><FaTrash /></button>
+            </div>
+          ))}
+          <button className="btn btn-sm btn-outline-dark mt-1" onClick={() => setParams((p) => ({ ...p, reservas: [...p.reservas, { clave: "otras_reservas", nombre: "Otra reserva", pct: 0 }] }))}><FaPlus className="me-1" />Reserva</button>
+        </div>
+        <div className="d-flex gap-2 mt-3">
+          <button className="btn btn-sm btn-dark" onClick={simular}>Ver distribución</button>
+          {esSuper && sim && !yaAplicado && <button className="btn btn-sm fw-semibold" style={{ background: ACCENT, color: AZUL }} disabled={aplicando || !(sim.excedente > 0)} onClick={aplicar}>{aplicando && <span className="spinner-border spinner-border-sm me-1" />}Aplicar distribución</button>}
+          {yaAplicado && <span className="small text-success align-self-center">Los excedentes de {params.anio} ya se distribuyeron.</span>}
+        </div>
+      </Tarjeta>
+
+      {sim && (
+        <Tarjeta className="mb-3">
+          <div className="d-flex flex-wrap gap-4 mb-2 small">
+            <div><div className="text-muted">Excedente {sim.origen === "manual" ? "(escrito a mano)" : "(contabilidad)"}</div><div className="fw-bold">{dinero(sim.excedente)}</div></div>
+            {sim.reservas.map((r) => <div key={r.nombre}><div className="text-muted">{r.nombre} ({r.pct}%)</div><div className="fw-bold">{dinero(r.monto)}</div></div>)}
+            <div><div className="text-muted">Por aportaciones</div><div className="fw-bold">{dinero(sim.por_aportaciones)}</div></div>
+            <div><div className="text-muted">Por intereses</div><div className="fw-bold">{dinero(sim.por_intereses)}</div></div>
+            <div><div className="text-muted">A los socios</div><div className="fw-bold">{dinero(sim.repartido)}</div></div>
+          </div>
+          {sim.distribuible - sim.repartido >= 0.01 && (
+            <div className="alert alert-warning py-2 small">
+              {dinero(sim.distribuible - sim.repartido)} no se reparten porque ningún socio tiene base para esa parte
+              (por ejemplo, nadie pagó intereses ese año). Quedan en resultados; puedes ajustar el porcentaje por aportaciones.
+            </div>
+          )}
+          <div className="table-responsive" style={{ maxHeight: 420, overflowY: "auto" }}>
+            <table className="table table-sm small">
+              <thead className="text-muted"><tr><th>N.º</th><th>Socio</th><th className="text-end">Aportaciones</th><th className="text-end">Intereses pagados</th><th className="text-end">Por aportaciones</th><th className="text-end">Por intereses</th><th className="text-end">Total</th></tr></thead>
+              <tbody>{sim.socios.map((f) => <tr key={f.id_usuario}><td>{f.numero_socio || ""}</td><td>{f.socio}</td><td className="text-end">{cifra(f.base_aportaciones)}</td><td className="text-end">{cifra(f.base_intereses)}</td><td className="text-end">{cifra(f.por_aportaciones)}</td><td className="text-end">{cifra(f.por_intereses)}</td><td className="text-end fw-semibold">{cifra(f.total)}</td></tr>)}</tbody>
+            </table>
+          </div>
+        </Tarjeta>
+      )}
+
+      {historial.length > 0 && (
+        <Tarjeta>
+          <h6 className="fw-bold">Ejercicios distribuidos</h6>
+          <table className="table table-sm small mb-0">
+            <thead className="text-muted"><tr><th>Año</th><th className="text-end">Excedente</th><th className="text-end">A los socios</th><th>Origen</th><th>Aplicado</th></tr></thead>
+            <tbody>{historial.map((h) => <tr key={h.anio}><td>{h.anio}</td><td className="text-end">{cifra(h.excedente)}</td><td className="text-end">{cifra(h.repartido)}</td><td>{h.origen}</td><td>{fecha(h.aplicado_en)}{h.aplicado_por_nombre ? ` · ${h.aplicado_por_nombre}` : ""}</td></tr>)}</tbody>
+          </table>
+        </Tarjeta>
+      )}
+    </>
   );
 }

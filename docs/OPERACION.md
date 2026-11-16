@@ -161,6 +161,19 @@ Pantalla **Libros contables** (permiso de Contabilidad; la apertura y el catálo
 Reportes con Excel: libro diario, libro mayor, balanza de comprobación, balance general y estado de resultados.
 El catálogo base está en `backend/utils/contabilidad.js`; el contador puede agregar cuentas y renombrarlas.
 
+## Ahorro, plazo fijo y excedentes
+
+- **Productos de ahorro** (pantalla Ahorro): Aportaciones, Vivienda y Pensiones vienen con tasa 0%. Cada producto
+  define su tasa anual, saldo mínimo, si permite retiros y si se abre solo a cada socio nuevo. Se pueden crear otros.
+- **Intereses**: cada noche se guarda el saldo de cada cuenta; el día 1 de cada mes se acredita el interés del mes
+  anterior sobre el saldo promedio diario (saldo promedio × tasa × días ÷ 365), una sola vez por cuenta y mes, con
+  su movimiento y su partida. La retención de impuesto, si aplica, se configura en Parámetros.
+- **Plazo fijo**: productos de clase plazo fijo con tasa, montos, plazos y penalización por retiro anticipado (% del
+  interés). El interés se paga con el capital al vencer, en efectivo, por banco o a una cuenta del socio.
+- **Excedentes** (Libros contables → Excedentes): al cerrar un año se separan las reservas y el resto se reparte entre
+  los socios por aportaciones y por intereses pagados; se acredita en su cuenta de aportaciones, con la partida de
+  cierre del ejercicio. Solo años terminados y una vez por año.
+
 ## Zona horaria
 
 El servidor trabaja en UTC; la cooperativa en Honduras (UTC-6). La aplicación calcula "hoy" y los

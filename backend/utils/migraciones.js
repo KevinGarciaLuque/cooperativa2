@@ -782,6 +782,41 @@ const MIGRACIONES = [
       await require("./contabilidad").sembrarCatalogo(conn);
     },
   },
+  {
+    id: "2026_11_006_excedentes",
+    descripcion: "Distribución de excedentes del ejercicio",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS excedentes_ejercicio (
+          id_ejercicio INT AUTO_INCREMENT PRIMARY KEY,
+          anio SMALLINT NOT NULL,
+          origen VARCHAR(20) NOT NULL,
+          excedente DECIMAL(14,2) NOT NULL,
+          reservas TEXT NOT NULL,
+          pct_aportaciones DECIMAL(5,2) NOT NULL,
+          por_aportaciones DECIMAL(14,2) NOT NULL,
+          por_intereses DECIMAL(14,2) NOT NULL,
+          repartido DECIMAL(14,2) NOT NULL,
+          aplicado_por INT NULL,
+          aplicado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_excedentes_anio (anio)
+        )
+      `);
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS excedentes_socios (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          id_ejercicio INT NOT NULL,
+          id_usuario INT NOT NULL,
+          base_aportaciones DECIMAL(14,2) NOT NULL,
+          base_intereses DECIMAL(14,2) NOT NULL,
+          por_aportaciones DECIMAL(14,2) NOT NULL,
+          por_intereses DECIMAL(14,2) NOT NULL,
+          total DECIMAL(14,2) NOT NULL,
+          INDEX idx_excedente_socio (id_usuario)
+        )
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

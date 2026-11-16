@@ -1565,6 +1565,62 @@ test("ahorro: productos, intereses del mes, plazo fijo y reglas de retiro", asyn
   assert.equal((await api("GET", "/libros/estado", null, ids.tSuper)).b.errores_pendientes, 0);
 });
 
+test("excedentes: reservas, reparto por aportaciones e intereses, una vez por año y su cierre contable", async () => {
+  const anioActual = new Date().getFullYear();
+  const anio = anioActual - 1;
+  const base = { anio, pct_aportaciones: 50, reservas: [{ clave: "reserva_legal", nombre: "Reserva legal", pct: 10 }, { clave: "fondo_educacion", nombre: "Educación", pct: 10 }] };
+
+  // La contabilidad no estaba abierta el año pasado: hay que escribir el excedente
+  assert.equal((await api("POST", "/libros/excedentes/simular", base, ids.tSuper)).s, 400);
+  const sim = await api("POST", "/libros/excedentes/simular", { ...base, monto_manual: 1000 }, ids.tSuper);
+  assert.equal(sim.s, 200, sim.b?.message);
+  assert.equal(sim.b.distribuible, 800); // 1,000 − 20% de reservas
+  assert.equal(sim.b.por_aportaciones, 400);
+  cerca(sim.b.socios.reduce((t, f) => t + f.total, 0), sim.b.repartido);
+  assert.ok(sim.b.socios.length > 0);
+
+  const quien = sim.b.socios[0];
+  const [[antes]] = await pool.query("SELECT saldo_actual FROM cuentas WHERE id_usuario = ? AND tipo_cuenta = 'Aportaciones'", [quien.id_usuario]);
+  assert.equal((await api("POST", "/libros/excedentes/aplicar", { ...base, monto_manual: 1000 }, ids.tAdmin)).s, 403);
+  assert.equal((await api("POST", "/libros/excedentes/aplicar", { anio: anioActual, monto_manual: 1000 }, ids.tSuper)).s, 400, "el año en curso no");
+  const ap = await api("POST", "/libros/excedentes/aplicar", { ...base, monto_manual: 1000 }, ids.tSuper);
+  assert.equal(ap.s, 200, ap.b?.message);
+  const [[despues]] = await pool.query("SELECT saldo_actual FROM cuentas WHERE id_usuario = ? AND tipo_cuenta = 'Aportaciones'", [quien.id_usuario]);
+  cerca(parseFloat(despues.saldo_actual), parseFloat(antes.saldo_actual) + quien.total);
+  assert.equal((await api("POST", "/libros/excedentes/aplicar", { ...base, monto_manual: 1000 }, ids.tSuper)).s, 409, "una sola vez por año");
+
+  // Con contabilidad: el excedente sale de los libros y queda la partida de cierre
+  const anio2 = anioActual - 2;
+  const [[ini]] = await pool.query("SELECT valor FROM configuracion_sitio WHERE clave = 'cont_inicio'");
+  await pool.query("UPDATE configuracion_sitio SET valor = ? WHERE clave = 'cont_inicio'", [`${anio2}-01-01`]);
+  try {
+    const cat = (await api("GET", "/libros/catalogo", null, ids.tSuper)).b.data;
+    const idDe = (clave) => cat.find((c) => c.clave === clave).id_cuenta_contable;
+    const ing = await api("POST", "/libros/partidas", {
+      fecha: `${anio2}-06-15`,
+      concepto: "Ingreso de prueba del ejercicio anterior",
+      lineas: [{ id_cuenta_contable: idDe("caja"), debe: 500 }, { id_cuenta_contable: idDe("otros_ingresos"), haber: 500 }],
+    }, ids.tSuper);
+    assert.equal(ing.s, 201, ing.b?.message);
+    const s2 = await api("POST", "/libros/excedentes/simular", { ...base, anio: anio2 }, ids.tSuper);
+    assert.equal(s2.b.origen, "contabilidad");
+    assert.equal(s2.b.excedente, 500);
+    const a2 = await api("POST", "/libros/excedentes/aplicar", { ...base, anio: anio2 }, ids.tSuper);
+    assert.equal(a2.s, 200, a2.b?.message);
+    const [[cierre]] = await pool.query("SELECT COUNT(*) AS n FROM partidas WHERE origen IN ('cierre_ejercicio','excedentes') AND origen_id = ?", [anio2]);
+    assert.equal(cierre.n, 2);
+    // Al cierre de ese año los ingresos quedan en cero y el excedente distribuido
+    const bal = await api("GET", `/libros/balanza?hasta=${anio2}-12-31`, null, ids.tSuper);
+    const fila = (clave) => bal.b.filas.find((f) => f.id_cuenta_contable === idDe(clave));
+    cerca(fila("otros_ingresos").saldo_final, 0);
+    cerca(fila("resultado_ejercicio").saldo_final, 500 - s2.b.repartido - s2.b.reservas.reduce((t, r) => t + r.monto, 0));
+    cerca(fila("reserva_legal").saldo_final, 50);
+    assert.equal(bal.b.cuadra, true);
+  } finally {
+    await pool.query("UPDATE configuracion_sitio SET valor = ? WHERE clave = 'cont_inicio'", [ini.valor]);
+  }
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

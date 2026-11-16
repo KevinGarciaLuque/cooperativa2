@@ -8,6 +8,7 @@ const pool = require("../db");
 const { hoyISO } = require("../utils/fechas");
 const { dinero } = require("../utils/pais");
 const { fechaInicio, registrarPartida } = require("../utils/contabilidad");
+const { RESERVAS_BASE, simularExcedentes, aplicarExcedentes } = require("../utils/excedentes");
 
 const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 const num = (v) => parseFloat(v || 0);
@@ -440,6 +441,44 @@ router.get("/errores", async (req, res) => {
 router.post("/errores/:id/resolver", async (req, res) => {
   await pool.query("UPDATE contabilidad_errores SET resuelto = 1 WHERE id_error = ?", [req.params.id]);
   res.json({ success: true });
+});
+
+// ── Excedentes del ejercicio ────────────────────────────────────────────────
+router.get("/excedentes", async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT e.*, u.nombre_completo AS aplicado_por_nombre FROM excedentes_ejercicio e
+       LEFT JOIN usuarios u ON u.id_usuario = e.aplicado_por ORDER BY e.anio DESC`
+    );
+    res.json({ success: true, reservas_base: RESERVAS_BASE, data: rows.map((r) => ({ ...r, reservas: JSON.parse(r.reservas || "[]") })) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo cargar el historial de excedentes" });
+  }
+});
+
+router.post("/excedentes/simular", async (req, res) => {
+  try {
+    const anio = parseInt(req.body.anio);
+    if (!(anio > 2000)) return res.status(400).json({ message: "Indica el año." });
+    res.json({ success: true, ...(await simularExcedentes(anio, req.body)) });
+  } catch (error) {
+    if (error.codigo) return res.status(error.codigo).json({ message: error.message });
+    console.error("ERROR SIMULAR EXCEDENTES:", error);
+    res.status(500).json({ message: "No se pudo calcular la distribución" });
+  }
+});
+
+router.post("/excedentes/aplicar", soloSuperAdmin, async (req, res) => {
+  try {
+    const anio = parseInt(req.body.anio);
+    if (!(anio > 2000)) return res.status(400).json({ message: "Indica el año." });
+    const r = await aplicarExcedentes(anio, req.body, req.usuario.id_usuario);
+    res.json({ success: true, ...r, message: `Excedentes de ${anio} distribuidos a ${r.socios.length} socio(s): ${dinero(r.repartido)}.` });
+  } catch (error) {
+    if (error.codigo) return res.status(error.codigo).json({ message: error.message });
+    console.error("ERROR APLICAR EXCEDENTES:", error);
+    res.status(500).json({ message: "No se pudo aplicar la distribución" });
+  }
 });
 
 // ── Excel ───────────────────────────────────────────────────────────────────

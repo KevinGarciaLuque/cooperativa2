@@ -329,6 +329,11 @@ export default function Solicitudes() {
                       <div className="d-flex justify-content-between align-items-start mb-2">
                         <div>
                           <div className="fw-bold fs-5">{p.nombre_completo}</div>
+                          {p.producto_nombre && (
+                            <span className="badge rounded-pill mb-1" style={{ background: "#eef6dc", color: "#3f6212" }}>
+                              {p.producto_nombre}
+                            </span>
+                          )}
                           <div className="small text-muted">
                             Identidad {p.dni} · {p.telefono || "sin teléfono"} ·{" "}
                             {String(p.creada_en).substring(0, 10)}

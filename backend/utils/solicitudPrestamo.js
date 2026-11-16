@@ -4,6 +4,7 @@ const config = require("./configFinanciera");
 const { calcularCuotaMensual } = require("./calculosPrestamo");
 const { formatearNombre } = require("./nombres");
 const { dinero } = require("./pais");
+const { listarProductos, obtenerProducto, fueraDeProducto } = require("./productos");
 
 const PROPOSITOS = ["negocio", "vivienda", "educacion", "salud", "agricultura", "consumo", "otro"];
 const OCUPACIONES = ["empleado", "negocio_propio", "agricultor", "independiente", "jubilado", "otro"];
@@ -11,9 +12,11 @@ const OCUPACIONES = ["empleado", "negocio_propio", "agricultor", "independiente"
 const num = (v) => parseFloat(v || 0);
 const aTexto = (v, max) => String(v || "").trim().substring(0, max);
 
-// Parámetros que ve quien llena el formulario
-const parametrosSolicitud = () => {
+// Parámetros que ve quien llena el formulario. Si la cooperativa tiene productos de crédito
+// visibles para los socios, se elige uno y sus condiciones mandan sobre las generales.
+const parametrosSolicitud = async () => {
   const c = config.obtener();
+  const productos = await listarProductos({ paraSocios: true });
   return {
     tasa_mensual: c.sol_tasa_mensual,
     monto_max: c.sol_monto_max,
@@ -21,22 +24,44 @@ const parametrosSolicitud = () => {
     pct_ingreso_max: c.sol_pct_ingreso_max,
     propositos: PROPOSITOS,
     ocupaciones: OCUPACIONES,
+    productos: productos.map(({ id_producto, nombre, descripcion, tasa_mensual, monto_min, monto_max, plazo_min, plazo_max }) => ({
+      id_producto, nombre, descripcion, tasa_mensual, monto_min, monto_max, plazo_min, plazo_max,
+    })),
   };
 };
 
 // Devuelve { error } o { datos } con los valores ya normalizados
-const validarSolicitud = (b = {}) => {
+const validarSolicitud = async (b = {}) => {
   const c = config.obtener();
   const monto = num(b.monto);
   const plazo = parseInt(b.plazo_meses);
+
+  // Producto de crédito: obligatorio si la cooperativa ofrece alguno a los socios
+  let producto = null;
+  if (b.id_producto) {
+    producto = await obtenerProducto(parseInt(b.id_producto));
+    if (!producto || !producto.activo || !producto.visible_socios) {
+      return { error: "Ese tipo de préstamo ya no está disponible. Elige otro." };
+    }
+    const fuera = fueraDeProducto(producto, monto, plazo);
+    if (fuera?.campo === "monto") {
+      return { error: `Para ${producto.nombre}, el monto va de ${dinero(fuera.min)} a ${dinero(fuera.max)}.` };
+    }
+    if (fuera?.campo === "plazo") {
+      return { error: `Para ${producto.nombre}, el plazo va de ${fuera.min} a ${fuera.max} meses.` };
+    }
+  } else if ((await listarProductos({ paraSocios: true })).length) {
+    return { error: "Elige el tipo de préstamo." };
+  }
+
   // Ya no se pregunta en el formulario; si viene (formularios anteriores) se guarda, si no queda en 0
   const cuotaPosible = num(b.cuota_posible) > 0 ? num(b.cuota_posible) : 0;
   const ingreso = num(b.ingreso_mensual);
 
-  if (!(monto > 0) || monto > c.sol_monto_max) {
+  if (!producto && (!(monto > 0) || monto > c.sol_monto_max)) {
     return { error: `El monto debe ser mayor a 0 y no superar ${dinero(c.sol_monto_max)}.` };
   }
-  if (!Number.isInteger(plazo) || plazo < 1 || plazo > c.sol_plazo_max) {
+  if (!producto && (!Number.isInteger(plazo) || plazo < 1 || plazo > c.sol_plazo_max)) {
     return { error: `El plazo debe estar entre 1 y ${c.sol_plazo_max} meses.` };
   }
   if (!PROPOSITOS.includes(b.proposito)) return { error: "Selecciona el destino del préstamo." };
@@ -70,20 +95,22 @@ const validarSolicitud = (b = {}) => {
       ocupacion: b.ocupacion,
       lugar_trabajo: aTexto(b.lugar_trabajo, 120) || null,
       referencias,
+      producto,
     },
   };
 };
 
 // Crea el préstamo pendiente y su solicitud dentro de la transacción recibida
 const insertarSolicitud = async (conn, idUsuario, d) => {
-  const tasaMensual = config.obtener().sol_tasa_mensual;
+  // La tasa referencial del producto elegido, o la general (Parámetros → Solicitudes)
+  const tasaMensual = d.producto ? d.producto.tasa_mensual : config.obtener().sol_tasa_mensual;
   const tasaAnual = parseFloat((tasaMensual * 12).toFixed(4));
   const cuotaEstimada = parseFloat(calcularCuotaMensual(d.monto, tasaAnual, d.plazo).toFixed(2));
 
   const [pr] = await conn.query(
-    `INSERT INTO prestamos (id_usuario, monto, tasa_interes, tipo_tasa, tasa_original, plazo_meses, saldo_restante, estado)
-     VALUES (?, ?, ?, 'nominal_mensual', ?, ?, ?, 'pendiente')`,
-    [idUsuario, d.monto, tasaAnual, tasaMensual, d.plazo, d.monto]
+    `INSERT INTO prestamos (id_usuario, monto, tasa_interes, tipo_tasa, tasa_original, plazo_meses, saldo_restante, estado, id_producto)
+     VALUES (?, ?, ?, 'nominal_mensual', ?, ?, ?, 'pendiente', ?)`,
+    [idUsuario, d.monto, tasaAnual, tasaMensual, d.plazo, d.monto, d.producto?.id_producto || null]
   );
 
   await conn.query(

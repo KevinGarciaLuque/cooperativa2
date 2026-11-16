@@ -538,6 +538,39 @@ const MIGRACIONES = [
       }
     },
   },
+  {
+    id: "2026_11_002_productos_credito",
+    descripcion: "Productos de crédito y producto de cada préstamo",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS productos_credito (
+          id_producto INT AUTO_INCREMENT PRIMARY KEY,
+          nombre VARCHAR(80) NOT NULL,
+          descripcion VARCHAR(300) NULL,
+          tasa_mensual DECIMAL(6,3) NOT NULL,
+          monto_min DECIMAL(12,2) NOT NULL DEFAULT 0,
+          monto_max DECIMAL(12,2) NOT NULL,
+          plazo_min INT NOT NULL DEFAULT 1,
+          plazo_max INT NOT NULL,
+          garantia_requerida ENUM('ninguna','aval','real') NOT NULL DEFAULT 'aval',
+          visible_socios TINYINT(1) NOT NULL DEFAULT 1,
+          activo TINYINT(1) NOT NULL DEFAULT 1,
+          orden INT NOT NULL DEFAULT 0,
+          creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          actualizado_en DATETIME NULL,
+          UNIQUE KEY uq_producto_nombre (nombre)
+        )
+      `);
+      const [[e]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'prestamos' AND COLUMN_NAME = 'id_producto'`
+      );
+      if (!e.n) {
+        await conn.query(`ALTER TABLE prestamos ADD COLUMN id_producto INT NULL`);
+        await conn.query(`ALTER TABLE prestamos ADD INDEX idx_prestamo_producto (id_producto)`);
+      }
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

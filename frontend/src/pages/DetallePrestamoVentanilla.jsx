@@ -262,6 +262,7 @@ export default function DetallePrestamoVentanilla({
               </div>
               <div className="text-muted small">
                 <FaCalendarAlt className="me-1" />
+                {p.producto_nombre && <>{p.producto_nombre} · </>}
                 Otorgado: {soloFecha(p.fecha_otorgado) || "—"} · Plazo:{" "}
                 {calc.plazo === 0 ? "Indefinido (solo intereses)" : `${calc.plazo} mes${calc.plazo > 1 ? "es" : ""}`} · Tasa mensual:{" "}
                 {(calc.tasaMensual * 100).toFixed(2)}%

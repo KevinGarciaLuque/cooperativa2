@@ -831,7 +831,7 @@ export default function SocioPerfil() {
                             <div className="small text-muted">
                               {p.estado === "aprobado"
                                 ? `Aprobado: ${fecha(p.fecha_aprobacion)}`
-                                : `Otorgado: ${fecha(p.fecha_otorgado)}`}
+                                : `${p.producto_nombre ? `${p.producto_nombre} · ` : ""}Otorgado: ${fecha(p.fecha_otorgado)}`}
                             </div>
                           </div>
                         </div>

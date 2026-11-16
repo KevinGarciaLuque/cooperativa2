@@ -31,6 +31,7 @@ const MODULO_POR_PREFIJO = {
   caja: "caja",
   cobranza: "cobranza",
   consolidaciones: "prestamos",
+  productos: "prestamos",
   solicitudes: "prestamos",
   contabilidad: "contabilidad",
   recibos: "pagos",

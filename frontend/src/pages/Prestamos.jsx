@@ -32,6 +32,7 @@ export default function Prestamos() {
     tasa_interes: "",
     tipo_tasa: "nominal_mensual",
     plazo_meses: "",
+    id_producto: "",
     fecha_otorgado: "",
     estado: "pendiente",
   });
@@ -41,6 +42,7 @@ export default function Prestamos() {
   const [aDesembolsar, setADesembolsar] = useState(null); // préstamo aprobado en proceso de desembolso
   const [desembolsando, setDesembolsando] = useState(false);
   const [reciboNuevo, setReciboNuevo] = useState(null);
+  const [productos, setProductos] = useState([]); // productos de crédito activos
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -58,6 +60,10 @@ export default function Prestamos() {
       ]);
       setPrestamos(prestamosRes.data.data || prestamosRes.data || []);
       setUsuarios(usuariosRes.data.data || usuariosRes.data || []);
+      axios
+        .get(`${API_URL}/productos?activos=1`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => setProductos(r.data.data || []))
+        .catch(() => setProductos([]));
     } catch (err) {
       mostrarAlerta("No se pudieron obtener los datos.", "error");
     } finally {
@@ -71,7 +77,8 @@ export default function Prestamos() {
   }, []);
 
   const handleInput = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm((f) => ({ ...f, [name]: value }));
   };
 
   // Crear o editar préstamo
@@ -117,6 +124,7 @@ export default function Prestamos() {
         tasa_interes: "",
         tipo_tasa: "nominal_mensual",
         plazo_meses: "",
+        id_producto: "",
         fecha_otorgado: "",
         estado: "pendiente",
       });
@@ -243,6 +251,7 @@ export default function Prestamos() {
       plazo_meses: "",
       fecha_otorgado: "",
       estado: "pendiente",
+      id_producto: "",
     });
     setShowModal(true);
   };
@@ -627,6 +636,7 @@ export default function Prestamos() {
           editPrestamo={editPrestamo}
           form={form}
           usuarios={usuarios}
+          productos={productos}
           onClose={() => setShowModal(false)}
           onSubmit={handleSubmit}
           handleInput={handleInput}

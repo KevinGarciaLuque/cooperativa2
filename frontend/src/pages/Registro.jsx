@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FaHandHoldingUsd, FaCheckCircle, FaExclamationTriangle, FaArrowLeft } from "react-icons/fa";
 import { CamposMonto, CamposIngresos, AvisoRelacion } from "../components/CamposSolicitud";
-import { SOLICITUD_VACIA, fmt, solicitudDesde, simular } from "../utils/solicitud";
+import { SOLICITUD_VACIA, fmt, solicitudDesde, simular, errorDelPrestamo } from "../utils/solicitud";
 import { CampoFotoIdentidad } from "../components/FotosIdentidad";
 import { formatearNombre } from "../utils/nombres";
 import { VerPoliticasPublicas } from "../components/PoliticasSocio";
@@ -85,14 +85,9 @@ export default function Registro() {
   // Paso 1: el préstamo que necesita
   const continuarPrestamo = (e) => {
     e.preventDefault();
-    const monto = parseFloat(solicitud.monto) || 0;
-    const plazo = parseInt(solicitud.plazo_meses) || 0;
-    if (param && monto > param.monto_max) {
-      setError(`El monto máximo es ${fmt(param.monto_max)}.`);
-      return;
-    }
-    if (param && (plazo < 1 || plazo > param.plazo_max)) {
-      setError(`El plazo debe estar entre 1 y ${param.plazo_max} meses.`);
+    const problema = errorDelPrestamo(param, solicitud);
+    if (problema) {
+      setError(problema);
       return;
     }
     setQuierePrestamo(true);

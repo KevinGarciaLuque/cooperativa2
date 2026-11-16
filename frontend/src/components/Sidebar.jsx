@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { useConfigSitio } from "../hooks/useConfigSitio";
+import { FaLayerGroup } from "react-icons/fa";
 import {
   FaTachometerAlt,
   FaUsers,
@@ -68,6 +69,7 @@ const TODOS_MODULOS = [
 const menuSuperAdmin = [
   ...TODOS_MODULOS,
   { to: "/parametros-financieros", icon: <FaSlidersH />, label: "Parámetros" },
+  { to: "/productos-credito", icon: <FaLayerGroup />, label: "Productos de crédito" },
   { to: "/politicas", icon: <FaBook />, label: "Políticas" },
   { to: "/superadmin", icon: <FaShieldAlt />, label: "Control de Accesos" },
 ];

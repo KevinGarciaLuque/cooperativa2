@@ -2,7 +2,7 @@
 // para que ambos pidan exactamente lo mismo.
 import { FaInfoCircle } from "react-icons/fa";
 import InputMonto from "../ui/InputMonto";
-import { OCUPACIONES, PROPOSITOS, fmt, simular } from "../utils/solicitud";
+import { OCUPACIONES, PROPOSITOS, fmt, simular, condiciones } from "../utils/solicitud";
 import { formatearNombre } from "../utils/nombres";
 import { simboloMoneda } from "../utils/pais";
 
@@ -17,22 +17,48 @@ export const AvisoRelacion = ({ sim }) =>
 // ¿Cuánto y en cuánto tiempo? + cuota estimada
 export function CamposMonto({ param, form, setForm }) {
   const sim = simular(param, form);
+  const c = condiciones(param, form);
+  const productos = param?.productos || [];
   const poner = (campo) => (v) => setForm((f) => ({ ...f, [campo]: v }));
 
   return (
     <div className="row g-3">
+      {productos.length > 0 && (
+        <div className="col-12">
+          <label className="form-label fw-semibold small">Tipo de préstamo *</label>
+          <select
+            required
+            className="form-select form-select-lg"
+            value={form.id_producto || ""}
+            onChange={(e) => poner("id_producto")(e.target.value)}
+          >
+            <option value="">Selecciona...</option>
+            {productos.map((p) => (
+              <option key={p.id_producto} value={p.id_producto}>
+                {p.nombre}
+              </option>
+            ))}
+          </select>
+          {c?.producto && (
+            <div className="form-text">
+              {c.producto.descripcion ? `${c.producto.descripcion} · ` : ""}De {fmt(c.monto_min)} a {fmt(c.monto_max)}, de{" "}
+              {c.plazo_min} a {c.plazo_max} meses.
+            </div>
+          )}
+        </div>
+      )}
       <div className="col-12 col-md-6">
         <label className="form-label fw-semibold small">¿Cuánto necesitas? ({simboloMoneda()}) *</label>
         <InputMonto
           required className="form-control form-control-lg" placeholder="0.00"
           value={form.monto} onChange={poner("monto")}
         />
-        {param && <div className="form-text">Máximo {fmt(param.monto_max)}</div>}
+        {c && !c.falta_producto && <div className="form-text">Máximo {fmt(c.monto_max)}</div>}
       </div>
       <div className="col-12 col-md-6">
         <label className="form-label fw-semibold small">¿En cuántos meses lo pagarás? *</label>
         <input
-          type="number" min="1" max={param?.plazo_max || 60} step="1" required className="form-control form-control-lg"
+          type="number" min={c?.plazo_min || 1} max={c?.plazo_max || 60} step="1" required className="form-control form-control-lg"
           value={form.plazo_meses} onChange={(e) => poner("plazo_meses")(e.target.value)} placeholder="Ej: 6"
         />
       </div>

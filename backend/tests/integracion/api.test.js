@@ -1231,6 +1231,60 @@ test("plan de pagos: vencimientos y atraso; el socio ve el suyo sin intereses", 
   }
 });
 
+test("productos de crédito: los crea el Super Administrador y mandan en las solicitudes", async () => {
+  const producto = {
+    nombre: "Consumo Prueba", tasa_mensual: 2.5, monto_min: 1000, monto_max: 20000,
+    plazo_min: 3, plazo_max: 24, garantia_requerida: "aval",
+  };
+  assert.equal((await api("POST", "/productos", producto, ids.tAdmin)).s, 403);
+  assert.equal((await api("POST", "/productos", { ...producto, monto_min: 50000 }, ids.tSuper)).s, 400);
+  const creado = await api("POST", "/productos", producto, ids.tSuper);
+  assert.equal(creado.s, 201, creado.b?.message);
+  const idProd = creado.b.data.id_producto;
+  assert.equal((await api("POST", "/productos", producto, ids.tSuper)).s, 409, "nombre repetido");
+  assert.equal((await api("GET", "/productos", null, ids.tAdmin)).s, 200, "el personal los consulta");
+  assert.equal((await api("GET", "/productos", null, ids.tSocio)).s, 403, "el socio no entra a la lista");
+
+  // Un socio nuevo, sin solicitudes en trámite
+  const [u] = await pool.query(
+    `INSERT INTO usuarios (nombre_completo, dni, telefono, correo, password, rol_id, estado, fecha_registro)
+     VALUES ('Socio Productos Prueba', '0801000000611', '98765432', 'productos@prueba.hn', 'x', 2, 'activo', NOW())`
+  );
+  const t = tokenDe(u.insertId, "Socio", 2);
+  const base = { monto: 5000, plazo_meses: 12, proposito: "consumo", ocupacion: "empleado", ingreso_mensual: 9000, acepta: true, referencias: AVAL };
+  try {
+    const params = await api("GET", "/solicitudes/parametros", null, t);
+    const visto = params.b.data.productos.find((p) => p.id_producto === idProd);
+    assert.ok(visto, "el socio ve el producto al solicitar");
+    assert.equal(visto.tasa_mensual, 2.5);
+
+    const sin = await api("POST", "/solicitudes/prestamo", base, t);
+    assert.equal(sin.s, 400);
+    assert.match(sin.b.message, /tipo de préstamo/);
+    const fuera = await api("POST", "/solicitudes/prestamo", { ...base, id_producto: idProd, plazo_meses: 36 }, t);
+    assert.equal(fuera.s, 400);
+    assert.match(fuera.b.message, /de 3 a 24 meses/);
+
+    const ok = await api("POST", "/solicitudes/prestamo", { ...base, id_producto: idProd }, t);
+    assert.equal(ok.s, 201, ok.b?.message);
+    const [[pr]] = await pool.query("SELECT id_producto, tasa_interes FROM prestamos WHERE id_prestamo = ?", [ok.b.id_prestamo]);
+    assert.equal(pr.id_producto, idProd);
+    cerca(parseFloat(pr.tasa_interes), 30); // 2.5% mensual = 30% anual
+
+    // Desactivado: deja de ofrecerse y las solicitudes vuelven a los parámetros generales
+    assert.equal((await api("PUT", `/productos/${idProd}`, { activo: false }, ids.tSuper)).s, 200);
+    const despues = await api("GET", "/solicitudes/parametros", null, t);
+    assert.ok(!despues.b.data.productos.some((p) => p.id_producto === idProd));
+  } finally {
+    await pool.query("UPDATE productos_credito SET activo = 0 WHERE id_producto = ?", [idProd]);
+    await pool.query("DELETE s FROM solicitudes_prestamo s JOIN prestamos p ON p.id_prestamo = s.id_prestamo WHERE p.id_usuario = ?", [u.insertId]);
+    await pool.query("DELETE FROM prestamos WHERE id_usuario = ?", [u.insertId]);
+    await pool.query("DELETE FROM notificaciones WHERE id_usuario = ?", [u.insertId]).catch(() => {});
+    await pool.query("DELETE FROM bitacora WHERE id_usuario = ?", [u.insertId]);
+    await pool.query("DELETE FROM usuarios WHERE id_usuario = ?", [u.insertId]);
+  }
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

@@ -9,6 +9,7 @@ export default function ModalPrestamo({
   editPrestamo,
   form,
   usuarios,
+  productos = [],
   onClose,
   onSubmit,
   handleInput,
@@ -214,6 +215,45 @@ export default function ModalPrestamo({
                       ⚠️ Este préstamo tiene <strong>{editPrestamo.total_pagos} pago{parseInt(editPrestamo.total_pagos) !== 1 ? "s" : ""}</strong> registrado{parseInt(editPrestamo.total_pagos) !== 1 ? "s" : ""}. El saldo actual es <strong>{dinero(parseFloat(editPrestamo.saldo_restante || 0))}</strong>. Cambiar la tasa solo afecta los pagos futuros.
                     </div>
                   )}
+
+                  {/* Producto de crédito (solo al registrar uno nuevo) */}
+                  {!editPrestamo && productos.length > 0 && (() => {
+                    const prod = productos.find((p) => String(p.id_producto) === String(form.id_producto));
+                    const monto = parseFloat(form.monto) || 0;
+                    const plazo = parseInt(form.plazo_meses) || 0;
+                    const fuera = prod && ((monto && (monto < prod.monto_min || monto > prod.monto_max)) || (plazo && (plazo < prod.plazo_min || plazo > prod.plazo_max)));
+                    return (
+                      <div>
+                        <label className="form-label fw-semibold small" style={{ color: "#2c3e50" }}>
+                          Producto de crédito
+                        </label>
+                        <select
+                          className="form-select"
+                          value={form.id_producto || ""}
+                          onChange={(e) => {
+                            const elegido = productos.find((p) => String(p.id_producto) === e.target.value);
+                            handleInput({ target: { name: "id_producto", value: e.target.value } });
+                            if (elegido) {
+                              handleInput({ target: { name: "tipo_tasa", value: "nominal_mensual" } });
+                              handleInput({ target: { name: "tasa_interes", value: String(elegido.tasa_mensual) } });
+                            }
+                          }}
+                        >
+                          <option value="">Sin producto (condiciones libres)</option>
+                          {productos.map((p) => (
+                            <option key={p.id_producto} value={p.id_producto}>{p.nombre}</option>
+                          ))}
+                        </select>
+                        {prod && (
+                          <div className="small mt-1" style={{ color: fuera ? "#b91c1c" : "#64748b" }}>
+                            {dinero(prod.monto_min, 0)} a {dinero(prod.monto_max, 0)} · {prod.plazo_min} a {prod.plazo_max} meses ·
+                            tasa referencial {prod.tasa_mensual}% mensual
+                            {fuera && " — el monto o el plazo están fuera de este producto"}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Monto */}
                   <div>

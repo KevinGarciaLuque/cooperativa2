@@ -24,8 +24,13 @@ const aTexto = (v, max) => String(v || "").trim().substring(0, max);
 // ============================================
 // PARÁMETROS PARA EL FORMULARIO (socio)
 // ============================================
-router.get("/parametros", (req, res) => {
-  res.json({ success: true, data: parametrosSolicitud() });
+router.get("/parametros", async (req, res) => {
+  try {
+    res.json({ success: true, data: await parametrosSolicitud() });
+  } catch (error) {
+    console.error("ERROR AL LEER PARÁMETROS DE SOLICITUD:", error);
+    res.status(500).json({ message: "No se pudieron cargar los parámetros" });
+  }
 });
 
 // ============================================
@@ -55,7 +60,7 @@ router.post("/prestamo", async (req, res) => {
     if (!esSocio(req)) {
       return res.status(403).json({ message: "Solo un socio puede enviar su propia solicitud." });
     }
-    const { error, datos } = validarSolicitud(req.body);
+    const { error, datos } = await validarSolicitud(req.body);
     if (error) return res.status(400).json({ message: error });
     const { monto, plazo } = datos;
 
@@ -154,10 +159,12 @@ router.get("/", soloPersonal, async (req, res) => {
               (SELECT IFNULL(SUM(saldo_restante), 0) FROM prestamos x
                  WHERE x.id_usuario = pr.id_usuario AND x.estado IN ('activo','mora')) AS saldo_vigente,
               (SELECT COUNT(*) FROM prestamos x WHERE x.id_usuario = pr.id_usuario AND x.estado = 'pagado') AS prestamos_pagados,
-              (SELECT COUNT(*) FROM documentos_identidad d WHERE d.id_usuario = pr.id_usuario) AS fotos_identidad
+              (SELECT COUNT(*) FROM documentos_identidad d WHERE d.id_usuario = pr.id_usuario) AS fotos_identidad,
+              pr.id_producto, pc.nombre AS producto_nombre
        FROM solicitudes_prestamo s
        INNER JOIN prestamos pr ON s.id_prestamo = pr.id_prestamo
        INNER JOIN usuarios u ON pr.id_usuario = u.id_usuario
+       LEFT JOIN productos_credito pc ON pc.id_producto = pr.id_producto
        WHERE pr.estado IN ('pendiente', 'aprobado')
        ORDER BY s.creada_en ASC`
     );

@@ -8,6 +8,7 @@ const { notificarSocio, crearNotificacion, escaparHtml } = require("../utils/not
 const { avisarAprobacion } = require("../utils/cartaAprobacion");
 const { dinero } = require("../utils/pais");
 const { planDePrestamo } = require("../utils/planPagos");
+const { obtenerProducto, fueraDeProducto } = require("../utils/productos");
 const {
   calcularCuotaMensual,
   generarTablaAmortizacion,
@@ -67,9 +68,11 @@ router.get("/", async (req, res) => {
        u.nombre_completo, 
        u.dni,
        (SELECT COUNT(*) FROM pagos_prestamo WHERE id_prestamo = p.id_prestamo) as total_pagos,
-       (SELECT IFNULL(SUM(monto_pagado), 0) FROM pagos_prestamo WHERE id_prestamo = p.id_prestamo) as total_pagado
+       (SELECT IFNULL(SUM(monto_pagado), 0) FROM pagos_prestamo WHERE id_prestamo = p.id_prestamo) as total_pagado,
+       pc.nombre AS producto_nombre
        FROM prestamos p 
        INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
+       LEFT JOIN productos_credito pc ON pc.id_producto = p.id_producto
        ${whereClause}
        ORDER BY p.fecha_otorgado DESC`,
       params
@@ -134,9 +137,11 @@ router.get("/:id", async (req, res) => {
        u.nombre_completo, 
        u.dni, 
        u.telefono, 
-       u.correo
+       u.correo,
+       pc.nombre AS producto_nombre
        FROM prestamos p 
        INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
+       LEFT JOIN productos_credito pc ON pc.id_producto = p.id_producto
        WHERE p.id_prestamo = ?`,
       [req.params.id]
     );
@@ -196,8 +201,10 @@ router.get("/usuario/:id_usuario", async (req, res) => {
     const [prestamos] = await pool.query(
       `SELECT p.*,
        (SELECT COUNT(*) FROM pagos_prestamo WHERE id_prestamo = p.id_prestamo) as total_pagos,
-       (SELECT IFNULL(SUM(monto_pagado), 0) FROM pagos_prestamo WHERE id_prestamo = p.id_prestamo) as total_pagado
+       (SELECT IFNULL(SUM(monto_pagado), 0) FROM pagos_prestamo WHERE id_prestamo = p.id_prestamo) as total_pagado,
+       pc.nombre AS producto_nombre
        FROM prestamos p
+       LEFT JOIN productos_credito pc ON pc.id_producto = p.id_producto
        WHERE p.id_usuario = ?
        ORDER BY p.fecha_otorgado DESC`,
       [req.params.id_usuario]
@@ -808,7 +815,7 @@ router.get("/estadisticas/general", async (req, res) => {
 router.post("/", async (req, res) => {
   const connection = await pool.getConnection();
   try {
-    const { id_usuario, monto, tasa_interes, plazo_meses, descripcion, estado, fecha_otorgado, tipo_tasa, tasa_original } = req.body;
+    const { id_usuario, monto, tasa_interes, plazo_meses, descripcion, estado, fecha_otorgado, tipo_tasa, tasa_original, id_producto } = req.body;
 
     if (!id_usuario || !monto || !tasa_interes || !plazo_meses) {
       return res.status(400).json({ message: "Usuario, monto, tasa de interés y plazo son requeridos." });
@@ -832,6 +839,22 @@ router.post("/", async (req, res) => {
     if (usuario.length === 0)
       return res.status(404).json({ message: "Usuario no encontrado o inactivo" });
 
+    // Producto de crédito (opcional): el monto y el plazo deben caber en sus condiciones.
+    // La tasa la pone quien otorga (la del producto es la referencial).
+    let producto = null;
+    if (id_producto) {
+      producto = await obtenerProducto(parseInt(id_producto), connection);
+      if (!producto || !producto.activo) return res.status(400).json({ message: "Ese producto de crédito no está activo." });
+      const fuera = fueraDeProducto(producto, montoNum, plazoNum);
+      if (fuera) {
+        return res.status(400).json({
+          message: fuera.campo === "monto"
+            ? `Para ${producto.nombre}, el monto va de ${dinero(fuera.min)} a ${dinero(fuera.max)}.`
+            : `Para ${producto.nombre}, el plazo va de ${fuera.min} a ${fuera.max} meses.`,
+        });
+      }
+    }
+
     const cuotaMensual = calcularCuotaMensual(montoNum, tasaNum, plazoNum);
     const estadosPermitidos = ['pendiente', 'aprobado', 'activo', 'mora', 'pagado', 'rechazado'];
     const estadoPrestamo = (estado && estadosPermitidos.includes(estado)) ? estado : 'pendiente';
@@ -842,9 +865,9 @@ router.post("/", async (req, res) => {
     await connection.beginTransaction();
 
     const [result] = await connection.query(
-      `INSERT INTO prestamos (id_usuario, monto, tasa_interes, tipo_tasa, tasa_original, plazo_meses, saldo_restante, estado, fecha_otorgado)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id_usuario, montoNum, tasaNum, tipoTasaGuardar, tasaOriginalGuardar, plazoNum, montoNum, estadoPrestamo, fechaOtorgado]
+      `INSERT INTO prestamos (id_usuario, monto, tasa_interes, tipo_tasa, tasa_original, plazo_meses, saldo_restante, estado, fecha_otorgado, id_producto)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id_usuario, montoNum, tasaNum, tipoTasaGuardar, tasaOriginalGuardar, plazoNum, montoNum, estadoPrestamo, fechaOtorgado, producto?.id_producto || null]
     );
 
     if (["activo", "mora", "pagado"].includes(estadoPrestamo)) {

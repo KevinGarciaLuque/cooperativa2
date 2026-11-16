@@ -25,6 +25,7 @@ export const OCUPACIONES = {
 };
 
 export const SOLICITUD_VACIA = {
+  id_producto: "",
   monto: "",
   plazo_meses: "",
   proposito: "",
@@ -42,6 +43,7 @@ export const SOLICITUD_VACIA = {
 
 // Cuerpo que espera el servidor
 export const solicitudDesde = (form, acepta) => ({
+  ...(form.id_producto ? { id_producto: parseInt(form.id_producto) } : {}),
   monto: parseFloat(form.monto) || 0,
   plazo_meses: parseInt(form.plazo_meses) || 0,
   proposito: form.proposito,
@@ -71,11 +73,46 @@ const cuotaDe = (monto, plazo, tasaMensual) => {
   return (monto * i * Math.pow(1 + i, plazo)) / (Math.pow(1 + i, plazo) - 1);
 };
 
+// Condiciones que aplican a la solicitud: las del producto elegido si la cooperativa ofrece
+// productos de crédito; si no, las generales. `falta_producto` si hay productos y no eligió.
+export const condiciones = (param, form) => {
+  if (!param) return null;
+  const productos = param.productos || [];
+  if (!productos.length) return { ...param, monto_min: 0, plazo_min: 1, producto: null, falta_producto: false };
+  const producto = productos.find((p) => String(p.id_producto) === String(form.id_producto)) || null;
+  if (!producto) return { ...param, monto_min: 0, plazo_min: 1, producto: null, falta_producto: true };
+  return {
+    ...param,
+    tasa_mensual: producto.tasa_mensual,
+    monto_min: producto.monto_min,
+    monto_max: producto.monto_max,
+    plazo_min: producto.plazo_min,
+    plazo_max: producto.plazo_max,
+    producto,
+    falta_producto: false,
+  };
+};
+
+// Revisión del paso del préstamo antes de seguir: el mensaje de error o null
+export const errorDelPrestamo = (param, form) => {
+  const c = condiciones(param, form);
+  if (!c) return null;
+  if (c.falta_producto) return "Elige el tipo de préstamo.";
+  const monto = parseFloat(form.monto) || 0;
+  const plazo = parseInt(form.plazo_meses) || 0;
+  if (monto < c.monto_min || monto > c.monto_max || monto <= 0) {
+    return c.monto_min > 0 ? `El monto va de ${fmt(c.monto_min)} a ${fmt(c.monto_max)}.` : `El monto máximo es ${fmt(c.monto_max)}.`;
+  }
+  if (plazo < c.plazo_min || plazo > c.plazo_max) return `El plazo debe estar entre ${c.plazo_min} y ${c.plazo_max} meses.`;
+  return null;
+};
+
 export const simular = (param, form) => {
   const monto = parseFloat(form.monto) || 0;
   const plazo = parseInt(form.plazo_meses) || 0;
   const ingreso = parseFloat(form.ingreso_mensual) || 0;
-  const cuotaEstimada = param && monto > 0 && plazo > 0 ? cuotaDe(monto, plazo, param.tasa_mensual) : 0;
+  const c = condiciones(param, form);
+  const cuotaEstimada = c && !c.falta_producto && monto > 0 && plazo > 0 ? cuotaDe(monto, plazo, c.tasa_mensual) : 0;
 
 
   const relacion = ingreso > 0 && cuotaEstimada > 0 ? (cuotaEstimada / ingreso) * 100 : null;

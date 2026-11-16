@@ -47,7 +47,7 @@ router.get("/estado", async (req, res) => {
       habilitado: cfg.habilitado,
       valido,
       // Para calcular la cuota estimada en el formulario (solo con un enlace válido)
-      parametros: valido ? parametrosSolicitud() : null,
+      parametros: valido ? await parametrosSolicitud() : null,
     });
   } catch (error) {
     res.status(500).json({ message: "No se pudo verificar el enlace de registro" });
@@ -130,7 +130,7 @@ router.post("/", recibirFormulario, async (req, res) => {
 
     let solicitud = null;
     if (prestamo) {
-      const { error, datos } = validarSolicitud(prestamo);
+      const { error, datos } = await validarSolicitud(prestamo);
       if (error) return res.status(400).json({ message: error });
       solicitud = datos;
     }

@@ -123,6 +123,21 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
     if (isDesktop) setOpen(false);
   }, [isDesktop]);
 
+  // Con el menú abierto en el celular, la página de atrás no se desplaza. En iPhone, el
+  // desplazamiento de fondo (y la barra del navegador que aparece y desaparece) dejaba parte
+  // de la pantalla sin pintar (en negro).
+  useEffect(() => {
+    if (!open) return;
+    const html = document.documentElement;
+    const antes = { html: html.style.overflow, body: document.body.style.overflow };
+    html.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = antes.html;
+      document.body.style.overflow = antes.body;
+    };
+  }, [open]);
+
   // Cargar permisos del rol actual desde la API
   useEffect(() => {
     if (!user?.rol_id || user?.rol === "Super Administrador" || user?.rol === "Socio") {
@@ -326,7 +341,31 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
         .sidebar-offcanvas {
           background: linear-gradient(175deg, ${SIDEBAR_BG} 0%, ${SIDEBAR_BG2} 100%) !important;
           border-right: none !important;
-          box-shadow: 6px 0 32px rgba(0,0,0,0.45);
+          box-shadow: 6px 0 24px rgba(0,0,0,0.35);
+          /* Alto de la pantalla visible (en iPhone 100vh no la sigue) y capa propia */
+          top: 0 !important;
+          bottom: 0 !important;
+          height: 100vh;
+          height: 100dvh;
+          will-change: transform;
+          -webkit-backface-visibility: hidden;
+          backface-visibility: hidden;
+        }
+        .sidebar-offcanvas .offcanvas-body {
+          overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch;
+          padding-bottom: calc(24px + env(safe-area-inset-bottom));
+        }
+        .sidebar-offcanvas:not(.show) {
+          -webkit-transform: translateX(-100%);
+          transform: translateX(-100%);
+        }
+        .sidebar-backdrop-movil {
+          position: fixed;
+          inset: 0;
+          height: 100vh;
+          height: 100dvh;
+          -webkit-transform: translateZ(0);
         }
         .sidebar-offcanvas .sidebar-link {
           color: #8892a4 !important;
@@ -496,7 +535,7 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
       {/* Backdrop móvil */}
       {open && (
         <div
-          className="offcanvas-backdrop fade show d-lg-none"
+          className="offcanvas-backdrop fade show d-lg-none sidebar-backdrop-movil"
           style={{ zIndex: 3999 }}
           onClick={() => setOpen(false)}
         />

@@ -16,7 +16,8 @@ import {
   FaLock,
   FaSave,
   FaTimes,
-  FaCamera
+  FaCamera,
+  FaKey
 } from "react-icons/fa";
 import { docIdentidad, pais } from "../../utils/pais";
 
@@ -101,6 +102,32 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
 
   const handleInput = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
+
+  // Restablecer la contraseña de otro usuario (solo Super Administrador)
+  const esSuperAdmin = usuarioLogueado?.rol === "Super Administrador";
+  const [nuevaClave, setNuevaClave] = useState({ abierta: false, password: "", confirmar: "", guardando: false });
+  useEffect(() => {
+    setNuevaClave({ abierta: false, password: "", confirmar: "", guardando: false });
+  }, [usuario, show]);
+  const restablecerPassword = async () => {
+    if (nuevaClave.password !== nuevaClave.confirmar) {
+      mostrarAlerta("Las contraseñas no coinciden.", "error");
+      return;
+    }
+    setNuevaClave((c) => ({ ...c, guardando: true }));
+    try {
+      const r = await axios.post(
+        `${API_URL}/usuarios/${usuario.id_usuario}/restablecer-password`,
+        { password_nuevo: nuevaClave.password },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      mostrarAlerta(r.data.message || "Contraseña restablecida.", "success");
+      setNuevaClave({ abierta: false, password: "", confirmar: "", guardando: false });
+    } catch (err) {
+      mostrarAlerta(err.response?.data?.message || "No se pudo restablecer la contraseña.", "error");
+      setNuevaClave((c) => ({ ...c, guardando: false }));
+    }
+  };
 
   // Guardar (crear/editar)
   const handleSubmit = async (e) => {
@@ -447,6 +474,67 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
                   <option value="inactivo">✗ Inactivo</option>
                 </select>
               </div>
+
+              {/* Restablecer contraseña (al editar, solo Super Administrador) */}
+              {tipo === "editar" && esSuperAdmin && usuario?.id_usuario !== usuarioLogueado?.id_usuario && (
+                <div className="col-12">
+                  <div className="border rounded-3 p-3" style={{ background: "#f8f9fb" }}>
+                    {!nuevaClave.abierta ? (
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary btn-sm"
+                        onClick={() => setNuevaClave((c) => ({ ...c, abierta: true }))}
+                      >
+                        <FaKey className="me-2" />
+                        Restablecer contraseña
+                      </button>
+                    ) : (
+                      <div className="row g-2 align-items-end">
+                        <div className="col-12 small text-muted">
+                          Escribe la contraseña nueva para {usuario?.nombre_completo}: al menos 8 caracteres, con letras y números.
+                        </div>
+                        <div className="col-md-4">
+                          <label className="form-label small fw-semibold mb-1">Contraseña nueva</label>
+                          <input
+                            type="password"
+                            className="form-control"
+                            autoComplete="new-password"
+                            value={nuevaClave.password}
+                            onChange={(e) => setNuevaClave({ ...nuevaClave, password: e.target.value })}
+                          />
+                        </div>
+                        <div className="col-md-4">
+                          <label className="form-label small fw-semibold mb-1">Repetir contraseña</label>
+                          <input
+                            type="password"
+                            className="form-control"
+                            autoComplete="new-password"
+                            value={nuevaClave.confirmar}
+                            onChange={(e) => setNuevaClave({ ...nuevaClave, confirmar: e.target.value })}
+                          />
+                        </div>
+                        <div className="col-md-4 d-flex gap-2">
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            disabled={nuevaClave.guardando || nuevaClave.password.length < 8 || !nuevaClave.confirmar}
+                            onClick={restablecerPassword}
+                          >
+                            {nuevaClave.guardando ? "Guardando..." : "Guardar contraseña"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-light"
+                            onClick={() => setNuevaClave({ abierta: false, password: "", confirmar: "", guardando: false })}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Contraseña (solo al crear) */}
               {tipo === "crear" && (

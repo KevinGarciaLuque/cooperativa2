@@ -810,6 +810,38 @@ router.post("/:id/cambiar-password", async (req, res) => {
 });
 
 // ============================================
+// RESTABLECER LA CONTRASEÑA DE OTRO USUARIO (solo Super Administrador)
+// POST /api/usuarios/:id/restablecer-password  { password_nuevo }
+// ============================================
+router.post("/:id/restablecer-password", async (req, res) => {
+  try {
+    if (req.usuario?.rol !== "Super Administrador") {
+      return res.status(403).json({ message: "Solo el Super Administrador puede restablecer contraseñas." });
+    }
+    const errorPassword = validarPassword(req.body?.password_nuevo);
+    if (errorPassword) return res.status(400).json({ message: errorPassword });
+
+    const [[u]] = await pool.query("SELECT id_usuario, nombre_completo FROM usuarios WHERE id_usuario = ?", [req.params.id]);
+    if (!u) return res.status(404).json({ message: "Usuario no encontrado" });
+
+    const passwordHash = await bcrypt.hash(req.body.password_nuevo, await bcrypt.genSalt(10));
+    await pool.query("UPDATE usuarios SET password = ? WHERE id_usuario = ?", [passwordHash, u.id_usuario]);
+    // Los enlaces de recuperación pendientes dejan de servir
+    await pool.query("DELETE FROM password_resets WHERE user_id = ?", [u.id_usuario]).catch(() => {});
+
+    await registrarBitacora(
+      u.id_usuario,
+      "Contraseña restablecida",
+      `${req.usuario.nombre_completo} (usuario #${req.usuario.id_usuario}) restableció la contraseña de ${u.nombre_completo}`
+    );
+    res.json({ success: true, message: `Contraseña de ${u.nombre_completo} restablecida.` });
+  } catch (error) {
+    console.error("ERROR AL RESTABLECER CONTRASEÑA:", error);
+    res.status(500).json({ message: "No se pudo restablecer la contraseña" });
+  }
+});
+
+// ============================================
 // CAMBIAR ESTADO DEL USUARIO (activar/suspender/desactivar)
 // ============================================
 router.patch("/:id/estado", async (req, res) => {

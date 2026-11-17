@@ -1897,6 +1897,21 @@ test("verificación en dos pasos: el personal confirma con el código del correo
   }
 });
 
+test("restablecer contraseña: solo el Super Administrador, con la política de contraseñas", async () => {
+  const ruta = `/usuarios/${ids.socio2}/restablecer-password`;
+  assert.equal((await api("POST", ruta, { password_nuevo: "Nueva12345" }, ids.tAdmin)).s, 403);
+  assert.equal((await api("POST", ruta, { password_nuevo: "corta" }, ids.tSuper)).s, 400);
+  assert.equal((await api("POST", ruta, { password_nuevo: "sololetras" }, ids.tSuper)).s, 400);
+  const ok = await api("POST", ruta, { password_nuevo: "Nueva12345" }, ids.tSuper);
+  assert.equal(ok.s, 200, ok.b?.message);
+  assert.ok((await api("POST", "/usuarios/login", { dni: "0801000000004", password: "Nueva12345" })).b.token);
+  assert.equal((await api("POST", "/usuarios/login", { dni: "0801000000004", password: "Clave1234" })).s, 401);
+  const [[bit]] = await pool.query("SELECT detalle FROM bitacora WHERE id_usuario = ? AND accion = 'Contraseña restablecida' ORDER BY id_bitacora DESC LIMIT 1", [ids.socio2]);
+  assert.match(bit.detalle, /restableció la contraseña de Socio Dos Prueba/);
+  // Se deja como estaba para las demás pruebas
+  assert.equal((await api("POST", ruta, { password_nuevo: "Clave1234" }, ids.tSuper)).s, 200);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

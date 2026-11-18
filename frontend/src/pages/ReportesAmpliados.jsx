@@ -2,7 +2,8 @@
 // cerrados y cartera agrupada. Se ven en pantalla y se bajan en Excel. Función nueva.
 import { useState } from "react";
 import axios from "axios";
-import { FaChartBar, FaFileExcel, FaPlay } from "react-icons/fa";
+import { FaChartBar, FaFileExcel, FaPlay, FaCalendarAlt, FaExclamationTriangle, FaHourglassHalf, FaCheckCircle, FaLayerGroup, FaHistory } from "react-icons/fa";
+import Pestanas from "../components/Pestanas";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
 import { dinero } from "../utils/pais";
@@ -11,6 +12,14 @@ import { bajarArchivo, mensajeBlob } from "../components/DocumentosCredito";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const AZUL = "#1a2035";
 const ACCENT = "#a8cd3a";
+const ICONOS = {
+  proyeccion: <FaCalendarAlt />,
+  vencidos: <FaExclamationTriangle />,
+  por_cerrar: <FaHourglassHalf />,
+  cerrados: <FaCheckCircle />,
+  cartera: <FaLayerGroup />,
+  historial: <FaHistory />,
+};
 const REPORTES = [
   ["proyeccion", "Proyección de cobros", "Cuotas que vencen en un rango de fechas y las vencidas sin pagar."],
   ["vencidos", "Créditos vencidos", "Préstamos cuyo plazo ya terminó y todavía tienen saldo."],
@@ -88,15 +97,14 @@ export default function ReportesAmpliados() {
         </div>
       </div>
 
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 14 }}>
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 14, overflow: "hidden" }}>
+        <Pestanas
+          variante="tarjeta"
+          activa={tipo}
+          onCambiar={(k) => { setTipo(k); setResultado(null); }}
+          tabs={REPORTES.map(([k, t]) => ({ clave: k, titulo: t, icono: ICONOS[k] }))}
+        />
         <div className="card-body">
-          <div className="d-flex flex-wrap gap-2 mb-3">
-            {REPORTES.map(([k, t]) => (
-              <button key={k} className={`btn btn-sm ${tipo === k ? "btn-primary" : "btn-outline-secondary"}`} onClick={() => { setTipo(k); setResultado(null); }}>
-                {t}
-              </button>
-            ))}
-          </div>
           <div className="small text-muted mb-2">{actual[2]}</div>
           <div className="row g-2 align-items-end">
             {["proyeccion", "cerrados"].includes(tipo) && (

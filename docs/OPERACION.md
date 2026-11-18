@@ -209,6 +209,12 @@ El catálogo base está en `backend/utils/contabilidad.js`; el contador puede ag
   préstamo y sucursal del socio; ficha de inscripción del socio en Word (contrato y pagaré en Word); en el
   pago rápido, saldos de ahorro y depósito a las cuentas del socio en la misma operación (pagos ampliados);
   garantías de cada integrante desde el crédito grupal.
+- **Configuración avanzada de créditos** (Productos de crédito, por producto; vacío = lo general):
+  mora (% anual) y días de gracia propios; frecuencia de las cuotas (mensual, quincenal o semanal; el plazo
+  se escribe en meses); interés sobre saldos o fijo sobre el monto original (flat); redondeo de la cuota (la
+  última ajusta); cargo automático en cada pago (monto fijo o %, con su concepto: entra a caja aparte). Todo
+  se copia al préstamo al desembolsarlo: los préstamos ya entregados no cambian. Además, el código de los
+  créditos con formato propio (por ejemplo {prod}-{aa}-{n}) y fecha de recepción y n.º de solicitud.
 - **Reportes ampliados** (menú "Reportes de cartera"): proyección de cobros, créditos vencidos, pendientes de
   cerrar, cerrados, cartera agrupada (promotor, línea, municipio, sucursal, producto, individual/grupal) e
   historial crediticio de un socio; en pantalla y en Excel, por sucursal.

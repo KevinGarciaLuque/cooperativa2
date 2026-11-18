@@ -1182,6 +1182,20 @@ const MIGRACIONES = [
       }
     },
   },
+  {
+    id: "2026_11_019_frecuencia_pago",
+    descripcion: "Frecuencia de pago por producto: mensual (como siempre), quincenal o semanal",
+    async up(conn) {
+      for (const t of ["productos_credito", "prestamos"]) {
+        const [[e]] = await conn.query(
+          `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'frecuencia_pago'`,
+          [t]
+        );
+        if (!e.n) await conn.query(`ALTER TABLE ${t} ADD COLUMN frecuencia_pago VARCHAR(10) NULL`);
+      }
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

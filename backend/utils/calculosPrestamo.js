@@ -37,9 +37,14 @@ const calcularInteresPeriodo = (saldo, tasaAnual, dias) => {
   return parseFloat((parseFloat(saldo) * tasaDiaria * dias).toFixed(2));
 };
 
-// Días para cobrar interés según el modo de pago (mínimo un mes completo).
-const diasDeInteres = (modo, fechaBase, fechaPago) =>
-  modo === "cuota_fija" ? DIAS_MES : Math.max(DIAS_MES, diasEntre(fechaBase, fechaPago));
+// Días de cada periodo de pago según la frecuencia del préstamo (mensual = 30, como siempre)
+const DIAS_PERIODO = { semanal: 7, quincenal: 15 };
+const diasPeriodo = (p) => DIAS_PERIODO[p?.frecuencia_pago] || DIAS_MES;
+
+// Días para cobrar interés según el modo de pago (mínimo un periodo completo: un mes, o
+// 15 / 7 días en los préstamos quincenales o semanales).
+const diasDeInteres = (modo, fechaBase, fechaPago, periodo = DIAS_MES) =>
+  modo === "cuota_fija" ? periodo : Math.max(periodo, diasEntre(fechaBase, fechaPago));
 
 // Días de atraso: pasados los días de gracia (por defecto 30) desde el último
 // pago o desde el otorgamiento.
@@ -59,10 +64,10 @@ const calcularInteresMoratorio = (saldo, diasMora, tasaAnual = null) =>
 // Lo que cuesta cancelar hoy todo el préstamo: saldo + interés de los días usados
 // desde el último pago (mínimo un mes) + mora. Pagar antes del plazo pactado no
 // cobra los intereses de los meses que faltan: solo los del tiempo transcurrido.
-const liquidacionAlDia = ({ saldo, tasaAnual, fechaOtorgado, fechaUltimoPago, moraTasa = null, moraGracia = null, baseInteres = null }) => {
+const liquidacionAlDia = ({ saldo, tasaAnual, fechaOtorgado, fechaUltimoPago, moraTasa = null, moraGracia = null, baseInteres = null, periodo = DIAS_MES }) => {
   const saldoNum = parseFloat(saldo) || 0;
   const base = soloFecha(fechaUltimoPago) || soloFecha(fechaOtorgado) || hoyISO();
-  const dias = Math.max(DIAS_MES, diasEntre(base, hoyISO()));
+  const dias = Math.max(periodo, diasEntre(base, hoyISO()));
   // baseInteres: monto original en los préstamos de interés fijo ("flat")
   const interes = calcularInteresPeriodo(baseInteres != null ? parseFloat(baseInteres) : saldoNum, tasaAnual, dias);
   const diasMora = calcularDiasMora(fechaOtorgado, fechaUltimoPago, moraGracia);
@@ -116,6 +121,7 @@ module.exports = {
   calcularDiasMora,
   calcularInteresMoratorio,
   DIAS_MES,
+  diasPeriodo,
   soloFecha,
   esFechaISO,
   hoyISO,

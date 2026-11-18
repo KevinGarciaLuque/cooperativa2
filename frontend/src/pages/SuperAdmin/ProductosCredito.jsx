@@ -34,6 +34,7 @@ const VACIO = {
   cargo_concepto: "",
   redondeo_cuota: "",
   metodo_interes: "",
+  frecuencia_pago: "",
 };
 
 export default function ProductosCredito() {
@@ -87,6 +88,7 @@ export default function ProductosCredito() {
             cargo_concepto: p.cargo_concepto || "",
             redondeo_cuota: p.redondeo_cuota ?? "",
             metodo_interes: p.metodo_interes || "",
+            frecuencia_pago: p.frecuencia_pago || "",
           }
         : VACIO
     );
@@ -279,6 +281,17 @@ export default function ProductosCredito() {
                           <div className="col-6 col-md-3">
                             <label className="form-label small mb-1">Días de gracia</label>
                             <input className="form-control form-control-sm" type="number" min="0" max="90" value={form.mora_dias_gracia} onChange={cambiar("mora_dias_gracia")} placeholder="General" />
+                          </div>
+                          <div className="col-12 col-md-6">
+                            <label className="form-label small mb-1">Frecuencia de las cuotas</label>
+                            <select className="form-select form-select-sm" value={form.frecuencia_pago} onChange={cambiar("frecuencia_pago")}>
+                              <option value="">Mensual (como siempre)</option>
+                              <option value="quincenal">Quincenal (2 cuotas por mes)</option>
+                              <option value="semanal">Semanal (52 cuotas por año)</option>
+                            </select>
+                            {form.frecuencia_pago && (
+                              <div className="form-text">El plazo se sigue escribiendo en meses. Sin días de gracia propios, se usan los días del periodo.</div>
+                            )}
                           </div>
                           <div className="col-12 col-md-6">
                             <label className="form-label small mb-1">Cálculo del interés</label>

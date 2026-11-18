@@ -34,13 +34,27 @@ const redondearCuota = (cuota, redondeo) => {
   return r > 0 ? r2(Math.ceil(r2(cuota) / r - 1e-9) * r) : cuota;
 };
 
-const generarPlan = ({ monto, tasaAnual, plazo, fechaInicio, redondeo = null, metodo = null }) => {
+// Frecuencia (configuración por producto): el plazo sigue en meses; las cuotas quincenales son
+// 2 por mes y las semanales 52 por año. Su interés usa la misma tasa diaria que los pagos
+// (tasa anual / 360 por día).
+const DIAS_FREC = { semanal: 7, quincenal: 15 };
+const numeroDeCuotas = (plazoMeses, frecuencia) =>
+  frecuencia === "semanal" ? Math.round((parseInt(plazoMeses) * 52) / 12) : frecuencia === "quincenal" ? parseInt(plazoMeses) * 2 : parseInt(plazoMeses);
+const fechaCuota = (inicio, k, frecuencia) => {
+  if (!DIAS_FREC[frecuencia]) return sumarMeses(inicio, k);
+  const d = new Date(`${inicio}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + DIAS_FREC[frecuencia] * k);
+  return d.toISOString().substring(0, 10);
+};
+
+const generarPlan = ({ monto, tasaAnual, plazo, fechaInicio, redondeo = null, metodo = null, frecuencia = null }) => {
   const capitalTotal = r2(monto);
-  const n = parseInt(plazo);
+  const n = numeroDeCuotas(plazo, frecuencia);
   const inicio = soloFecha(fechaInicio);
   if (!(capitalTotal > 0) || !(n > 0) || !inicio) return [];
 
-  const i = parseFloat(tasaAnual) / 100 / 12;
+  const i = DIAS_FREC[frecuencia] ? (parseFloat(tasaAnual) / 100 / 360) * DIAS_FREC[frecuencia] : parseFloat(tasaAnual) / 100 / 12;
+  const sumarMesesF = (base, k) => fechaCuota(base, k, frecuencia);
   // Interés fijo ("flat"): cada cuota paga el mismo interés sobre el monto original y el mismo capital
   if (metodo === "flat") {
     const interesFijo = r2(capitalTotal * i);
@@ -50,7 +64,7 @@ const generarPlan = ({ monto, tasaAnual, plazo, fechaInicio, redondeo = null, me
     for (let k = 1; k <= n; k++) {
       const capital = k === n ? saldoF : Math.min(saldoF, r2(cuota - interesFijo));
       saldoF = r2(saldoF - capital);
-      cuotasFlat.push({ numero: k, fecha_vencimiento: sumarMeses(inicio, k), cuota: r2(capital + interesFijo), capital, interes: interesFijo, saldo: saldoF });
+      cuotasFlat.push({ numero: k, fecha_vencimiento: sumarMesesF(inicio, k), cuota: r2(capital + interesFijo), capital, interes: interesFijo, saldo: saldoF });
     }
     return cuotasFlat;
   }
@@ -67,7 +81,7 @@ const generarPlan = ({ monto, tasaAnual, plazo, fechaInicio, redondeo = null, me
     saldo = r2(saldo - capital);
     cuotas.push({
       numero: k,
-      fecha_vencimiento: sumarMeses(inicio, k),
+      fecha_vencimiento: sumarMesesF(inicio, k),
       cuota: r2(capital + interes),
       capital,
       interes,
@@ -137,6 +151,7 @@ const planDePrestamo = (p, hoy = hoyISO()) => {
     fechaInicio: p.fecha_otorgado,
     redondeo: p.redondeo_cuota,
     metodo: p.metodo_interes,
+    frecuencia: p.frecuencia_pago,
   });
   if (!cuotas.length) return null;
   return estadoDelPlan(cuotas, {
@@ -151,9 +166,9 @@ const planDePrestamo = (p, hoy = hoyISO()) => {
 const cuotaDelPrestamo = (p) => {
   const plan = generarPlan({
     monto: p.monto, tasaAnual: p.tasa_interes, plazo: p.plazo_meses, fechaInicio: "2000-01-01",
-    redondeo: p.redondeo_cuota, metodo: p.metodo_interes,
+    redondeo: p.redondeo_cuota, metodo: p.metodo_interes, frecuencia: p.frecuencia_pago,
   });
   return plan.length ? plan[0].cuota : calcularCuotaMensual(parseFloat(p.monto), parseFloat(p.tasa_interes), parseInt(p.plazo_meses));
 };
 
-module.exports = { generarPlan, estadoDelPlan, planDePrestamo, sumarMeses, redondearCuota, cuotaDelPrestamo };
+module.exports = { generarPlan, estadoDelPlan, planDePrestamo, sumarMeses, redondearCuota, cuotaDelPrestamo, numeroDeCuotas };

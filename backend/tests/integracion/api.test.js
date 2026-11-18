@@ -2350,6 +2350,40 @@ test("interés fijo (flat) por producto: cuota con capital e interés fijos sobr
   await api("PUT", `/productos/${prod.b.data.id_producto}`, { activo: false }, ids.tSuper);
 });
 
+test("frecuencia de pago por producto: cuotas semanales y quincenales con su interés y fechas", async () => {
+  const crear = async (nombre, frecuencia) => {
+    const prod = await api("POST", "/productos", { nombre, tasa_mensual: 2, monto_min: 100, monto_max: 100000, plazo_min: 1, plazo_max: 24, garantia_requerida: "ninguna", frecuencia_pago: frecuencia }, ids.tSuper);
+    assert.equal(prod.s, 201, prod.b?.message);
+    const nuevo = await api("POST", "/prestamos", { id_usuario: ids.socio, monto: 520, tasa_interes: 24, plazo_meses: 3, estado: "aprobado", id_producto: prod.b.data.id_producto }, ids.tSuper);
+    const id = nuevo.b.id_prestamo || nuevo.b.data?.id_prestamo || nuevo.b.prestamo?.id_prestamo;
+    assert.equal((await api("POST", `/prestamos/${id}/desembolsar`, { metodo: "efectivo" }, ids.tSuper)).s, 200);
+    return { id, idProd: prod.b.data.id_producto };
+  };
+  const dias = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
+
+  const sem = await crear("Semanal Prueba", "semanal");
+  const plan = (await api("GET", `/prestamos/${sem.id}/plan`, null, ids.tAdmin)).b.plan;
+  assert.equal(plan.length, 13, "3 meses = 13 semanas");
+  assert.equal(dias(plan[0].fecha_vencimiento, plan[1].fecha_vencimiento), 7);
+  const [[g]] = await pool.query("SELECT mora_dias_gracia FROM prestamos WHERE id_prestamo = ?", [sem.id]);
+  assert.equal(g.mora_dias_gracia, 7, "gracia según la semana");
+  const pago = await api("POST", "/pagos", { id_prestamo: sem.id, monto_pagado: plan[0].cuota, metodo_pago: "efectivo", tipo_pago: "cuota_fija" }, ids.tAdmin);
+  assert.equal(pago.s, 201, pago.b?.message);
+  assert.ok(Math.abs(pago.b.detalles.monto_interes - plan[0].interes) <= 0.01, "el interés del pago es el de la semana");
+  const pp = await api("GET", `/pagos/prestamo/${sem.id}/proximo-pago`, null, ids.tAdmin);
+  assert.equal(pp.b.proximo_pago.cuota_mensual, plan[0].cuota);
+
+  const quin = await crear("Quincenal Prueba", "quincenal");
+  const planQ = (await api("GET", `/prestamos/${quin.id}/plan`, null, ids.tAdmin)).b.plan;
+  assert.equal(planQ.length, 6);
+  assert.equal(dias(planQ[0].fecha_vencimiento, planQ[1].fecha_vencimiento), 15);
+
+  for (const x of [sem, quin]) {
+    await pool.query("UPDATE prestamos SET estado = 'pagado', saldo_restante = 0 WHERE id_prestamo = ?", [x.id]);
+    await api("PUT", `/productos/${x.idProd}`, { activo: false }, ids.tSuper);
+  }
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

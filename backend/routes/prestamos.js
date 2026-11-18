@@ -21,6 +21,7 @@ const {
   calcularDiasMora,
   calcularInteresMoratorio,
   DIAS_MES,
+  diasPeriodo,
   soloFecha,
   hoyISO,
   diasEntre,
@@ -230,7 +231,7 @@ router.put("/:id/datos-credito", async (req, res) => {
 router.get("/:id/plan", async (req, res) => {
   try {
     const [[p]] = await pool.query(
-      `SELECT id_prestamo, id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado, redondeo_cuota, metodo_interes
+      `SELECT id_prestamo, id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado, redondeo_cuota, metodo_interes, frecuencia_pago
        FROM prestamos WHERE id_prestamo = ?`,
       [req.params.id]
     );
@@ -780,7 +781,7 @@ const cotizarLiquidacion = async (conn, idPrestamo) => {
   );
   const hoy = hoyISO();
   const fechaBase = soloFecha(ultimo.length > 0 ? ultimo[0].fecha_pago : p.fecha_otorgado) || hoy;
-  const dias = Math.max(DIAS_MES, diasEntre(fechaBase, hoy));
+  const dias = Math.max(diasPeriodo(p), diasEntre(fechaBase, hoy));
   const saldo = parseFloat(p.saldo_restante);
   const interes = calcularInteresPeriodo(p.metodo_interes === "flat" ? parseFloat(p.monto) : saldo, p.tasa_interes, dias);
   const diasMora = calcularDiasMora(p.fecha_otorgado, ultimo.length > 0 ? ultimo[0].fecha_pago : null, p.mora_dias_gracia);

@@ -21,6 +21,7 @@ const {
   calcularInteresPeriodo,
   diasDeInteres,
   liquidacionAlDia,
+  diasPeriodo,
 } = require("../utils/calculosPrestamo");
 
 // ============================================
@@ -317,7 +318,7 @@ const procesarPago = async (connection, body, usuario) => {
     const fechaBase = esFechaISO(fecha_referencia)
       ? fecha_referencia
       : fechaUltimoPago || soloFecha(prestamoData.fecha_otorgado) || fechaPagoStr;
-    const diasInteres = diasDeInteres(modo, fechaBase, fechaPagoStr);
+    const diasInteres = diasDeInteres(modo, fechaBase, fechaPagoStr, diasPeriodo(prestamoData));
 
     // Interés fijo ("flat", configuración por producto): sobre el monto original, no sobre el saldo
     const interesDelPeriodo = calcularInteresPeriodo(
@@ -651,6 +652,7 @@ router.get("/prestamo/:id_prestamo/proximo-pago", async (req, res) => {
       moraTasa: prestamoData.mora_tasa_anual,
       moraGracia: prestamoData.mora_dias_gracia,
       baseInteres: prestamoData.metodo_interes === "flat" ? prestamoData.monto : null,
+      periodo: diasPeriodo(prestamoData),
     });
 
     const cuotasPagadas = totalPagos[0].total;

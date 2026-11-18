@@ -557,7 +557,7 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
             </div>
 
             {/* Datos ampliados del crédito (si se registraron) */}
-            {(prestamo.codigo || prestamo.linea_credito || prestamo.destino || prestamo.promotor_nombre || prestamo.numero_pagare || prestamo.numero_acta || prestamo.numero_cheque || prestamo.mora_tasa_anual != null || prestamo.cargo_tipo) && (
+            {(prestamo.codigo || prestamo.linea_credito || prestamo.destino || prestamo.promotor_nombre || prestamo.numero_pagare || prestamo.numero_acta || prestamo.numero_cheque || prestamo.mora_tasa_anual != null || prestamo.cargo_tipo || prestamo.frecuencia_pago || prestamo.metodo_interes) && (
               <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: "12px" }}>
                 <div className="card-body">
                   <h6 className="fw-bold mb-2">Datos del crédito</h6>
@@ -572,6 +572,8 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
                       ["N.º cheque", prestamo.numero_cheque],
                       ["Recepción", prestamo.fecha_recepcion && String(prestamo.fecha_recepcion).substring(0, 10)],
                       ["N.º solicitud", prestamo.numero_solicitud],
+                      ["Frecuencia", { semanal: "Cuotas semanales", quincenal: "Cuotas quincenales" }[prestamo.frecuencia_pago]],
+                      ["Interés", prestamo.metodo_interes === "flat" ? "Fijo sobre el monto (flat)" : null],
                       ["Mora del producto", prestamo.mora_tasa_anual != null && `${parseFloat(prestamo.mora_tasa_anual)}% anual${prestamo.mora_dias_gracia != null ? `, ${prestamo.mora_dias_gracia} días de gracia` : ""}`],
                       ["Cargo automático", prestamo.cargo_tipo && `${prestamo.cargo_concepto}: ${prestamo.cargo_tipo === "porcentaje" ? `${parseFloat(prestamo.cargo_valor)}% del pago` : parseFloat(prestamo.cargo_valor)}`],
                     ]

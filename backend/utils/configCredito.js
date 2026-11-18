@@ -4,7 +4,7 @@
 // préstamos ya entregados. Además recibe su código con el formato de la cooperativa.
 const pool = require("../db");
 
-const CAMPOS = ["mora_tasa_anual", "mora_dias_gracia", "cargo_tipo", "cargo_valor", "cargo_concepto", "redondeo_cuota", "metodo_interes"];
+const CAMPOS = ["mora_tasa_anual", "mora_dias_gracia", "cargo_tipo", "cargo_valor", "cargo_concepto", "redondeo_cuota", "metodo_interes", "frecuencia_pago"];
 
 const formatoCodigo = async (conn = pool) => {
   try {
@@ -44,6 +44,13 @@ const alDesembolsar = async (conn, idPrestamo) => {
       ...CAMPOS.map((c) => p[`prod_${c}`] ?? null),
       idPrestamo,
     ]);
+  }
+  // Semanal o quincenal sin gracia propia: la gracia general (30 días) es para pagos mensuales;
+  // se usa el periodo (7 o 15 días) más la tolerancia que la cooperativa da por encima del mes.
+  const periodo = { semanal: 7, quincenal: 15 }[p.prod_frecuencia_pago];
+  if (p.id_producto && periodo && p.prod_mora_dias_gracia == null) {
+    const extra = Math.max(0, parseInt(require("./configFinanciera").obtener().mora_dias_gracia) - 30);
+    await conn.query("UPDATE prestamos SET mora_dias_gracia = ? WHERE id_prestamo = ?", [periodo + extra, idPrestamo]);
   }
   const formato = await formatoCodigo(conn);
   if (formato && !p.codigo) await conn.query("UPDATE prestamos SET codigo = ? WHERE id_prestamo = ?", [armarCodigo(formato, p), idPrestamo]);

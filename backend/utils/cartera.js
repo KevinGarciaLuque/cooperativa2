@@ -32,7 +32,7 @@ const clasificar = (diasMora, diasParaVencer) => {
 const obtenerCartera = async (filtro = { sql: "", params: [] }) => {
   const [prestamos] = await pool.query(
     `SELECT p.id_prestamo, p.id_usuario, p.monto, p.saldo_restante, p.tasa_interes, p.plazo_meses,
-            p.mora_tasa_anual, p.mora_dias_gracia, p.redondeo_cuota, p.metodo_interes,
+            p.mora_tasa_anual, p.mora_dias_gracia, p.redondeo_cuota, p.metodo_interes, p.frecuencia_pago,
             p.estado, p.fecha_otorgado,
             u.nombre_completo, u.dni, u.telefono, u.correo,
             (SELECT MAX(fecha_pago) FROM pagos_prestamo WHERE id_prestamo = p.id_prestamo) AS ultimo_pago,

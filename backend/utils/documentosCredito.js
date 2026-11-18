@@ -22,7 +22,7 @@ const CAMPOS = [
   ["socio_numero", "Número de socio"], ["socio_direccion", "Dirección"], ["socio_telefono", "Teléfono"],
   ["monto", "Monto (con separador de miles)"], ["monto_letras", "Monto en letras"], ["moneda_simbolo", "Símbolo de la moneda"],
   ["moneda_nombre", "Nombre de la moneda"], ["tasa_mensual", "Tasa mensual (%)"], ["tasa_anual", "Tasa anual (%)"],
-  ["plazo_meses", "Plazo en meses"], ["cuota", "Cuota mensual"], ["fecha_otorgado", "Fecha de otorgamiento"],
+  ["plazo_meses", "Plazo en meses"], ["numero_cuotas", "Número de cuotas"], ["frecuencia", "mensuales / quincenales / semanales"], ["cuota", "Cuota mensual"], ["fecha_otorgado", "Fecha de otorgamiento"],
   ["fecha_vencimiento", "Fecha de la última cuota"], ["linea", "Línea de crédito"], ["destino", "Destino"],
   ["numero_pagare", "N.º de pagaré"], ["numero_acta", "N.º de acta"], ["numero_cheque", "N.º de cheque"],
   ["grupo", "Grupo (créditos grupales)"], ["promotor", "Promotor"], ["garantias_texto", "Garantías en un párrafo"],
@@ -53,7 +53,7 @@ const datosDocumento = async (idPrestamo, usuario) => {
   const [[coop]] = await pool.query("SELECT valor FROM configuracion_sitio WHERE clave = 'site_name'");
   const [garantias] = await pool.query("SELECT * FROM garantias WHERE id_prestamo = ? AND estado = 'vigente' ORDER BY id_garantia", [idPrestamo]).catch(() => [[]]);
   const otorgado = soloFecha(p.fecha_otorgado) || hoyISO();
-  const plan = generarPlan({ monto: p.monto, tasaAnual: p.tasa_interes, plazo: p.plazo_meses, fechaInicio: otorgado, redondeo: p.redondeo_cuota, metodo: p.metodo_interes });
+  const plan = generarPlan({ monto: p.monto, tasaAnual: p.tasa_interes, plazo: p.plazo_meses, fechaInicio: otorgado, redondeo: p.redondeo_cuota, metodo: p.metodo_interes, frecuencia: p.frecuencia_pago });
   const tasaMensual = p.tipo_tasa === "nominal_mensual" && p.tasa_original != null ? parseFloat(p.tasa_original) : parseFloat(p.tasa_interes) / 12;
   const n = (v) => pais.numero(v);
   const textoGarantias = garantias.length
@@ -77,6 +77,8 @@ const datosDocumento = async (idPrestamo, usuario) => {
     tasa_mensual: n(tasaMensual),
     tasa_anual: n(tasaMensual * 12),
     plazo_meses: String(p.plazo_meses),
+    numero_cuotas: String(plan.length || p.plazo_meses),
+    frecuencia: { semanal: "semanales", quincenal: "quincenales" }[p.frecuencia_pago] || "mensuales",
     cuota: plan.length ? n(plan[0].cuota) : "",
     fecha_otorgado: fechaLarga(otorgado),
     fecha_vencimiento: plan.length ? fechaLarga(plan[plan.length - 1].fecha_vencimiento) : "",

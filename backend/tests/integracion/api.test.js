@@ -2173,6 +2173,47 @@ test("pagos ampliados: boleta, otros cargos que entran a caja, pago rápido y co
   assert.equal((await api("PUT", "/configuracion/funciones", { pagos_ampliados: false }, ids.tSuper)).s, 200);
 });
 
+test("contrato y pagaré en Word: plantilla llena con los datos del préstamo y plantilla propia", async () => {
+  const PizZip = require("pizzip");
+  const bajar = (ruta, token) => fetch(`${base}/api${ruta}`, { headers: { Authorization: `Bearer ${token}` } });
+  const [[pr]] = await pool.query("SELECT id_prestamo FROM prestamos WHERE estado IN ('activo','mora') ORDER BY id_prestamo DESC LIMIT 1");
+  assert.equal((await bajar(`/documentos-credito/prestamos/${pr.id_prestamo}/contrato`, ids.tAdmin)).status, 403, "apagada");
+  assert.equal((await api("PUT", "/configuracion/funciones", { contratos_word: true }, ids.tSuper)).s, 200);
+
+  const r = await bajar(`/documentos-credito/prestamos/${pr.id_prestamo}/contrato`, ids.tAdmin);
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get("content-type"), /wordprocessingml/);
+  const xml = new PizZip(Buffer.from(await r.arrayBuffer())).file("word/document.xml").asText();
+  assert.match(xml, /CONTRATO DE PRÉSTAMO N.º \d+/);
+  assert.ok(!/\{socio_nombre\}/.test(xml), "sin marcadores sin llenar");
+  assert.match(xml, /con \d{2}\/100/, "monto en letras");
+  const pag = await bajar(`/documentos-credito/prestamos/${pr.id_prestamo}/pagare`, ids.tAdmin);
+  assert.equal(pag.status, 200);
+
+  // Plantilla propia: una mal escrita se rechaza; una buena se usa; borrarla vuelve a la original
+  const docx = (texto) => {
+    const z = new PizZip(require("fs").readFileSync(require("path").join(__dirname, "../../plantillas/pagare.docx")));
+    z.file("word/document.xml", z.file("word/document.xml").asText().replace(/PAGARÉ N.º \{numero_pagare\}/, texto));
+    return z.generate({ type: "nodebuffer" });
+  };
+  const subir = (buffer, token = ids.tSuper) => {
+    const f = new FormData();
+    f.append("plantilla", new Blob([buffer]), "pagare.docx");
+    return fetch(`${base}/api/documentos-credito/plantillas/pagare`, { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: f });
+  };
+  assert.equal((await subir(docx("PAGARÉ PROPIO {socio_nombre}"), ids.tAdmin)).status, 403);
+  assert.equal((await subir(docx("PAGARÉ {socio_nombre"))).status, 400);
+  assert.equal((await subir(docx("PAGARÉ PROPIO {socio_nombre}"))).status, 200);
+  const propio = new PizZip(Buffer.from(await (await bajar(`/documentos-credito/prestamos/${pr.id_prestamo}/pagare`, ids.tAdmin)).arrayBuffer())).file("word/document.xml").asText();
+  assert.match(propio, /PAGARÉ PROPIO/);
+  const pl = await api("GET", "/documentos-credito/plantillas", null, ids.tAdmin);
+  assert.equal(pl.b.data.find((x) => x.tipo === "pagare").personalizada, true);
+  assert.equal((await api("DELETE", "/documentos-credito/plantillas/pagare", null, ids.tSuper)).s, 200);
+  assert.equal((await api("GET", "/documentos-credito/plantillas", null, ids.tAdmin)).b.data.find((x) => x.tipo === "pagare").personalizada, false);
+
+  assert.equal((await api("PUT", "/configuracion/funciones", { contratos_word: false }, ids.tSuper)).s, 200);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

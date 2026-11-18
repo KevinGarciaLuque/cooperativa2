@@ -7,6 +7,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useAlerta } from "../../context/AlertaContext";
 import InputMonto from "../../ui/InputMonto";
 import { dinero, simboloMoneda } from "../../utils/pais";
+import PlantillasDocumentos from "../../components/PlantillasDocumentos";
 
 const ACCENT = "#a8cd3a";
 const AZUL = "#1a2035";
@@ -275,6 +276,8 @@ export default function ProductosCredito() {
           </div>
         </div>
       )}
+
+      <PlantillasDocumentos token={token} mostrarAlerta={mostrarAlerta} />
     </div>
   );
 }

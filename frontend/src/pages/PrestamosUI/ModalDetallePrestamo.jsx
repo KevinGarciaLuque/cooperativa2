@@ -5,6 +5,7 @@ import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 import { dinero, cifra, simboloMoneda, docIdentidad } from "../../utils/pais";
 import PlanPagos from "../../components/PlanPagos";
 import GarantiasPrestamo from "../../components/GarantiasPrestamo";
+import DocumentosCredito from "../../components/DocumentosCredito";
 
 // ==================== COMPONENTE MODAL DETALLE PRÉSTAMO ====================
 export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose, getEstadoInfo, token, apiUrl, onLiquidado }) {
@@ -548,6 +549,11 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Contrato y pagaré en Word (función nueva) */}
+            <div className="mb-3">
+              <DocumentosCredito idPrestamo={prestamo.id_prestamo} token={token} onError={(m) => window.alert(m)} />
             </div>
 
             {/* Datos ampliados del crédito (si se registraron) */}

@@ -23,7 +23,6 @@ const CATALOGO = [
     clave: "contratos_word",
     nombre: "Contrato y pagaré en Word",
     descripcion: "Documentos del crédito generados desde plantillas que la cooperativa puede editar.",
-    proximamente: true,
   },
   {
     clave: "reportes_ampliados",

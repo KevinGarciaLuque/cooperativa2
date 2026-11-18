@@ -182,6 +182,7 @@ app.use("/api/cumplimiento", require("./routes/cumplimiento"));
 app.use("/api/comite", ocultarInteresSocio, require("./routes/comite"));
 app.use("/api/grupos", ocultarInteresSocio, require("./routes/grupos"));
 app.use("/api/pagos-ampliados", ocultarInteresSocio, require("./routes/pagosAmpliados"));
+app.use("/api/documentos-credito", require("./routes/documentosCredito"));
 app.use("/api/aportaciones", require("./routes/aportaciones"));
 app.use("/api/pagos", ocultarInteresSocio, require("./routes/pagos"));
 app.use("/api/movimientos", require("./routes/movimientos"));

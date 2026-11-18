@@ -104,6 +104,18 @@ const menuSocio = [
   { to: "/mis-aportaciones", icon: <FaPiggyBank />, label: "Mis Aportaciones" },
 ];
 
+// Pie del menú: autoría y versión del sistema
+const PieSidebar = () => (
+  <div className="sidebar-footer">
+    <div className="sidebar-footer-autor">
+      Desarrollado por <span>Kevin García</span>
+    </div>
+    <div className="sidebar-footer-version">
+      SmartCoop v1.0 &middot; &copy; {new Date().getFullYear()}
+    </div>
+  </div>
+);
+
 export default function Sidebar({ collapsed, onCollapseChange }) {
   const { user, token } = useAuth();
   const funciones = useFunciones();
@@ -430,7 +442,7 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
         .sidebar-offcanvas .offcanvas-body {
           overscroll-behavior: contain;
           -webkit-overflow-scrolling: touch;
-          padding-bottom: calc(24px + env(safe-area-inset-bottom));
+          padding-bottom: 12px;
         }
         .sidebar-offcanvas:not(.show) {
           -webkit-transform: translateX(-100%);
@@ -452,14 +464,19 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
         /* Pie fijo al final del menú (ya no flota encima de las últimas opciones) */
         .sidebar-footer {
           flex-shrink: 0;
-          padding: 10px 16px;
+          padding: 10px 16px 12px;
           border-top: 1px solid rgba(255,255,255,0.07);
           color: ${TEXT_MUTED};
-          font-size: 0.72rem;
+          font-size: 0.7rem;
+          line-height: 1.45;
           text-align: center;
           overflow: hidden;
           white-space: nowrap;
         }
+        .sidebar-footer-autor { color: #c3cad6; font-weight: 600; letter-spacing: .2px; }
+        .sidebar-footer-autor span { color: ${ACCENT}; }
+        .sidebar-footer-version { opacity: .75; font-size: 0.66rem; }
+        .sidebar-offcanvas .sidebar-footer { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
       `}</style>
 
       {/* ── Botón toggle escritorio ── */}
@@ -505,9 +522,7 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
 
         {/* Footer */}
         {!collapsed && (
-          <div className="sidebar-footer">
-            v1.0 &mdash; {new Date().getFullYear()}
-          </div>
+          <PieSidebar />
         )}
       </aside>
 
@@ -552,6 +567,7 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
         <div className="offcanvas-body px-0" style={{ overflowX: "hidden" }}>
           {listaMenu(true)}
         </div>
+        <PieSidebar />
       </div>
 
       {/* Backdrop móvil */}

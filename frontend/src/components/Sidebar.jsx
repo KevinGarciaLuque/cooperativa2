@@ -272,16 +272,26 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
           white-space: nowrap;
         }
         .sidebar-divider { height: 1px; margin: 10px 16px; background: rgba(255,255,255,0.09); }
+        /* Títulos de grupo: verdes, más pequeños y con una línea, para que no se confundan con las opciones */
         .sidebar-section-label {
-          font-size: 0.65rem;
-          font-weight: 700;
-          letter-spacing: 1.4px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 0.66rem;
+          font-weight: 800;
+          letter-spacing: 1.6px;
           text-transform: uppercase;
-          color: ${TEXT_MUTED};
-          padding: 14px 20px 4px;
+          color: ${ACCENT};
+          padding: 16px 18px 6px;
           overflow: hidden;
           white-space: nowrap;
           transition: opacity 0.2s;
+        }
+        .sidebar-section-label::after {
+          content: "";
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(90deg, rgba(168,205,58,0.45), rgba(168,205,58,0));
         }
         .sidebar-link {
           position: relative;

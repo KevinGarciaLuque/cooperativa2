@@ -171,21 +171,20 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// ============================================
-// REGISTRAR UN NUEVO PAGO (CON ACTUALIZACIÓN AUTOMÁTICA)
-// ============================================
-router.post("/", async (req, res) => {
-  const connection = await pool.getConnection();
-
-  // Toda la operación va en una transacción; los retornos anticipados la revierten
-  const fail = async (codigo, cuerpo) => {
-    await connection.rollback().catch(() => {});
-    return res.status(codigo).json(cuerpo);
+// Registra un pago dentro de una transacción abierta (la usa el pago individual y el pago grupal).
+// Si algo no es válido lanza FalloPago con el código y la respuesta para el navegador.
+class FalloPago extends Error {
+  constructor(codigo, cuerpo) {
+    super(cuerpo?.message || "Pago no válido");
+    this.codigo = codigo;
+    this.cuerpo = cuerpo;
+  }
+}
+const procesarPago = async (connection, body, usuario) => {
+  const fail = (codigo, cuerpo) => {
+    throw new FalloPago(codigo, cuerpo);
   };
-
-  try {
-    await connection.beginTransaction();
-    const { id_prestamo, monto_pagado, metodo_pago, condonar_mora, tipo_pago, fecha_pago, fecha_referencia, id_reporte } = req.body;
+    const { id_prestamo, monto_pagado, metodo_pago, condonar_mora, tipo_pago, fecha_pago, fecha_referencia, id_reporte } = body;
 
     // Pago reportado por el socio desde su panel: se confirma junto con este registro
     let reporte = null;
@@ -293,15 +292,7 @@ router.post("/", async (req, res) => {
     const moraGenerada = diasMora > 0 ? calcularInteresMoratorio(saldoActual, diasMora) : 0;
     let moraCondonada = false;
     if (condonar_mora && moraGenerada > 0) {
-      let rolSolicitante = null;
-      try {
-        const token = req.header("Authorization")?.replace("Bearer ", "");
-        rolSolicitante = token
-          ? jwt.verify(token, process.env.JWT_SECRET).rol
-          : null;
-      } catch {
-        rolSolicitante = null;
-      }
+      const rolSolicitante = usuario?.rol || null;
       if (rolSolicitante !== "Super Administrador") {
         return fail(403, { message: "Solo el Super Administrador puede omitir la mora." });
       }
@@ -387,7 +378,7 @@ router.post("/", async (req, res) => {
       referencia_tipo: "pago",
       referencia_id: nuevoPagoId,
       id_socio: prestamoData.id_usuario,
-      id_registrado_por: req.usuario?.id_usuario,
+      id_registrado_por: usuario?.id_usuario,
       fecha: fechaPagoStr === hoy ? null : `${fechaPagoStr} 12:00:00`,
     });
 
@@ -417,7 +408,7 @@ router.post("/", async (req, res) => {
         liquidado: prestamoLiquidado,
       },
       fecha: fechaPagoStr === hoy ? null : `${fechaPagoStr} 12:00:00`,
-      emitido_por: req.usuario?.id_usuario,
+      emitido_por: usuario?.id_usuario,
     });
 
     // Si el préstamo fue liquidado, cambiar estado y emitir la constancia de finiquito
@@ -427,7 +418,7 @@ router.post("/", async (req, res) => {
         `UPDATE prestamos SET estado = 'pagado', saldo_restante = 0.00 WHERE id_prestamo = ?`,
         [id_prestamo]
       );
-      idFiniquito = await emitirFiniquito(connection, id_prestamo, req.usuario?.id_usuario);
+      idFiniquito = await emitirFiniquito(connection, id_prestamo, usuario?.id_usuario);
     } else if (prestamoData.estado === 'mora' && (diasMora === 0 || interesMoratorio > 0 || moraCondonada)) {
       // La mora quedó pagada (o fue omitida) con este pago: el préstamo vuelve a activo
       await connection.query(
@@ -460,10 +451,30 @@ router.post("/", async (req, res) => {
       await connection.query(
         `UPDATE pagos_reportados SET estado = 'confirmado', id_pago = ?, revisado_por = ?, revisado_en = NOW()
          WHERE id_reporte = ?`,
-        [nuevoPagoId, req.usuario?.id_usuario || null, reporte.id_reporte]
+        [nuevoPagoId, usuario?.id_usuario || null, reporte.id_reporte]
       );
     }
 
+    return {
+      id_prestamo, reporte, prestamoData, montoPagadoNum, nuevoSaldo, prestamoLiquidado, nuevoPagoId, idRecibo, idFiniquito,
+      capitalDelPeriodo, interesEfectivo, saldoActual, cuotaMensual, diasMora, diasInteres, modo, interesMoratorio,
+      moraCondonada, moraGenerada,
+    };
+};
+
+// ============================================
+// REGISTRAR UN NUEVO PAGO (CON ACTUALIZACIÓN AUTOMÁTICA)
+// ============================================
+router.post("/", async (req, res) => {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+    const {
+      id_prestamo, reporte, prestamoData, montoPagadoNum, nuevoSaldo, prestamoLiquidado, nuevoPagoId, idRecibo, idFiniquito,
+      capitalDelPeriodo, interesEfectivo, saldoActual, cuotaMensual, diasMora, diasInteres, modo, interesMoratorio,
+      moraCondonada, moraGenerada,
+    } = await procesarPago(connection, req.body, req.usuario);
     await connection.commit();
 
     // Aviso al socio con su recibo: por correo si reportó el pago desde la app, y siempre en su campanita
@@ -512,7 +523,8 @@ router.post("/", async (req, res) => {
     });
 
   } catch (error) {
-    await connection.rollback();
+    await connection.rollback().catch(() => {});
+    if (error instanceof FalloPago) return res.status(error.codigo).json(error.cuerpo);
     console.error("ERROR AL REGISTRAR PAGO:", error);
     res.status(500).json({ 
       message: "Error al registrar el pago", 
@@ -1223,3 +1235,5 @@ router.get("/reportes/morosidad", async (req, res) => {
 });
 
 module.exports = router;
+module.exports.procesarPago = procesarPago;
+module.exports.FalloPago = FalloPago;

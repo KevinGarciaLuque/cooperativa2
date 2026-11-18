@@ -13,7 +13,6 @@ const CATALOGO = [
     clave: "creditos_grupales",
     nombre: "Créditos grupales",
     descripcion: "Grupos con integrantes y cargos, crédito con desglose y plan por integrante, pago grupal.",
-    proximamente: true,
   },
   {
     clave: "pagos_ampliados",

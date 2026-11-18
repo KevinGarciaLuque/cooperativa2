@@ -191,7 +191,13 @@ El catálogo base está en `backend/utils/contabilidad.js`; el contador puede ag
 - **Datos ampliados de socios y créditos:** en el expediente del socio, escolaridad, fecha de ingreso,
   departamento/provincia (lista del país), municipio, comunidad y cónyuge; en el préstamo, línea,
   destino, promotor, número de pagaré, acta y cheque (y filtros por línea y promotor).
-- Próximamente: créditos grupales, pagos ampliados, contrato en Word y reportes ampliados.
+- **Créditos grupales** (menú "Créditos grupales"): grupos de socios con cargos (presidente, tesorero…),
+  promotor y comunidad. El crédito grupal crea un préstamo para cada integrante con su monto (mismo plazo y
+  tasa): cada uno tiene su plan de pagos y su mora. Se aprueban (con el comité si el monto lo exige) y se
+  desembolsan a todos desde el crédito. El **pago grupal** registra lo que paga cada integrante en una sola
+  operación: si uno no es válido, no se registra ninguno; cada pago entra a caja, a contabilidad y emite su
+  recibo. No se puede sacar del grupo a quien tiene un crédito grupal vigente.
+- Próximamente: pagos ampliados, contrato en Word y reportes ampliados.
 
 ## Varias sucursales
 

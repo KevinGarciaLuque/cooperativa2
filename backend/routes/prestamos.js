@@ -72,6 +72,8 @@ router.get("/", async (req, res) => {
       whereClause += ` AND p.linea_credito = ?`;
       params.push(String(req.query.linea_credito));
     }
+    if (req.query.tipo === "grupal") whereClause += " AND p.id_credito_grupal IS NOT NULL";
+    if (req.query.tipo === "individual") whereClause += " AND p.id_credito_grupal IS NULL";
     if (parseInt(req.query.id_promotor)) {
       whereClause += ` AND p.id_promotor = ?`;
       params.push(parseInt(req.query.id_promotor));
@@ -89,7 +91,9 @@ router.get("/", async (req, res) => {
        (SELECT COUNT(*) FROM pagos_prestamo WHERE id_prestamo = p.id_prestamo) as total_pagos,
        (SELECT IFNULL(SUM(monto_pagado), 0) FROM pagos_prestamo WHERE id_prestamo = p.id_prestamo) as total_pagado,
        pc.nombre AS producto_nombre,
-       (SELECT pr.nombre_completo FROM usuarios pr WHERE pr.id_usuario = p.id_promotor) AS promotor_nombre
+       (SELECT pr.nombre_completo FROM usuarios pr WHERE pr.id_usuario = p.id_promotor) AS promotor_nombre,
+       (SELECT g.nombre FROM creditos_grupales cg JOIN grupos g ON g.id_grupo = cg.id_grupo
+          WHERE cg.id_credito_grupal = p.id_credito_grupal) AS grupo_nombre
        FROM prestamos p 
        INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
        LEFT JOIN productos_credito pc ON pc.id_producto = p.id_producto

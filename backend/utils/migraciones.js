@@ -1056,6 +1056,55 @@ const MIGRACIONES = [
       }
     },
   },
+  {
+    id: "2026_11_014_creditos_grupales",
+    descripcion: "Grupos de socios, integrantes con cargo y créditos grupales",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS grupos (
+          id_grupo INT AUTO_INCREMENT PRIMARY KEY,
+          nombre VARCHAR(100) NOT NULL,
+          id_sucursal INT NULL,
+          id_promotor INT NULL,
+          comunidad VARCHAR(120) NULL,
+          estado ENUM('activo','inactivo') NOT NULL DEFAULT 'activo',
+          creado_por INT NULL,
+          creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS grupo_integrantes (
+          id_grupo INT NOT NULL,
+          id_usuario INT NOT NULL,
+          cargo VARCHAR(30) NOT NULL DEFAULT 'integrante',
+          agregado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (id_grupo, id_usuario),
+          INDEX idx_integrante_usuario (id_usuario)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS creditos_grupales (
+          id_credito_grupal INT AUTO_INCREMENT PRIMARY KEY,
+          id_grupo INT NOT NULL,
+          monto_total DECIMAL(14,2) NOT NULL,
+          tasa_mensual DECIMAL(8,4) NOT NULL,
+          plazo_meses INT NOT NULL,
+          id_producto INT NULL,
+          descripcion VARCHAR(255) NULL,
+          creado_por INT NULL,
+          creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_credito_grupo (id_grupo)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      const [[e]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'prestamos' AND COLUMN_NAME = 'id_credito_grupal'`
+      );
+      if (!e.n) {
+        await conn.query("ALTER TABLE prestamos ADD COLUMN id_credito_grupal INT NULL, ADD INDEX idx_prestamo_grupal (id_credito_grupal)");
+      }
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

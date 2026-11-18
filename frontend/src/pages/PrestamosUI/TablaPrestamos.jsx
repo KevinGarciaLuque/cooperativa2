@@ -326,6 +326,11 @@ function ModalHistorialPrestamos({ grupo, onClose, onEdit, onDelete, onVerDetall
                         <div style={{ minWidth: 0 }}>
                           <div className="fw-bold d-flex align-items-center gap-2 flex-wrap" style={{ color: "#2c3e50", fontSize: "0.95rem" }}>
                             <span>Préstamo #{p.id_prestamo}</span>
+                            {p.grupo_nombre && (
+                              <span className="badge bg-light text-dark border ms-1" title="Crédito grupal">
+                                Grupo: {p.grupo_nombre}
+                              </span>
+                            )}
                             <span className="badge d-inline-flex align-items-center gap-1"
                               style={{ background: estadoInfo.bg, color: estadoInfo.color, border: `1.5px solid ${estadoInfo.color}`, borderRadius: 20, fontSize: 12, fontWeight: 600, padding: "3px 10px" }}>
                               <IconoEstado style={{ fontSize: 11 }} />{estadoInfo.label}

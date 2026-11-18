@@ -35,6 +35,7 @@ import {
   FaGavel,
 } from "react-icons/fa";
 import LogoCoop from "./LogoCoop";
+import { useFunciones } from "../hooks/useFunciones";
 
 const SIDEBAR_BG = "#1a2035";
 const SIDEBAR_BG2 = "#222d45";
@@ -56,6 +57,7 @@ const TODOS_MODULOS = [
   { key: "prestamos",     to: "/prestamos",     icon: <FaHandHoldingUsd />, label: "Préstamos" },
   { key: "aportaciones",  to: "/aportaciones",  icon: <FaPiggyBank />,      label: "Aportaciones" },
   { key: "prestamos",     to: "/solicitudes",    icon: <FaInbox />,          label: "Solicitudes" },
+  { key: "prestamos",     to: "/creditos-grupales", icon: <FaUsers />,       label: "Créditos grupales", funcion: "creditos_grupales" },
   { key: "prestamos",     to: "/comite-credito", icon: <FaGavel />,         label: "Comité de crédito" },
   { key: "contabilidad",  to: "/contabilidad",  icon: <FaBalanceScale />,   label: "Contabilidad" },
   { key: "contabilidad",  to: "/libros-contables", icon: <FaBook />,      label: "Libros contables" },
@@ -89,6 +91,7 @@ const menuSocio = [
 
 export default function Sidebar({ collapsed, onCollapseChange }) {
   const { user, token } = useAuth();
+  const funciones = useFunciones();
   const { config } = useConfigSitio();
   const siteName = config.site_name || "SmartCoop";
   const [open, setOpen] = useState(false); // móvil/tablet offcanvas
@@ -171,6 +174,8 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
       menu = TODOS_MODULOS.filter((m) => (m.reservado ? reservadoVisible(m) : permisosRol[m.key] !== false));
     }
   }
+  // Funciones nuevas: solo aparecen si el Super Administrador las encendió (él las ve siempre)
+  menu = menu.filter((m) => !m.funcion || funciones[m.funcion]);
 
   const w = collapsed && isDesktop ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH;
 

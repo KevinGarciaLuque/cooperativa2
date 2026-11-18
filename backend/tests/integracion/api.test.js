@@ -2036,6 +2036,85 @@ test("funciones nuevas: apagadas solo las ve el Super Administrador; datos ampli
   assert.equal((await api("PUT", "/configuracion/funciones", { datos_ampliados: false }, ids.tSuper)).s, 200);
 });
 
+test("créditos grupales: grupo con cargos, crédito por integrante, desembolso y pago grupal todo o nada", async () => {
+  // Apagada: el personal no entra; el Super Administrador sí
+  assert.equal((await api("GET", "/grupos", null, ids.tAdmin)).s, 403);
+  assert.equal((await api("GET", "/grupos", null, ids.tSuper)).s, 200);
+  assert.equal((await api("PUT", "/configuracion/funciones", { creditos_grupales: true }, ids.tSuper)).s, 200);
+
+  const integrantes = [{ id_usuario: ids.socio, cargo: "presidente" }, { id_usuario: ids.socio2, cargo: "tesorero" }];
+  assert.equal((await api("POST", "/grupos", { nombre: "Solo uno", integrantes: [integrantes[0]] }, ids.tAdmin)).s, 400);
+  assert.equal((await api("POST", "/grupos", { nombre: "Dos presidentes", integrantes: integrantes.map((i) => ({ ...i, cargo: "presidente" })) }, ids.tAdmin)).s, 400);
+  assert.equal((await api("POST", "/grupos", { nombre: "Con personal", integrantes: [...integrantes, { id_usuario: ids.admin }] }, ids.tAdmin)).s, 400);
+  const g = await api("POST", "/grupos", { nombre: "Mujeres Emprendedoras", comunidad: "Aldea El Sitio", id_promotor: ids.admin, integrantes }, ids.tAdmin);
+  assert.equal(g.s, 201, g.b?.message);
+  const idG = g.b.id_grupo;
+  const det = await api("GET", `/grupos/${idG}`, null, ids.tAdmin);
+  assert.equal(det.b.data.integrantes[0].cargo, "presidente");
+
+  // Crédito grupal: un préstamo pendiente por integrante
+  assert.equal((await api("POST", `/grupos/${idG}/creditos`, { tasa_mensual: 2, plazo_meses: 6, montos: [{ id_usuario: ids.admin, monto: 100 }] }, ids.tAdmin)).s, 400);
+  const cr = await api("POST", `/grupos/${idG}/creditos`, {
+    tasa_mensual: 2, plazo_meses: 6, linea_credito: "Comercio",
+    montos: [{ id_usuario: ids.socio, monto: 3000 }, { id_usuario: ids.socio2, monto: 2000 }],
+  }, ids.tAdmin);
+  assert.equal(cr.s, 201, cr.b?.message);
+  const idC = cr.b.id_credito_grupal;
+  let c = (await api("GET", `/grupos/creditos/${idC}`, null, ids.tAdmin)).b.data;
+  assert.equal(c.monto_total, 5000);
+  assert.equal(c.estado, "pendiente");
+  assert.equal(c.prestamos.length, 2);
+
+  // Aprobar y desembolsar cada integrante con lo que ya existe
+  for (const p of c.prestamos) {
+    assert.equal((await api("PATCH", `/prestamos/${p.id_prestamo}/aprobar`, {}, ids.tSuper)).s, 200);
+    const d = await api("POST", `/prestamos/${p.id_prestamo}/desembolsar`, { metodo: "efectivo" }, ids.tSuper);
+    assert.equal(d.s, 200, d.b?.message);
+  }
+  c = (await api("GET", `/grupos/creditos/${idC}`, null, ids.tAdmin)).b.data;
+  assert.equal(c.estado, "activo");
+  const lista = (await api("GET", "/prestamos?tipo=grupal", null, ids.tAdmin)).b.data;
+  assert.ok(lista.some((p) => p.grupo_nombre === "Mujeres Emprendedoras"));
+
+  // Pago grupal: si uno no es válido, no se registra ninguno
+  const [pA, pB] = c.prestamos;
+  const [[antes]] = await pool.query("SELECT COUNT(*) AS n FROM pagos_prestamo WHERE id_prestamo IN (?, ?)", [pA.id_prestamo, pB.id_prestamo]);
+  const malo = await api("POST", `/grupos/creditos/${idC}/pagar`, {
+    metodo_pago: "efectivo", detalles: [{ id_prestamo: pA.id_prestamo, monto_pagado: 300 }, { id_prestamo: pB.id_prestamo, monto_pagado: 999999 }],
+  }, ids.tAdmin);
+  assert.equal(malo.s, 400);
+  assert.match(malo.b.message, new RegExp(pB.nombre_completo));
+  const [[igual]] = await pool.query("SELECT COUNT(*) AS n FROM pagos_prestamo WHERE id_prestamo IN (?, ?)", [pA.id_prestamo, pB.id_prestamo]);
+  assert.equal(igual.n, antes.n, "todo o nada");
+
+  const ok = await api("POST", `/grupos/creditos/${idC}/pagar`, {
+    metodo_pago: "efectivo", detalles: [{ id_prestamo: pA.id_prestamo, monto_pagado: 600 }, { id_prestamo: pB.id_prestamo, monto_pagado: 400 }],
+  }, ids.tAdmin);
+  assert.equal(ok.s, 201, ok.b?.message);
+  assert.equal(ok.b.total, 1000);
+  assert.equal(ok.b.detalles.length, 2);
+  assert.ok(ok.b.detalles.every((d) => d.id_recibo && d.saldo_nuevo < (d.id_prestamo === pA.id_prestamo ? 3000 : 2000)));
+  const [[caja]] = await pool.query("SELECT COUNT(*) AS n FROM caja_movimientos WHERE categoria = 'pago_prestamo' AND referencia_id IN (SELECT id_pago FROM pagos_prestamo WHERE id_prestamo IN (?, ?))", [pA.id_prestamo, pB.id_prestamo]);
+  assert.equal(caja.n, 2, "cada pago entra a caja");
+
+  // No se saca del grupo a quien tiene un crédito vigente
+  const [nuevoSocio] = await pool.query(
+    `INSERT INTO usuarios (nombre_completo, dni, telefono, correo, password, rol_id, estado, fecha_registro)
+     VALUES ('Socio Tres Grupo', '0801000000111', '98765432', 'tres@prueba.hn', 'x', 2, 'activo', NOW())`
+  );
+  const sinSocio2 = await api("PUT", `/grupos/${idG}`, { nombre: "Mujeres Emprendedoras", integrantes: [integrantes[0], { id_usuario: nuevoSocio.insertId }] }, ids.tAdmin);
+  assert.equal(sinSocio2.s, 409);
+  assert.match(sinSocio2.b.message, /crédito grupal vigente/);
+  const conTres = await api("PUT", `/grupos/${idG}`, { nombre: "Mujeres Emprendedoras", integrantes: [...integrantes, { id_usuario: nuevoSocio.insertId, cargo: "vocal" }] }, ids.tAdmin);
+  assert.equal(conTres.s, 200, conTres.b?.message);
+
+  // Limpieza
+  await pool.query("UPDATE prestamos SET estado = 'pagado', saldo_restante = 0 WHERE id_credito_grupal = ?", [idC]);
+  await pool.query("DELETE FROM grupo_integrantes WHERE id_usuario = ?", [nuevoSocio.insertId]);
+  await pool.query("DELETE FROM usuarios WHERE id_usuario = ?", [nuevoSocio.insertId]);
+  assert.equal((await api("PUT", "/configuracion/funciones", { creditos_grupales: false }, ids.tSuper)).s, 200);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

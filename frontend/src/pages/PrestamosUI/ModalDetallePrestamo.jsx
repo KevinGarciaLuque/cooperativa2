@@ -550,6 +550,32 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
               </div>
             </div>
 
+            {/* Datos ampliados del crédito (si se registraron) */}
+            {(prestamo.linea_credito || prestamo.destino || prestamo.promotor_nombre || prestamo.numero_pagare || prestamo.numero_acta || prestamo.numero_cheque) && (
+              <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: "12px" }}>
+                <div className="card-body">
+                  <h6 className="fw-bold mb-2">Datos del crédito</h6>
+                  <div className="row g-2 small">
+                    {[
+                      ["Línea", prestamo.linea_credito],
+                      ["Destino", prestamo.destino],
+                      ["Promotor", prestamo.promotor_nombre],
+                      ["N.º pagaré", prestamo.numero_pagare],
+                      ["N.º acta", prestamo.numero_acta],
+                      ["N.º cheque", prestamo.numero_cheque],
+                    ]
+                      .filter(([, v]) => v)
+                      .map(([k, v]) => (
+                        <div className="col-6 col-md-4" key={k}>
+                          <div className="text-muted">{k}</div>
+                          <div className="fw-semibold">{v}</div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Plan de pagos: vencimientos y estado de cada cuota */}
             {["activo", "mora", "pagado"].includes(String(prestamo.estado || "").toLowerCase()) && (
               <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: "12px" }}>

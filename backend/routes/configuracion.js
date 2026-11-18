@@ -118,6 +118,39 @@ router.get("/", async (req, res) => {
 // GET/PUT /api/configuracion/financiera  (requiere sesión; PUT solo Super Admin)
 // Parámetros de mora que usa todo el sistema
 // ============================================================
+// GET /api/configuracion/funciones → catálogo, estado guardado y lo que ve este usuario
+router.get("/funciones", verificarToken, async (req, res) => {
+  try {
+    const funciones = require("../utils/funciones");
+    res.json({
+      success: true,
+      catalogo: funciones.CATALOGO,
+      estado: await funciones.leer(),
+      efectivas: await funciones.efectivas(req.usuario),
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudieron leer las funciones" });
+  }
+});
+
+// PUT /api/configuracion/funciones  { datos_ampliados: true, ... }  (Super Administrador)
+router.put("/funciones", verificarToken, soloSuperAdmin, async (req, res) => {
+  try {
+    const funciones = require("../utils/funciones");
+    const estado = await funciones.guardar(req.body || {});
+    const encendidas = funciones.CATALOGO.filter((c) => estado[c.clave]).map((c) => c.nombre);
+    await pool.query("INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())", [
+      req.usuario.id_usuario,
+      "Funciones nuevas",
+      encendidas.length ? `Encendidas: ${encendidas.join(", ")}` : "Todas apagadas",
+    ]);
+    res.json({ success: true, message: "Funciones guardadas.", estado });
+  } catch (error) {
+    console.error("ERROR AL GUARDAR FUNCIONES:", error);
+    res.status(500).json({ message: "No se pudieron guardar las funciones" });
+  }
+});
+
 // GET /api/configuracion/sucursales → sucursales activas y la del usuario (para el selector)
 router.get("/sucursales", verificarToken, async (req, res) => {
   try {

@@ -1026,6 +1026,36 @@ const MIGRACIONES = [
       if (p) await conn.query("UPDATE recibos SET id_sucursal = ? WHERE id_sucursal IS NULL", [p.id_sucursal]);
     },
   },
+  {
+    id: "2026_11_013_datos_ampliados",
+    descripcion: "Datos ampliados del socio (escolaridad, cónyuge, ubicación) y del crédito (línea, promotor, pagaré)",
+    async up(conn) {
+      const columnas = [
+        ["usuarios", "escolaridad", "VARCHAR(40) NULL"],
+        ["usuarios", "conyuge_nombre", "VARCHAR(100) NULL"],
+        ["usuarios", "conyuge_identidad", "VARCHAR(20) NULL"],
+        ["usuarios", "conyuge_telefono", "VARCHAR(20) NULL"],
+        ["usuarios", "departamento", "VARCHAR(60) NULL"],
+        ["usuarios", "municipio", "VARCHAR(80) NULL"],
+        ["usuarios", "comunidad", "VARCHAR(120) NULL"],
+        ["usuarios", "fecha_ingreso", "DATE NULL"],
+        ["prestamos", "linea_credito", "VARCHAR(50) NULL"],
+        ["prestamos", "destino", "VARCHAR(150) NULL"],
+        ["prestamos", "id_promotor", "INT NULL"],
+        ["prestamos", "numero_pagare", "VARCHAR(30) NULL"],
+        ["prestamos", "numero_acta", "VARCHAR(30) NULL"],
+        ["prestamos", "numero_cheque", "VARCHAR(30) NULL"],
+      ];
+      for (const [tabla, nombre, def] of columnas) {
+        const [[e]] = await conn.query(
+          `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+          [tabla, nombre]
+        );
+        if (!e.n) await conn.query(`ALTER TABLE ${tabla} ADD COLUMN ${nombre} ${def}`);
+      }
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

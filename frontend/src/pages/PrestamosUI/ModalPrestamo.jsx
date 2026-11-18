@@ -2,6 +2,7 @@ import { useState } from "react";
 import { FaMoneyBillWave, FaCheckCircle, FaTimesCircle, FaCalendarAlt, FaPercentage, FaClock, FaUserTie } from "react-icons/fa";
 import { TIPOS_TASA, calcularTasaAnual, calcularCuotaSimulador } from "./helpers";
 import { dinero, cifra, simboloMoneda, docIdentidad, montoATexto, textoAMonto } from "../../utils/pais";
+import CamposCredito from "../../components/CamposCredito";
 
 // ==================== COMPONENTE MODAL PRÉSTAMO ====================
 export default function ModalPrestamo({
@@ -602,6 +603,8 @@ export default function ModalPrestamo({
                 </div>
               </div>
             </div>
+
+            <CamposCredito form={form} handleInput={handleInput} />
 
             {/* ── Footer ── */}
             <div className="modal-footer border-0 bg-white px-3 py-2 gap-2">

@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { FaShieldAlt, FaEdit, FaPlus, FaTrash, FaExclamationTriangle } from "react-icons/fa";
 import InputMonto from "../ui/InputMonto";
-import { dinero } from "../utils/pais";
+import { dinero, pais } from "../utils/pais";
+import { useFunciones } from "../hooks/useFunciones";
+
+const ESCOLARIDADES = ["Ninguna", "Primaria incompleta", "Primaria", "Básico", "Secundaria / Diversificado", "Técnico", "Universitaria", "Posgrado"];
+const fechaCorta = (v) => (v ? String(v).substring(0, 10) : "");
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const AZUL = "#1a2035";
@@ -18,6 +22,8 @@ const Dato = ({ etiqueta, valor }) => (
 );
 
 export default function PerfilCumplimiento({ idSocio, headers }) {
+  const { datos_ampliados: ampliados } = useFunciones();
+  const regiones = pais()?.regiones || { nombre: "Departamento", lista: [] };
   const [datos, setDatos] = useState(undefined);
   const [editando, setEditando] = useState(false);
   const [form, setForm] = useState(null);
@@ -38,6 +44,7 @@ export default function PerfilCumplimiento({ idSocio, headers }) {
     setForm({
       ...datos,
       ingreso_mensual: datos.ingreso_mensual ?? "",
+      fecha_ingreso: fechaCorta(datos.fecha_ingreso),
       beneficiarios: datos.beneficiarios.length ? datos.beneficiarios.map((b) => ({ ...b })) : [{ ...VACIO, porcentaje: "100" }],
     });
     setMensaje(null);
@@ -87,6 +94,16 @@ export default function PerfilCumplimiento({ idSocio, headers }) {
             valor={datos.es_pep ? <span className="badge bg-dark">PEP · {datos.pep_detalle}</span> : "No"}
           />
         </div>
+        {ampliados && (
+          <div className="row g-3 mb-3">
+            <Dato etiqueta="Escolaridad" valor={datos.escolaridad} />
+            <Dato etiqueta="Cónyuge" valor={[datos.conyuge_nombre, datos.conyuge_identidad, datos.conyuge_telefono].filter(Boolean).join(" · ")} />
+            <Dato etiqueta="Fecha de ingreso" valor={fechaCorta(datos.fecha_ingreso) || fechaCorta(datos.fecha_registro)} />
+            <Dato etiqueta={regiones.nombre} valor={datos.departamento} />
+            <Dato etiqueta="Municipio" valor={datos.municipio} />
+            <Dato etiqueta="Comunidad / aldea" valor={datos.comunidad} />
+          </div>
+        )}
         <div className="small text-muted mb-1">Beneficiarios</div>
         {datos.beneficiarios.length ? (
           <ul className="list-unstyled small mb-3">
@@ -174,6 +191,58 @@ export default function PerfilCumplimiento({ idSocio, headers }) {
           )}
         </div>
       </div>
+
+      {ampliados && (
+        <div className="row g-2 mt-2">
+          <div className="col-12 small fw-semibold mt-2">Datos generales</div>
+          <div className="col-6 col-md-4">
+            <label className="form-label small">Escolaridad</label>
+            <select className="form-select form-select-sm" {...campo("escolaridad")}>
+              <option value="">—</option>
+              {ESCOLARIDADES.map((x) => (
+                <option key={x}>{x}</option>
+              ))}
+            </select>
+          </div>
+          <div className="col-6 col-md-4">
+            <label className="form-label small">Fecha de ingreso a la cooperativa</label>
+            <input type="date" className="form-control form-control-sm" {...campo("fecha_ingreso")} />
+          </div>
+          <div className="col-12 col-md-4">
+            <label className="form-label small">{regiones.nombre}</label>
+            {regiones.lista?.length ? (
+              <select className="form-select form-select-sm" {...campo("departamento")}>
+                <option value="">—</option>
+                {regiones.lista.map((x) => (
+                  <option key={x}>{x}</option>
+                ))}
+              </select>
+            ) : (
+              <input className="form-control form-control-sm" maxLength={60} {...campo("departamento")} />
+            )}
+          </div>
+          <div className="col-6 col-md-4">
+            <label className="form-label small">Municipio</label>
+            <input className="form-control form-control-sm" maxLength={80} {...campo("municipio")} />
+          </div>
+          <div className="col-6 col-md-8">
+            <label className="form-label small">Comunidad / aldea / caserío</label>
+            <input className="form-control form-control-sm" maxLength={120} {...campo("comunidad")} />
+          </div>
+          <div className="col-12 col-md-5">
+            <label className="form-label small">Nombre del cónyuge</label>
+            <input className="form-control form-control-sm" maxLength={100} {...campo("conyuge_nombre")} />
+          </div>
+          <div className="col-6 col-md-4">
+            <label className="form-label small">Identidad del cónyuge</label>
+            <input className="form-control form-control-sm" maxLength={20} {...campo("conyuge_identidad")} />
+          </div>
+          <div className="col-6 col-md-3">
+            <label className="form-label small">Teléfono del cónyuge</label>
+            <input className="form-control form-control-sm" maxLength={20} {...campo("conyuge_telefono")} />
+          </div>
+        </div>
+      )}
 
       <div className="d-flex justify-content-between align-items-center mt-3 mb-1">
         <div className="small fw-semibold">Beneficiarios</div>

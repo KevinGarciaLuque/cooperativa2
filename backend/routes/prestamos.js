@@ -12,6 +12,7 @@ const { planDePrestamo } = require("../utils/planPagos");
 const { obtenerProducto, fueraDeProducto } = require("../utils/productos");
 const { faltaGarantia } = require("../utils/garantias");
 const comite = require("../utils/comite");
+const { habilitada } = require("../utils/funciones");
 const { contabilizar, conSalvaguarda } = require("../utils/contabilidad");
 const {
   calcularCuotaMensual,
@@ -66,6 +67,15 @@ router.get("/", async (req, res) => {
       const searchParam = `%${search}%`;
       params.push(searchParam, searchParam);
     }
+    // Filtros de los datos ampliados
+    if (req.query.linea_credito) {
+      whereClause += ` AND p.linea_credito = ?`;
+      params.push(String(req.query.linea_credito));
+    }
+    if (parseInt(req.query.id_promotor)) {
+      whereClause += ` AND p.id_promotor = ?`;
+      params.push(parseInt(req.query.id_promotor));
+    }
 
     // Sucursal que se está viendo (un socio buscado o pedido se atiende en cualquiera)
     const porSucursal = await filtroSocio(req, "u", !!(id_usuario || search));
@@ -78,7 +88,8 @@ router.get("/", async (req, res) => {
        u.dni,
        (SELECT COUNT(*) FROM pagos_prestamo WHERE id_prestamo = p.id_prestamo) as total_pagos,
        (SELECT IFNULL(SUM(monto_pagado), 0) FROM pagos_prestamo WHERE id_prestamo = p.id_prestamo) as total_pagado,
-       pc.nombre AS producto_nombre
+       pc.nombre AS producto_nombre,
+       (SELECT pr.nombre_completo FROM usuarios pr WHERE pr.id_usuario = p.id_promotor) AS promotor_nombre
        FROM prestamos p 
        INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
        LEFT JOIN productos_credito pc ON pc.id_producto = p.id_producto
@@ -108,6 +119,98 @@ router.get("/", async (req, res) => {
       message: "Error al obtener los préstamos", 
       error: error.message 
     });
+  }
+});
+
+// ============================================
+// DATOS AMPLIADOS DEL CRÉDITO (función "datos_ampliados")
+// ============================================
+const LINEAS_BASE = ["General", "Agricultura", "Agropecuario", "Comercio", "Pecuario", "Servicio", "Industria", "Artesanal", "Vivienda", "Emprendimiento", "Sin definir"];
+const lineasCredito = async () => {
+  try {
+    const [[f]] = await pool.query("SELECT valor FROM configuracion_sitio WHERE clave = 'lineas_credito'");
+    const l = f?.valor ? JSON.parse(f.valor) : null;
+    return Array.isArray(l) && l.length ? l : LINEAS_BASE;
+  } catch {
+    return LINEAS_BASE;
+  }
+};
+const texto = (v, max) => {
+  const t = String(v ?? "").trim();
+  return t ? t.substring(0, max) : null;
+};
+
+// GET /api/prestamos/catalogos → líneas de crédito y promotores (personal activo)
+router.get("/catalogos", async (req, res) => {
+  try {
+    const [promotores] = await pool.query(
+      `SELECT u.id_usuario, u.nombre_completo FROM usuarios u JOIN roles r ON r.id_rol = u.rol_id
+       WHERE u.estado = 'activo' AND r.nombre <> 'Socio' ORDER BY u.nombre_completo`
+    );
+    res.json({ success: true, lineas: await lineasCredito(), promotores, habilitada: await habilitada("datos_ampliados", req.usuario) });
+  } catch (error) {
+    console.error("ERROR AL LEER CATÁLOGOS DE CRÉDITO:", error);
+    res.status(500).json({ message: "No se pudieron leer los catálogos" });
+  }
+});
+
+// PUT /api/prestamos/catalogos/lineas  { lineas: [...] }  (Super Administrador)
+router.put("/catalogos/lineas", async (req, res) => {
+  if (req.usuario?.rol !== "Super Administrador") {
+    return res.status(403).json({ message: "Solo el Super Administrador cambia las líneas de crédito." });
+  }
+  const lineas = [...new Set((req.body?.lineas || []).map((l) => texto(l, 50)).filter(Boolean))];
+  if (!lineas.length) return res.status(400).json({ message: "Escribe al menos una línea de crédito." });
+  await pool.query(
+    "INSERT INTO configuracion_sitio (clave, valor) VALUES ('lineas_credito', ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)",
+    [JSON.stringify(lineas)]
+  );
+  res.json({ success: true, lineas });
+});
+
+// Valida y arma los datos ampliados del crédito a partir del cuerpo de la petición
+const datosCredito = async (b) => {
+  const lineas = await lineasCredito();
+  const linea = texto(b.linea_credito, 50);
+  if (linea && !lineas.includes(linea)) throw Object.assign(new Error("Esa línea de crédito no existe."), { codigo: 400 });
+  let promotor = null;
+  if (b.id_promotor) {
+    const [[p]] = await pool.query(
+      `SELECT u.id_usuario FROM usuarios u JOIN roles r ON r.id_rol = u.rol_id
+       WHERE u.id_usuario = ? AND u.estado = 'activo' AND r.nombre <> 'Socio'`,
+      [parseInt(b.id_promotor)]
+    );
+    if (!p) throw Object.assign(new Error("El promotor debe ser personal activo."), { codigo: 400 });
+    promotor = p.id_usuario;
+  }
+  return {
+    linea_credito: linea,
+    destino: texto(b.destino, 150),
+    id_promotor: promotor,
+    numero_pagare: texto(b.numero_pagare, 30),
+    numero_acta: texto(b.numero_acta, 30),
+    numero_cheque: texto(b.numero_cheque, 30),
+  };
+};
+
+// PUT /api/prestamos/:id/datos-credito
+router.put("/:id/datos-credito", async (req, res) => {
+  try {
+    if (!(await habilitada("datos_ampliados", req.usuario))) {
+      return res.status(403).json({ message: "Esta función no está habilitada." });
+    }
+    const d = await datosCredito(req.body || {});
+    const [r] = await pool.query(
+      `UPDATE prestamos SET linea_credito = ?, destino = ?, id_promotor = ?, numero_pagare = ?, numero_acta = ?, numero_cheque = ?
+       WHERE id_prestamo = ?`,
+      [d.linea_credito, d.destino, d.id_promotor, d.numero_pagare, d.numero_acta, d.numero_cheque, parseInt(req.params.id)]
+    );
+    if (!r.affectedRows) return res.status(404).json({ message: "Préstamo no encontrado" });
+    res.json({ success: true, message: "Datos del crédito guardados.", data: d });
+  } catch (error) {
+    if (error.codigo) return res.status(error.codigo).json({ message: error.message });
+    console.error("ERROR AL GUARDAR DATOS DEL CRÉDITO:", error);
+    res.status(500).json({ message: "No se pudieron guardar los datos del crédito" });
   }
 });
 
@@ -905,6 +1008,15 @@ router.post("/", async (req, res) => {
     if (comite.bloqueaCambioDirecto(req.usuario, montoNum, null, estadoPrestamo)) {
       return res.status(409).json({ message: `${comite.mensajeBloqueo()} Regístralo como pendiente.` });
     }
+    // Datos ampliados del crédito (si la función está habilitada para quien registra)
+    let ampliados = null;
+    if (await habilitada("datos_ampliados", req.usuario)) {
+      try {
+        ampliados = await datosCredito(req.body);
+      } catch (e) {
+        return res.status(e.codigo || 400).json({ message: e.message });
+      }
+    }
     const fechaOtorgado = fecha_otorgado || null;
     const tipoTasaGuardar = tipo_tasa || "nominal_anual";
     const tasaOriginalGuardar = tasa_original != null ? parseFloat(tasa_original) : tasaNum;
@@ -916,6 +1028,13 @@ router.post("/", async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id_usuario, montoNum, tasaNum, tipoTasaGuardar, tasaOriginalGuardar, plazoNum, montoNum, estadoPrestamo, fechaOtorgado, producto?.id_producto || null]
     );
+    if (ampliados && Object.values(ampliados).some((v) => v != null)) {
+      await connection.query(
+        `UPDATE prestamos SET linea_credito = ?, destino = ?, id_promotor = ?, numero_pagare = ?, numero_acta = ?, numero_cheque = ?
+         WHERE id_prestamo = ?`,
+        [ampliados.linea_credito, ampliados.destino, ampliados.id_promotor, ampliados.numero_pagare, ampliados.numero_acta, ampliados.numero_cheque, result.insertId]
+      );
+    }
 
     if (["activo", "mora", "pagado"].includes(estadoPrestamo)) {
       await registrarCaja(connection, {

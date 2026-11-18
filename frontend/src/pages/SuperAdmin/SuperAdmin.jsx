@@ -12,6 +12,8 @@ import {
   FaUnlock,
 } from "react-icons/fa";
 
+import PanelFunciones from "../../components/PanelFunciones";
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 // Iconos por módulo
@@ -370,6 +372,8 @@ export default function SuperAdmin() {
           )}
         </div>
       </div>
+
+      <PanelFunciones token={token} mostrarAlerta={mostrarAlerta} />
     </div>
   );
 }

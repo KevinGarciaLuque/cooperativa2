@@ -184,6 +184,15 @@ El catálogo base está en `backend/utils/contabilidad.js`; el contador puede ag
 - Si el correo falla al enviar, no se abre la sesión: revisa el servidor de correo antes de activarla.
 - En el ambiente de pruebas solo se pide si existe CORREO_PRUEBAS (los códigos llegan a esa dirección).
 
+## Funciones nuevas (se encienden en Control de Accesos)
+
+- Cada función nueva llega **apagada**. Apagada, solo el Super Administrador la ve (para probarla);
+  al encenderla en **Control de Accesos → Funciones nuevas**, la ve todo el personal.
+- **Datos ampliados de socios y créditos:** en el expediente del socio, escolaridad, fecha de ingreso,
+  departamento/provincia (lista del país), municipio, comunidad y cónyuge; en el préstamo, línea,
+  destino, promotor, número de pagaré, acta y cheque (y filtros por línea y promotor).
+- Próximamente: créditos grupales, pagos ampliados, contrato en Word y reportes ampliados.
+
 ## Varias sucursales
 
 - Las sucursales se crean en **Caja → Mi turno → Sucursales** (Super Administrador). Con una sola, el

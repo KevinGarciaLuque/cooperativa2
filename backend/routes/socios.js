@@ -10,6 +10,7 @@ const {
   leerLado,
 } = require("../utils/identidad");
 const { notificarAdministradores, escaparHtml } = require("../utils/notificaciones");
+const { habilitada } = require("../utils/funciones");
 
 const num = (v) => parseFloat(v || 0);
 
@@ -165,10 +166,16 @@ const CAMPOS_PERFIL = [
   "genero", "estado_civil", "nacionalidad", "profesion", "actividad_economica",
   "lugar_trabajo", "ingreso_mensual", "origen_fondos", "es_pep", "pep_detalle",
 ];
+// Datos ampliados (función "datos_ampliados"): se guardan solo si el usuario la tiene
+const CAMPOS_AMPLIADOS = [
+  "escolaridad", "conyuge_nombre", "conyuge_identidad", "conyuge_telefono",
+  "departamento", "municipio", "comunidad", "fecha_ingreso",
+];
 
 const expediente = async (id) => {
   const [[perfil]] = await pool.query(
-    `SELECT id_usuario, estado, ${CAMPOS_PERFIL.join(", ")}, perfil_actualizado_en FROM usuarios WHERE id_usuario = ?`,
+    `SELECT id_usuario, estado, ${CAMPOS_PERFIL.join(", ")}, ${CAMPOS_AMPLIADOS.join(", ")}, fecha_registro, perfil_actualizado_en
+     FROM usuarios WHERE id_usuario = ?`,
     [id]
   );
   if (!perfil) return null;
@@ -221,6 +228,17 @@ router.put("/:id/expediente", async (req, res) => {
     es_pep: b.es_pep ? 1 : 0,
     pep_detalle: b.es_pep ? texto(b.pep_detalle, 255) : null,
   };
+  const ampliados = {
+    escolaridad: texto(b.escolaridad, 40),
+    conyuge_nombre: texto(b.conyuge_nombre, 100),
+    conyuge_identidad: texto(b.conyuge_identidad, 20),
+    conyuge_telefono: texto(b.conyuge_telefono, 20),
+    departamento: texto(b.departamento, 60),
+    municipio: texto(b.municipio, 80),
+    comunidad: texto(b.comunidad, 120),
+    fecha_ingreso: /^\d{4}-\d{2}-\d{2}$/.test(String(b.fecha_ingreso || "")) ? b.fecha_ingreso : null,
+  };
+  const conAmpliados = await habilitada("datos_ampliados", req.usuario);
   if (perfil.ingreso_mensual != null && !(perfil.ingreso_mensual >= 0)) {
     return res.status(400).json({ message: "El ingreso mensual no es válido." });
   }
@@ -255,6 +273,12 @@ router.put("/:id/expediente", async (req, res) => {
       `UPDATE usuarios SET ${CAMPOS_PERFIL.map((c) => `${c} = ?`).join(", ")}, perfil_actualizado_en = NOW() WHERE id_usuario = ?`,
       [...CAMPOS_PERFIL.map((c) => perfil[c]), id]
     );
+    if (conAmpliados) {
+      await conn.query(
+        `UPDATE usuarios SET ${CAMPOS_AMPLIADOS.map((c) => `${c} = ?`).join(", ")} WHERE id_usuario = ?`,
+        [...CAMPOS_AMPLIADOS.map((c) => ampliados[c]), id]
+      );
+    }
     await conn.query("DELETE FROM beneficiarios WHERE id_usuario = ?", [id]);
     if (beneficiarios.length) {
       await conn.query(

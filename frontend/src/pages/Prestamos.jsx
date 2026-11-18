@@ -11,11 +11,14 @@ import TablaPrestamos from "./PrestamosUI/TablaPrestamos";
 import ModalPrestamo from "./PrestamosUI/ModalPrestamo";
 import ModalDetallePrestamo from "./PrestamosUI/ModalDetallePrestamo";
 import { dinero } from "../utils/pais";
+import { CAMPOS_CREDITO } from "../components/CamposCredito";
+import { useFunciones } from "../hooks/useFunciones";
 
 import "react-circular-progressbar/dist/styles.css";
 
 export default function Prestamos() {
   const { token } = useAuth();
+  const funciones = useFunciones();
   const { mostrarAlerta } = useAlerta();
   const [prestamos, setPrestamos] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
@@ -111,6 +114,14 @@ export default function Prestamos() {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
+        // Datos ampliados del crédito (solo si la función está habilitada)
+        if (funciones.datos_ampliados) {
+          await axios.put(
+            `${API_URL}/prestamos/${editPrestamo.id_prestamo}/datos-credito`,
+            Object.fromEntries(CAMPOS_CREDITO.map((k) => [k, form[k] || null])),
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        }
         mostrarAlerta("Préstamo actualizado correctamente.", "success");
       } else {
         await axios.post(`${API_URL}/prestamos`, payload, {

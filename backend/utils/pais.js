@@ -6,6 +6,7 @@
 const PAISES = {
   HN: {
     codigo: "HN",
+    regiones: { nombre: "Departamento", lista: ["Atlántida", "Choluteca", "Colón", "Comayagua", "Copán", "Cortés", "El Paraíso", "Francisco Morazán", "Gracias a Dios", "Intibucá", "Islas de la Bahía", "La Paz", "Lempira", "Ocotepeque", "Olancho", "Santa Bárbara", "Valle", "Yoro"] },
     umbral_efectivo: 250000, // reporte de efectivo (≈ US$10,000); confirmar con el regulador
     nombre: "Honduras",
     locale: "es-HN",
@@ -25,6 +26,7 @@ const PAISES = {
   },
   GT: {
     codigo: "GT",
+    regiones: { nombre: "Departamento", lista: ["Alta Verapaz", "Baja Verapaz", "Chimaltenango", "Chiquimula", "El Progreso", "Escuintla", "Guatemala", "Huehuetenango", "Izabal", "Jalapa", "Jutiapa", "Petén", "Quetzaltenango", "Quiché", "Retalhuleu", "Sacatepéquez", "San Marcos", "Santa Rosa", "Sololá", "Suchitepéquez", "Totonicapán", "Zacapa"] },
     umbral_efectivo: 77000, // reporte de efectivo (≈ US$10,000); confirmar con el regulador
     nombre: "Guatemala",
     locale: "es-GT",
@@ -44,6 +46,7 @@ const PAISES = {
   },
   SV: {
     codigo: "SV",
+    regiones: { nombre: "Departamento", lista: ["Ahuachapán", "Cabañas", "Chalatenango", "Cuscatlán", "La Libertad", "La Paz", "La Unión", "Morazán", "San Miguel", "San Salvador", "San Vicente", "Santa Ana", "Sonsonate", "Usulután"] },
     umbral_efectivo: 10000, // reporte de efectivo (≈ US$10,000); confirmar con el regulador
     nombre: "El Salvador",
     locale: "es-SV",
@@ -63,6 +66,7 @@ const PAISES = {
   },
   NI: {
     codigo: "NI",
+    regiones: { nombre: "Departamento", lista: ["Boaco", "Carazo", "Chinandega", "Chontales", "Costa Caribe Norte", "Costa Caribe Sur", "Estelí", "Granada", "Jinotega", "León", "Madriz", "Managua", "Masaya", "Matagalpa", "Nueva Segovia", "Río San Juan", "Rivas"] },
     umbral_efectivo: 365000, // reporte de efectivo (≈ US$10,000); confirmar con el regulador
     nombre: "Nicaragua",
     locale: "es-NI",
@@ -82,6 +86,7 @@ const PAISES = {
   },
   CR: {
     codigo: "CR",
+    regiones: { nombre: "Provincia", lista: ["Alajuela", "Cartago", "Guanacaste", "Heredia", "Limón", "Puntarenas", "San José"] },
     umbral_efectivo: 5100000, // reporte de efectivo (≈ US$10,000); confirmar con el regulador
     nombre: "Costa Rica",
     locale: "es-CR",
@@ -101,6 +106,7 @@ const PAISES = {
   },
   PA: {
     codigo: "PA",
+    regiones: { nombre: "Provincia", lista: ["Bocas del Toro", "Chiriquí", "Coclé", "Colón", "Darién", "Herrera", "Los Santos", "Panamá", "Panamá Oeste", "Veraguas", "Comarca Emberá-Wounaan", "Comarca Guna Yala", "Comarca Naso Tjër Di", "Comarca Ngäbe-Buglé"] },
     umbral_efectivo: 10000, // reporte de efectivo (≈ US$10,000); confirmar con el regulador
     nombre: "Panamá",
     locale: "es-PA",
@@ -121,6 +127,7 @@ const PAISES = {
   },
   BZ: {
     codigo: "BZ",
+    regiones: { nombre: "Distrito", lista: ["Belize", "Cayo", "Corozal", "Orange Walk", "Stann Creek", "Toledo"] },
     umbral_efectivo: 20000, // reporte de efectivo (≈ US$10,000); confirmar con el regulador
     nombre: "Belice",
     locale: "es-BZ",

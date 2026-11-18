@@ -1996,6 +1996,46 @@ test("sucursales: cada socio en la suya, el personal elige qué ver y el restrin
   await pool.query("UPDATE sucursales SET activa = 0 WHERE id_sucursal = ?", [sur]);
 });
 
+test("funciones nuevas: apagadas solo las ve el Super Administrador; datos ampliados de socio y crédito", async () => {
+  const f0 = await api("GET", "/configuracion/funciones", null, ids.tAdmin);
+  assert.equal(f0.s, 200);
+  assert.equal(f0.b.estado.datos_ampliados, false, "apagada por defecto");
+  assert.equal(f0.b.efectivas.datos_ampliados, false);
+  assert.equal((await api("GET", "/configuracion/funciones", null, ids.tSuper)).b.efectivas.datos_ampliados, true, "el Super Administrador la ve para probarla");
+  assert.equal((await api("PUT", "/configuracion/funciones", { datos_ampliados: true }, ids.tAdmin)).s, 403);
+
+  const nuevo = await api("POST", "/prestamos", { id_usuario: ids.socio, monto: 1000, tasa_interes: 24, plazo_meses: 6, linea_credito: "Comercio" }, ids.tAdmin);
+  const idP = nuevo.b.id_prestamo || nuevo.b.data?.id_prestamo || nuevo.b.prestamo?.id_prestamo;
+  let [[pr]] = await pool.query("SELECT linea_credito FROM prestamos WHERE id_prestamo = ?", [idP]);
+  assert.equal(pr.linea_credito, null, "apagada: no se guarda");
+  assert.equal((await api("PUT", `/prestamos/${idP}/datos-credito`, { linea_credito: "Comercio" }, ids.tAdmin)).s, 403);
+
+  // Encendida para todos
+  assert.equal((await api("PUT", "/configuracion/funciones", { datos_ampliados: true }, ids.tSuper)).s, 200);
+  require("../../utils/funciones").leer; // (la caché se actualiza al guardar)
+  const cat = await api("GET", "/prestamos/catalogos", null, ids.tAdmin);
+  assert.ok(cat.b.lineas.includes("Agricultura"));
+  assert.equal((await api("PUT", `/prestamos/${idP}/datos-credito`, { linea_credito: "Inventada" }, ids.tAdmin)).s, 400);
+  assert.equal((await api("PUT", `/prestamos/${idP}/datos-credito`, { id_promotor: ids.socio }, ids.tAdmin)).s, 400, "el promotor es personal");
+  const ok = await api("PUT", `/prestamos/${idP}/datos-credito`, { linea_credito: "Agricultura", destino: "Compra de terreno", id_promotor: ids.admin, numero_pagare: "P-19" }, ids.tAdmin);
+  assert.equal(ok.s, 200, ok.b?.message);
+  const lista = (await api("GET", "/prestamos?linea_credito=Agricultura", null, ids.tAdmin)).b.data;
+  assert.ok(lista.some((p) => p.id_prestamo === idP && p.promotor_nombre === "Admin Prueba"));
+
+  // Socio: escolaridad, cónyuge y ubicación
+  const exp = await api("PUT", `/socios/${ids.socio}/expediente`, {
+    actividad_economica: "Agricultor", ingreso_mensual: 9000, origen_fondos: "Cosecha",
+    escolaridad: "Secundaria", conyuge_nombre: "María Pérez", departamento: "Chimaltenango", municipio: "Patzún", comunidad: "Aldea El Sitio", fecha_ingreso: "2015-03-01",
+  }, ids.tAdmin);
+  assert.equal(exp.s, 200, exp.b?.message);
+  assert.equal(exp.b.data.municipio, "Patzún");
+  assert.equal(exp.b.data.escolaridad, "Secundaria");
+
+  // Limpieza
+  await pool.query("UPDATE prestamos SET estado = 'rechazado' WHERE id_prestamo = ?", [idP]);
+  assert.equal((await api("PUT", "/configuracion/funciones", { datos_ampliados: false }, ids.tSuper)).s, 200);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

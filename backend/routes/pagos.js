@@ -5,6 +5,7 @@ const { filtroSocio, filtroCaja } = require("../utils/sucursal");
 const { notificarSocio, crearNotificacion } = require("../utils/notificaciones");
 const jwt = require("jsonwebtoken");
 const { registrarCaja } = require("../utils/caja");
+const { habilitada } = require("../utils/funciones");
 const { crearRecibo, emitirFiniquito } = require("../utils/recibos");
 const { dinero } = require("../utils/pais");
 const { registrarCambio, conSalvaguarda } = require("../utils/contabilidad");
@@ -455,10 +456,39 @@ const procesarPago = async (connection, body, usuario) => {
       );
     }
 
+    // Pagos ampliados (función "pagos_ampliados"): boleta, lugar y otros cargos cobrados con el pago
+    let otrosCargos = 0;
+    if (await habilitada("pagos_ampliados", usuario)) {
+      const txt = (v, max) => (String(v ?? "").trim() ? String(v).trim().substring(0, max) : null);
+      otrosCargos = Math.round(parseFloat(body.otros_cargos || 0) * 100) / 100;
+      if (!(otrosCargos >= 0)) return fail(400, { message: "Los otros cargos no son válidos." });
+      const detalleCargos = txt(body.otros_cargos_detalle, 150);
+      if (otrosCargos > 0 && !detalleCargos) return fail(400, { message: "Indica el concepto de los otros cargos (seguro, gastos administrativos...)." });
+      await connection.query(
+        "UPDATE pagos_prestamo SET numero_boleta = ?, lugar_pago = ?, otros_cargos = ?, otros_cargos_detalle = ? WHERE id_pago = ?",
+        [txt(body.numero_boleta, 40), txt(body.lugar_pago, 80), otrosCargos, otrosCargos > 0 ? detalleCargos : null, nuevoPagoId]
+      );
+      if (otrosCargos > 0) {
+        // Entran a caja como ingreso de la cooperativa (no rebajan el préstamo)
+        await registrarCaja(connection, {
+          tipo: "ingreso",
+          categoria: "ingreso_cargos_credito",
+          monto: otrosCargos,
+          metodo: metodo_pago,
+          descripcion: `${detalleCargos} · préstamo #${id_prestamo}`,
+          referencia_tipo: "pago",
+          referencia_id: nuevoPagoId,
+          id_socio: prestamoData.id_usuario,
+          id_registrado_por: usuario?.id_usuario,
+          fecha: fechaPagoStr === hoy ? null : `${fechaPagoStr} 12:00:00`,
+        });
+      }
+    }
+
     return {
       id_prestamo, reporte, prestamoData, montoPagadoNum, nuevoSaldo, prestamoLiquidado, nuevoPagoId, idRecibo, idFiniquito,
       capitalDelPeriodo, interesEfectivo, saldoActual, cuotaMensual, diasMora, diasInteres, modo, interesMoratorio,
-      moraCondonada, moraGenerada,
+      moraCondonada, moraGenerada, otrosCargos,
     };
 };
 
@@ -989,6 +1019,32 @@ router.delete("/:id", async (req, res) => {
         creada_por: req.usuario?.id_usuario,
       })
     );
+
+    // Otros cargos cobrados con el pago (pagos ampliados): también se devuelven
+    const cargos = parseFloat(pagoData.otros_cargos || 0);
+    if (cargos > 0) {
+      await registrarCaja(connection, {
+        tipo: "egreso",
+        categoria: "anulacion_cargos_credito",
+        monto: cargos,
+        metodo: pagoData.metodo_pago,
+        descripcion: `Anulación de otros cargos del pago #${pagoData.id_pago}`,
+        referencia_tipo: "pago",
+        referencia_id: pagoData.id_pago,
+        id_socio: pagoData.id_usuario,
+        id_registrado_por: req.usuario?.id_usuario,
+      });
+      await conSalvaguarda(connection, { concepto: `Anulación de otros cargos del pago #${pagoData.id_pago}`, origen: "pago", origen_id: pagoData.id_pago }, () =>
+        registrarCambio(connection, {
+          antes: { tipo: "ingreso_caja", datos: { monto: cargos, metodo: pagoData.metodo_pago, categoria: "cargos_credito" } },
+          despues: null,
+          concepto: `Anulación de otros cargos del pago #${pagoData.id_pago}`,
+          origen: "pago",
+          origen_id: pagoData.id_pago,
+          creada_por: req.usuario?.id_usuario,
+        })
+      );
+    }
 
     // Contrapartida en caja: sale el dinero que había entrado por este pago
     await registrarCaja(connection, {

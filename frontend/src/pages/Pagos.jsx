@@ -203,6 +203,11 @@ export default function Pagos() {
         fecha_referencia: form.fecha_referencia || undefined,
         condonar_mora: form.condonar_mora ? true : undefined,
         id_reporte: !editPago && reporte ? reporte.id_reporte : undefined,
+        // Pagos ampliados (si la función está encendida; el servidor lo ignora si no)
+        numero_boleta: form.numero_boleta || undefined,
+        lugar_pago: form.lugar_pago || undefined,
+        otros_cargos: form.otros_cargos ? parseFloat(form.otros_cargos) : undefined,
+        otros_cargos_detalle: form.otros_cargos_detalle || undefined,
       };
       if (editPago) {
         await axios.put(`${API_URL}/pagos/${editPago.id_pago}`, payload, {

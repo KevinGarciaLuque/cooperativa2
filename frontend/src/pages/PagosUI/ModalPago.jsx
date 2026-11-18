@@ -3,6 +3,7 @@ import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import { FaMoneyCheckAlt, FaCalendarAlt, FaMoneyBillWave, FaFileInvoiceDollar, FaClock } from "react-icons/fa";
 import { cifra, simboloMoneda, montoATexto, textoAMonto } from "../../utils/pais";
+import { useFunciones } from "../../hooks/useFunciones";
 
 const fmt = (n) =>
   cifra(parseFloat(n || 0));
@@ -23,6 +24,7 @@ export default function ModalPago({
   reporte = null, // pago reportado por el socio: el monto queda fijo
   onVerComprobante,
 }) {
+  const funciones = useFunciones();
   // ── Hooks SIEMPRE antes del early return (regla de React) ────────────
   const [fechaReferencia, setFechaReferencia] = useState("");
   const [busquedaPrestamo, setBusquedaPrestamo] = useState("");
@@ -539,6 +541,29 @@ export default function ModalPago({
                     })}
                   </div>
                 </div>
+
+                {/* Pagos ampliados: boleta, lugar y otros cargos */}
+                {funciones.pagos_ampliados && !editPago && (
+                  <div className="row g-2">
+                    <div className="col-6">
+                      <label className="form-label fw-semibold small mb-1" style={{ color: "#2c3e50" }}>N.º de boleta</label>
+                      <input className="form-control form-control-sm" name="numero_boleta" maxLength={40} value={form.numero_boleta || ""} onChange={handleInput} />
+                    </div>
+                    <div className="col-6">
+                      <label className="form-label fw-semibold small mb-1" style={{ color: "#2c3e50" }}>Lugar de pago</label>
+                      <input className="form-control form-control-sm" name="lugar_pago" maxLength={80} placeholder="Ej.: Banrural, ventanilla" value={form.lugar_pago || ""} onChange={handleInput} />
+                    </div>
+                    <div className="col-5">
+                      <label className="form-label fw-semibold small mb-1" style={{ color: "#2c3e50" }}>Otros cargos</label>
+                      <input type="number" step="0.01" min="0" className="form-control form-control-sm" name="otros_cargos" value={form.otros_cargos || ""} onChange={handleInput} />
+                    </div>
+                    <div className="col-7">
+                      <label className="form-label fw-semibold small mb-1" style={{ color: "#2c3e50" }}>Concepto de los cargos</label>
+                      <input className="form-control form-control-sm" name="otros_cargos_detalle" maxLength={150} placeholder="Ej.: seguro de deuda" value={form.otros_cargos_detalle || ""} onChange={handleInput} />
+                    </div>
+                    <div className="col-12 small text-muted">Los otros cargos se cobran aparte: no rebajan el préstamo.</div>
+                  </div>
+                )}
 
                 {/* Descripción */}
                 <div>

@@ -372,6 +372,8 @@ router.post("/creditos/:id(\\d+)/pagar", async (req, res) => {
             fecha_pago: b.fecha_pago,
             tipo_pago: b.tipo_pago,
             condonar_mora: !!d.condonar_mora,
+            numero_boleta: b.numero_boleta,
+            lugar_pago: b.lugar_pago,
           },
           req.usuario
         );

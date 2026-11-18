@@ -18,7 +18,6 @@ const CATALOGO = [
     clave: "pagos_ampliados",
     nombre: "Pagos ampliados",
     descripcion: "Número de boleta, lugar de pago, otros cargos, conciliación de boletas y pago rápido.",
-    proximamente: true,
   },
   {
     clave: "contratos_word",

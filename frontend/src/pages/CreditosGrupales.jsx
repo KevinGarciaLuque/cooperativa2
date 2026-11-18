@@ -10,6 +10,7 @@ import InputMonto from "../ui/InputMonto";
 import ReciboModal from "../components/ReciboModal";
 import { dinero } from "../utils/pais";
 import { hoyLocal } from "../utils/fechas";
+import { useFunciones } from "../hooks/useFunciones";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const AZUL = "#1a2035";
@@ -42,6 +43,7 @@ const Tarjeta = ({ children }) => (
 
 export default function CreditosGrupales() {
   const { token } = useAuth();
+  const funciones = useFunciones();
   const { mostrarAlerta } = useAlerta();
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
   const error = (e, msg) => mostrarAlerta(e.response?.data?.message || msg, "error");
@@ -181,7 +183,7 @@ export default function CreditosGrupales() {
         }
       })
     );
-    setPago({ filas, metodo_pago: "efectivo", fecha_pago: hoyLocal(), resultado: null });
+    setPago({ filas, metodo_pago: "efectivo", fecha_pago: hoyLocal(), numero_boleta: "", lugar_pago: "", resultado: null });
   };
   const registrarPago = async () => {
     setTrabajando(true);
@@ -191,6 +193,8 @@ export default function CreditosGrupales() {
         {
           metodo_pago: pago.metodo_pago,
           fecha_pago: pago.fecha_pago,
+          numero_boleta: pago.numero_boleta || undefined,
+          lugar_pago: pago.lugar_pago || undefined,
           detalles: pago.filas.map((f) => ({ id_prestamo: f.id_prestamo, monto_pagado: f.monto })),
         },
         { headers }
@@ -487,6 +491,18 @@ export default function CreditosGrupales() {
                   <label className="form-label small mb-1">Fecha</label>
                   <input type="date" className="form-control form-control-sm" max={hoyLocal()} value={pago.fecha_pago} onChange={(e) => setPago({ ...pago, fecha_pago: e.target.value })} />
                 </div>
+                {funciones.pagos_ampliados && (
+                  <>
+                    <div className="col-6">
+                      <label className="form-label small mb-1">N.º de boleta</label>
+                      <input className="form-control form-control-sm" maxLength={40} value={pago.numero_boleta} onChange={(e) => setPago({ ...pago, numero_boleta: e.target.value })} />
+                    </div>
+                    <div className="col-6">
+                      <label className="form-label small mb-1">Lugar de pago</label>
+                      <input className="form-control form-control-sm" maxLength={80} value={pago.lugar_pago} onChange={(e) => setPago({ ...pago, lugar_pago: e.target.value })} />
+                    </div>
+                  </>
+                )}
               </div>
               <table className="table table-sm align-middle">
                 <thead className="table-light"><tr><th>Integrante</th><th className="text-end">Cuota del mes</th><th className="text-end">Para saldar</th><th style={{ width: 170 }}>Paga</th></tr></thead>

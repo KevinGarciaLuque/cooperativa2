@@ -2115,6 +2115,64 @@ test("créditos grupales: grupo con cargos, crédito por integrante, desembolso 
   assert.equal((await api("PUT", "/configuracion/funciones", { creditos_grupales: false }, ids.tSuper)).s, 200);
 });
 
+test("pagos ampliados: boleta, otros cargos que entran a caja, pago rápido y conciliación", async () => {
+  assert.equal((await api("GET", "/pagos-ampliados/conciliacion", null, ids.tAdmin)).s, 403, "apagada para el personal");
+  assert.equal((await api("PUT", "/configuracion/funciones", { pagos_ampliados: true }, ids.tSuper)).s, 200);
+
+  // Dos préstamos activos del socio 2
+  const crear = async (monto) => {
+    const r = await api("POST", "/prestamos", { id_usuario: ids.socio2, monto, tasa_interes: 24, plazo_meses: 12, estado: "aprobado" }, ids.tSuper);
+    const id = r.b.id_prestamo || r.b.data?.id_prestamo || r.b.prestamo?.id_prestamo;
+    assert.equal((await api("POST", `/prestamos/${id}/desembolsar`, { metodo: "efectivo" }, ids.tSuper)).s, 200);
+    return id;
+  };
+  const p1 = await crear(1200);
+  const p2 = await crear(800);
+
+  // Pago individual con boleta y otros cargos: los cargos no rebajan el préstamo y entran a caja aparte
+  const pago = await api("POST", "/pagos", {
+    id_prestamo: p1, monto_pagado: 150, metodo_pago: "deposito", numero_boleta: "B-7781", lugar_pago: "Banrural Patzún",
+    otros_cargos: 25, otros_cargos_detalle: "Seguro de deuda",
+  }, ids.tAdmin);
+  assert.equal(pago.s, 201, pago.b?.message);
+  const [[pg]] = await pool.query("SELECT numero_boleta, lugar_pago, otros_cargos FROM pagos_prestamo WHERE id_pago = ?", [pago.b.id_pago]);
+  assert.equal(pg.numero_boleta, "B-7781");
+  assert.equal(parseFloat(pg.otros_cargos), 25);
+  const [[cg]] = await pool.query("SELECT monto FROM caja_movimientos WHERE categoria = 'ingreso_cargos_credito' AND referencia_id = ?", [pago.b.id_pago]);
+  assert.equal(parseFloat(cg.monto), 25);
+  assert.equal((await api("POST", "/pagos", { id_prestamo: p1, monto_pagado: 50, otros_cargos: 10 }, ids.tAdmin)).s, 400, "cargos sin concepto");
+
+  // Anular un pago con otros cargos también los devuelve
+  const otro = await api("POST", "/pagos", { id_prestamo: p2, monto_pagado: 60, metodo_pago: "efectivo", otros_cargos: 12, otros_cargos_detalle: "Gastos administrativos" }, ids.tAdmin);
+  assert.equal(otro.s, 201, otro.b?.message);
+  const anula = await api("DELETE", `/pagos/${otro.b.id_pago}`, { motivo: "Prueba de anulación" }, ids.tSuper);
+  assert.equal(anula.s, 200, anula.b?.message);
+  const [[dev]] = await pool.query("SELECT monto FROM caja_movimientos WHERE categoria = 'anulacion_cargos_credito' AND referencia_id = ?", [otro.b.id_pago]);
+  assert.equal(parseFloat(dev.monto), 12);
+
+  // Pago rápido de los dos préstamos: todo o nada
+  const malo = await api("POST", "/pagos-ampliados/rapido", { metodo_pago: "efectivo", detalles: [{ id_prestamo: p1, monto_pagado: 100 }, { id_prestamo: p2, monto_pagado: 999999 }] }, ids.tAdmin);
+  assert.equal(malo.s, 400);
+  assert.equal((await api("POST", "/pagos-ampliados/rapido", { detalles: [{ id_prestamo: p1, monto_pagado: 10 }, { id_prestamo: ids.prestamoNuevo || 1, monto_pagado: 10 }] }, ids.tAdmin)).s >= 400, true);
+  const rapido = await api("POST", "/pagos-ampliados/rapido", {
+    metodo_pago: "transferencia", numero_boleta: "TR-55", detalles: [{ id_prestamo: p1, monto_pagado: 100 }, { id_prestamo: p2, monto_pagado: 80 }],
+  }, ids.tAdmin);
+  assert.equal(rapido.s, 201, rapido.b?.message);
+  assert.equal(rapido.b.detalles.length, 2);
+
+  // Conciliación de boletas
+  const pend = await api("GET", "/pagos-ampliados/conciliacion?search=B-7781", null, ids.tAdmin);
+  assert.equal(pend.s, 200);
+  assert.ok(pend.b.data.some((f) => f.id_pago === pago.b.id_pago && !f.conciliado));
+  assert.equal((await api("PUT", "/pagos-ampliados/conciliacion", { ids: [pago.b.id_pago] }, ids.tAdmin)).s, 200);
+  const conc = await api("GET", "/pagos-ampliados/conciliacion?estado=conciliado&search=B-7781", null, ids.tAdmin);
+  assert.ok(conc.b.data[0].conciliado);
+
+  // Limpieza
+  await pool.query("UPDATE prestamos SET estado = 'pagado', saldo_restante = 0 WHERE id_prestamo IN (?, ?)", [p1, p2]);
+  assert.equal((await api("PUT", "/configuracion/funciones", { pagos_ampliados: false }, ids.tSuper)).s, 200);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

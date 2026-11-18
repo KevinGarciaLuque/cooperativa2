@@ -1105,6 +1105,29 @@ const MIGRACIONES = [
       }
     },
   },
+  {
+    id: "2026_11_015_pagos_ampliados",
+    descripcion: "Boleta, lugar de pago, otros cargos y conciliación de pagos",
+    async up(conn) {
+      const columnas = [
+        ["numero_boleta", "VARCHAR(40) NULL"],
+        ["lugar_pago", "VARCHAR(80) NULL"],
+        ["otros_cargos", "DECIMAL(12,2) NOT NULL DEFAULT 0"],
+        ["otros_cargos_detalle", "VARCHAR(150) NULL"],
+        ["conciliado", "TINYINT(1) NOT NULL DEFAULT 0"],
+        ["conciliado_por", "INT NULL"],
+        ["conciliado_en", "DATETIME NULL"],
+      ];
+      for (const [nombre, def] of columnas) {
+        const [[e]] = await conn.query(
+          `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pagos_prestamo' AND COLUMN_NAME = ?`,
+          [nombre]
+        );
+        if (!e.n) await conn.query(`ALTER TABLE pagos_prestamo ADD COLUMN ${nombre} ${def}`);
+      }
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

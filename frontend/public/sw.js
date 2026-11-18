@@ -1,6 +1,6 @@
 // Service worker mínimo: permite instalar la app y abrirla aunque no haya conexión.
 // Nunca guarda respuestas de la API: los datos financieros siempre vienen del servidor.
-const CACHE = "cooperativa-shell-v2";
+const CACHE = "cooperativa-shell-v3";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/"])).then(() => self.skipWaiting()));
@@ -41,6 +41,42 @@ self.addEventListener("fetch", (event) => {
         })
         .catch(() => guardado);
       return guardado || red;
+    })
+  );
+});
+
+// Notificaciones en el teléfono (app del socio): pagos, cuotas por vencer, préstamos
+self.addEventListener("push", (event) => {
+  let datos = {};
+  try {
+    datos = event.data ? event.data.json() : {};
+  } catch {
+    datos = { titulo: event.data ? event.data.text() : "" };
+  }
+  const titulo = datos.titulo || "Cooperativa";
+  event.waitUntil(
+    self.registration.showNotification(titulo, {
+      body: datos.cuerpo || "",
+      icon: "/pwa-192.png",
+      badge: "/pwa-192.png",
+      tag: datos.etiqueta || undefined,
+      data: { url: datos.url || "/perfil" },
+    })
+  );
+});
+
+// Al tocar la notificación se abre (o se enfoca) la app
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/perfil";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((ventanas) => {
+      const abierta = ventanas.find((v) => new URL(v.url).origin === self.location.origin);
+      if (abierta) {
+        abierta.focus();
+        return abierta.navigate ? abierta.navigate(url) : null;
+      }
+      return self.clients.openWindow(url);
     })
   );
 });

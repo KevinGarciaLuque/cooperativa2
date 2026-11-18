@@ -332,3 +332,17 @@ Función nueva **"Informe al supervisor y reportes IVE"**: la enciende el Super 
 - **Efectivo para la IVE** (*Cumplimiento*): movimientos en efectivo iguales o mayores al umbral y las transacciones **múltiples** (varios movimientos menores del mismo socio en un día que juntos lo alcanzan). El Excel lleva los datos del socio: identidad, nacionalidad, fecha de nacimiento, profesión, actividad, lugar de trabajo, dirección, origen de los fondos y si es PEP.
 - **Sospechosas para la IVE** (*Cumplimiento*): las alertas marcadas como *reportadas*, con el análisis del oficial y los datos del socio.
 - Los formatos de Excel son estándar; cuando la cooperativa comparta su formulario oficial se ajustan las columnas.
+
+## Etapa 8: app del socio
+
+Función nueva **"App del socio"** (*Control de Accesos → Funciones nuevas*). Es la primera función que ven los socios: mientras esté apagada, ellos no ven nada nuevo.
+
+- **Instalar en el teléfono y notificaciones:** en *Resumen* aparece la tarjeta "Tu cooperativa en el teléfono". En Android instala la app con un botón; en iPhone explica cómo agregarla a la pantalla de inicio (las notificaciones en iPhone necesitan la app instalada e iOS 16.4 o más reciente). Al activar las notificaciones llega una de prueba.
+- **Qué notifica al teléfono:** todo lo que llega a la campanita del socio (pago registrado o confirmado, préstamo aprobado o desembolsado, aportaciones) y los recordatorios: cuota que vence en 3 días, cuota atrasada y depósito a plazo por vencer. Los recordatorios salen solos cada mañana a las 8:05 para los socios con notificaciones activadas.
+- **Pagar y transferir** (pestaña nueva del socio):
+  - *Pagar mi cuota con mi ahorro*: se aplica igual que en ventanilla (interés, mora, cargos automáticos y recibo) y se descuenta de la cuenta elegida. No pasa por el efectivo de la caja: queda como "Débito a su cuenta de ahorro" y su partida contable pasa directo del ahorro al préstamo.
+  - *Pasar dinero entre mis cuentas*: solo entre cuentas propias, con su partida contable.
+  - *Mi estado de cuenta*: PDF con cuentas, préstamos, movimientos y pagos del período.
+  - Cada operación pide confirmación; tocar dos veces "Pagar" no cobra dos veces.
+- **Aportaciones:** por defecto no se usan para pagar ni transferir (son capital). Se puede permitir en *Parámetros → App del socio*.
+- **Claves de las notificaciones:** se crean solas la primera vez. Para fijarlas, define `VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY` en el servidor; si las cambias, los socios deben volver a activar las notificaciones.

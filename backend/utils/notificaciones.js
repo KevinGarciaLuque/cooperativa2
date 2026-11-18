@@ -47,6 +47,8 @@ const crearNotificacion = async (idUsuario, { titulo, mensaje, tipo = "aviso", i
       "INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, id_recibo) VALUES (?, ?, ?, ?, ?)",
       [idUsuario, String(tipo).substring(0, 30), String(titulo).substring(0, 150), mensaje ? String(mensaje).substring(0, 600) : null, idRecibo || null]
     );
+    // También al teléfono, si el socio activó las notificaciones (sin esperar la respuesta)
+    require("./push").enviarPush(idUsuario, { titulo, cuerpo: mensaje, etiqueta: tipo }).catch(() => {});
   } catch (error) {
     console.error("No se pudo guardar la notificación:", error.message);
   }

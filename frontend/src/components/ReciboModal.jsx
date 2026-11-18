@@ -30,6 +30,7 @@ const METODOS = {
   cheque: "Cheque",
   deposito: "Depósito",
   cuenta: "Depósito a cuenta del socio",
+  debito_ahorro: "Débito a su cuenta de ahorro",
 };
 
 const formatearFecha = (f) => {

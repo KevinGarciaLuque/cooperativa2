@@ -45,6 +45,12 @@ const CATALOGO = [
     descripcion: "Historial crediticio, proyección de cobros, créditos vencidos, por cerrar y cerrados, por promotor y línea.",
   },
   {
+    clave: "app_socio",
+    socio: true, // la usan los socios (las demás funciones son solo para el personal)
+    nombre: "App del socio",
+    descripcion: "Notificaciones en el teléfono, pagar la cuota desde su ahorro, pasar dinero entre sus cuentas y descargar su estado de cuenta en PDF.",
+  },
+  {
     clave: "reportes_supervisor",
     nombre: "Informe al supervisor y reportes IVE",
     descripcion: "Indicadores financieros con semáforo (morosidad, cobertura, liquidez, solvencia, rentabilidad) en Excel; reporte de transacciones en efectivo y de transacciones sospechosas para la IVE.",
@@ -83,14 +89,19 @@ const guardar = async (cambios) => {
 // ¿Puede este usuario usar la función? (el Super Administrador siempre, para probarla)
 const habilitada = async (clave, usuario) => {
   if (usuario?.rol === "Super Administrador") return true;
-  if (usuario?.rol === "Socio") return false;
+  if (usuario?.rol === "Socio" && !CATALOGO.find((c) => c.clave === clave)?.socio) return false;
   return !!(await leer())[clave];
 };
 
 // Para el navegador: qué funciones ve este usuario
 const efectivas = async (usuario) => {
   const f = await leer();
-  return Object.fromEntries(CATALOGO.map((c) => [c.clave, usuario?.rol === "Super Administrador" ? true : usuario?.rol === "Socio" ? false : f[c.clave]]));
+  return Object.fromEntries(
+    CATALOGO.map((c) => [
+      c.clave,
+      usuario?.rol === "Super Administrador" ? true : usuario?.rol === "Socio" ? !!(c.socio && f[c.clave]) : f[c.clave],
+    ])
+  );
 };
 
 module.exports = { CATALOGO, leer, guardar, habilitada, efectivas };

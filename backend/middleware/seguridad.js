@@ -63,6 +63,10 @@ const REGLAS_SOCIO = [
   { metodo: "GET", re: /^\/socios\/(\d+)\/identidad(\/(frente|reverso))?$/, propio: 1, pendiente: true },
   { metodo: "POST", re: /^\/socios\/(\d+)\/identidad\/(frente|reverso)$/, propio: 1, pendiente: true },
   { metodo: "GET", re: /^\/socios\/(\d+)\/estado-cuenta$/, propio: 1 },
+  // Qué funciones nuevas tiene encendidas (la app del socio) y lo que hace con ellas
+  { metodo: "GET", re: /^\/configuracion\/funciones$/, libre: true },
+  { metodo: "GET", re: /^\/app-socio\/[a-z0-9.-]+$/, libre: true },
+  { metodo: "POST", re: /^\/app-socio\/[a-z0-9/-]+$/, libre: true },
   // Sus notificaciones (la ruta filtra siempre por el usuario de la sesión)
   { metodo: "GET", re: /^\/notificaciones$/, libre: true, pendiente: true },
   { metodo: "POST", re: /^\/notificaciones\/leer$/, libre: true, pendiente: true },

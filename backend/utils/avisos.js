@@ -41,6 +41,7 @@ const avisarUnaVez = async (idUsuario, tipo, titulo, mensaje) => {
     titulo.substring(0, 150),
     mensaje ? mensaje.substring(0, 600) : null,
   ]);
+  require("./push").enviarPush(idUsuario, { titulo, cuerpo: mensaje, etiqueta: tipo }).catch(() => {});
   return true;
 };
 

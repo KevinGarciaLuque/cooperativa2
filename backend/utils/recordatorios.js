@@ -130,11 +130,25 @@ const iniciarRecordatoriosScheduler = () => {
       console.error("Error al enviar los recordatorios de pago:", error.message);
     }
   };
+  // App del socio: los recordatorios de cuota llegan al teléfono aunque no abra la app
+  const tareaApp = async () => {
+    try {
+      const push = require("./push");
+      if (!(await push.activa())) return;
+      const { recordatoriosSocio } = require("./avisos");
+      const [socios] = await pool.query("SELECT DISTINCT id_usuario FROM push_suscripciones");
+      for (const s of socios) await recordatoriosSocio(s.id_usuario, { forzar: true });
+    } catch (error) {
+      console.error("Error en los recordatorios de la app del socio:", error.message);
+    }
+  };
   // Todos los días a las 8:00 de la mañana, hora de la cooperativa
   try {
     cron.schedule("0 8 * * *", tarea, { timezone: zona() });
+    cron.schedule("5 8 * * *", tareaApp, { timezone: zona() });
   } catch {
     cron.schedule("0 14 * * *", tarea); // 8:00 en Honduras (UTC-6)
+    cron.schedule("5 14 * * *", tareaApp);
   }
 };
 

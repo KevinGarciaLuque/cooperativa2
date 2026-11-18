@@ -16,6 +16,9 @@ import { numeroSocio } from "../../utils/numeroSocio";
 import PlanPagos from "../../components/PlanPagos";
 import ProximosPagos, { etiquetaVencimiento } from "../../components/ProximosPagos";
 import TabsCarrusel from "../../components/TabsCarrusel";
+import AppTelefono from "../../components/AppTelefono";
+import PagarTransferir from "../../components/PagarTransferir";
+import { useFunciones } from "../../hooks/useFunciones";
 import {
   FaUserCircle,
   FaMoneyBillWave,
@@ -42,6 +45,7 @@ import {
   FaUpload,
   FaReceipt,
   FaBook,
+  FaExchangeAlt,
 } from "react-icons/fa";
 import { cifra, simboloMoneda, docIdentidad } from "../../utils/pais";
 
@@ -89,6 +93,10 @@ export default function SocioPerfil() {
   const [ultimoPagoFecha, setUltimoPagoFecha] = useState(null); // último pago a préstamos
   const [moras, setMoras] = useState({}); // id_prestamo -> { dias, mora, porDia }
   const [proximas, setProximas] = useState({}); // id_prestamo -> { lista: próximas cuotas, total }
+  // App del socio (función que enciende el Super Administrador)
+  const { app_socio: conApp } = useFunciones();
+  const [clavePush, setClavePush] = useState(null);
+  const [recarga, setRecarga] = useState(0); // vuelve a leer saldos y préstamos tras pagar o transferir
   const [entregas, setEntregas] = useState({}); // id_prestamo -> { id_recibo, firmado }
   const [reciboEntrega, setReciboEntrega] = useState(null);
   const [reciboVer, setReciboVer] = useState(null);
@@ -327,7 +335,21 @@ export default function SocioPerfil() {
       setLoading(false);
     };
     if (user?.id_usuario) fetchData();
-  }, [user.id_usuario, token, API_URL]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.id_usuario, token, API_URL, recarga]);
+
+  useEffect(() => {
+    if (!conApp || !token) return;
+    axios
+      .get(`${API_URL}/app-socio/estado`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => setClavePush(r.data.clave_push || null))
+      .catch(() => setClavePush(null));
+  }, [conApp, token, API_URL]);
+
+  const aviso = (texto, tipo) => {
+    setMsg(texto);
+    setMsgTipo(tipo === "success" ? "success" : "error");
+  };
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
@@ -367,6 +389,7 @@ export default function SocioPerfil() {
     : [
         { key: "resumen",      label: "Resumen",            icon: <FaChartLine /> },
         { key: "prestamos",    label: "Préstamos",           icon: <FaHandHoldingUsd /> },
+        ...(conApp ? [{ key: "app_pagar", label: "Pagar y transferir", icon: <FaExchangeAlt /> }] : []),
         { key: "pagar",        label: "Reportar pago",       icon: <FaCreditCard /> },
         { key: "recibos",      label: "Mis recibos",         icon: <FaReceipt /> },
         { key: "solicitar",    label: "Solicitar préstamo",  icon: <FaClipboardList /> },
@@ -619,6 +642,17 @@ export default function SocioPerfil() {
           {/* TAB: REPORTAR PAGO */}
           {tab === "pagar" && <ReportarPagoSocio token={token} />}
 
+          {tab === "app_pagar" && conApp && (
+            <PagarTransferir
+              token={token}
+              prestamos={prestamos}
+              proximas={proximas}
+              onListo={() => setRecarga((n) => n + 1)}
+              onVerRecibo={setReciboVer}
+              onAviso={aviso}
+            />
+          )}
+
           {tab === "politicas" && <PoliticasSocio headers={headersAuth} version={politicasVersion} />}
 
           {tab === "recibos" && user?.id_usuario && (
@@ -647,6 +681,11 @@ export default function SocioPerfil() {
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+              {conApp && clavePush !== undefined && (
+                <div className="col-12" style={{ order: -2 }}>
+                  <AppTelefono headers={headersAuth} clavePush={clavePush} onAviso={aviso} />
                 </div>
               )}
               {/* Próximos pagos: siempre arriba, es lo primero que el socio necesita saber */}

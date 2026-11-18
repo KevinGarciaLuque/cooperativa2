@@ -18,12 +18,12 @@ export default function ParametrosFinancieros() {
   const [tasa, setTasa] = useState("");
   const [gracia, setGracia] = useState("");
   const [prov, setProv] = useState({ prov_al_dia: "", prov_1_30: "", prov_31_60: "", prov_61_90: "", prov_90_mas: "" });
-  const [sol, setSol] = useState({ sol_tasa_mensual: "", sol_monto_max: "", sol_plazo_max: "", sol_pct_ingreso_max: "", aho_retencion_pct: "0", aml_umbral: "0", aprob_monto_admin: "0", aprob_votos_comite: "2", caja_exigir_turno: "0", seg_2fa_personal: "0" });
+  const [sol, setSol] = useState({ sol_tasa_mensual: "", sol_monto_max: "", sol_plazo_max: "", sol_pct_ingreso_max: "", aho_retencion_pct: "0", aml_umbral: "0", aprob_monto_admin: "0", aprob_votos_comite: "2", caja_exigir_turno: "0", seg_2fa_personal: "0", app_debito_aportaciones: "0" });
   const [seguridad, setSeguridad] = useState(null);
   // Días de cada categoría de mora y metas de los indicadores del informe al supervisor
   const [lims, setLims] = useState({ prov_lim_1: "30", prov_lim_2: "60", prov_lim_3: "90" });
   const [metas, setMetas] = useState({ ind_meta_morosidad: "5", ind_meta_liquidez: "15", ind_meta_solvencia: "10", ind_meta_cobertura: "100" });
-  const { reportes_supervisor: conSupervisor } = useFunciones();
+  const { reportes_supervisor: conSupervisor, app_socio: conApp } = useFunciones();
   const [rec, setRec] = useState({ rec_activo: true, rec_dias_antes: "3", rec_mora_cada: "7" });
   const [enviando, setEnviando] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -45,6 +45,7 @@ export default function ParametrosFinancieros() {
           aprob_monto_admin: String(res.data.data.aprob_monto_admin ?? 0),
           aprob_votos_comite: String(res.data.data.aprob_votos_comite ?? 2),
           caja_exigir_turno: String(res.data.data.caja_exigir_turno ?? 0),
+          app_debito_aportaciones: String(res.data.data.app_debito_aportaciones ?? 0),
           seg_2fa_personal: String(res.data.data.seg_2fa_personal ?? 0),
         });
         setSeguridad(res.data.seguridad || null);
@@ -254,6 +255,23 @@ export default function ParametrosFinancieros() {
             Exigir turno abierto para operar en efectivo
           </label>
         </div>
+
+        {conApp && (
+          <>
+            <h5 className="fw-bold mt-4 mb-1" style={{ color: AZUL }}>App del socio</h5>
+            <p className="text-muted small">
+              Desde la app el socio paga su cuota con su ahorro y pasa dinero entre sus cuentas. Las aportaciones son capital:
+              por defecto no se usan para eso.
+            </p>
+            <div className="form-check form-switch mb-2">
+              <input id="debito-aportaciones" type="checkbox" className="form-check-input" checked={sol.app_debito_aportaciones === "1"}
+                onChange={(e) => setSol({ ...sol, app_debito_aportaciones: e.target.checked ? "1" : "0" })} disabled={cargando} />
+              <label htmlFor="debito-aportaciones" className="form-check-label">
+                Permitir pagar y transferir desde la cuenta de aportaciones
+              </label>
+            </div>
+          </>
+        )}
 
         <h5 className="fw-bold mt-4 mb-1" style={{ color: AZUL }}>Prevención de lavado de dinero</h5>
         <p className="text-muted small">

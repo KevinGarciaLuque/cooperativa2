@@ -40,6 +40,8 @@ const DEFAULTS = {
   caja_exigir_turno: 0,
   // Seguridad: 1 = el personal confirma su inicio de sesión con un código enviado a su correo
   seg_2fa_personal: 0,
+  // App del socio: 1 = también puede pagar o transferir desde su cuenta de aportaciones
+  app_debito_aportaciones: 0,
 };
 
 let cache = { ...DEFAULTS };

@@ -1220,6 +1220,24 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_11_021_app_socio",
+    descripcion: "App del socio: suscripciones a notificaciones en el teléfono",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS push_suscripciones (
+          id_suscripcion INT AUTO_INCREMENT PRIMARY KEY,
+          id_usuario INT NOT NULL,
+          endpoint VARCHAR(600) NOT NULL,
+          p256dh VARCHAR(200) NOT NULL,
+          auth VARCHAR(100) NOT NULL,
+          creada_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uk_push_endpoint (endpoint(255)),
+          INDEX idx_push_usuario (id_usuario)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

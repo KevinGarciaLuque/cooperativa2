@@ -2579,6 +2579,100 @@ test("etapa 7: rangos de mora configurables, indicadores para el supervisor y re
   assert.equal((await api("PUT", "/configuracion/funciones", { reportes_supervisor: false }, ids.tSuper)).s, 200);
 });
 
+test("etapa 8: app del socio — pagar desde su ahorro, transferir, estado de cuenta y notificaciones", async () => {
+  const [u] = await pool.query(
+    `INSERT INTO usuarios (nombre_completo, dni, telefono, correo, password, rol_id, estado, fecha_registro)
+     VALUES ('Socio App', '0801000000777', '98765432', 'app@prueba.hn', 'x', 2, 'activo', NOW())`
+  );
+  const id = u.insertId;
+  const t = tokenDe(id, "Socio", 2);
+  const cuenta = async (tipo, saldo) =>
+    (await pool.query("INSERT INTO cuentas (id_usuario, tipo_cuenta, saldo_actual, estado, fecha_apertura) VALUES (?, ?, ?, 'activa', NOW())", [id, tipo, saldo]))[0].insertId;
+  const cAport = await cuenta("Aportaciones", 1000);
+  const cViv = await cuenta("Vivienda", 5000);
+  const cPen = await cuenta("Pensiones", 0);
+  const [p] = await pool.query(
+    `INSERT INTO prestamos (id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado)
+     VALUES (?, 1200, 12, 12, 1200, 'activo', DATE_SUB(CURDATE(), INTERVAL 20 DAY))`,
+    [id]
+  );
+  const idP = p.insertId;
+
+  // Apagada: el socio no la ve ni la usa; el personal nunca la usa
+  assert.equal((await api("GET", "/app-socio/estado", null, t)).b.habilitada, false);
+  assert.equal((await api("POST", "/app-socio/pagar-cuota", { id_prestamo: idP, id_cuenta: cViv, monto: 100 }, t)).s, 403);
+  assert.equal((await api("GET", "/configuracion/funciones", null, t)).b.efectivas.app_socio, false);
+  assert.equal((await api("GET", "/app-socio/estado", null, ids.tAdmin)).s, 403);
+
+  assert.equal((await api("PUT", "/configuracion/funciones", { app_socio: true, reportes_supervisor: true }, ids.tSuper)).s, 200);
+  const fun = (await api("GET", "/configuracion/funciones", null, t)).b;
+  assert.equal(fun.efectivas.app_socio, true);
+  assert.equal(fun.efectivas.reportes_supervisor, false, "las funciones del personal siguen apagadas para el socio");
+  assert.equal(fun.estado, undefined, "al socio no se le muestra la configuración completa");
+  const est = await api("GET", "/app-socio/estado", null, t);
+  assert.equal(est.b.habilitada, true);
+  assert.ok(est.b.clave_push && est.b.clave_push.length > 40, "clave pública para las notificaciones");
+
+  const cuentas = (await api("GET", "/app-socio/cuentas", null, t)).b.data;
+  assert.equal(cuentas.find((c) => c.id_cuenta === cAport).puede_debitar, false, "aportaciones no se usan para pagar");
+  assert.equal(cuentas.find((c) => c.id_cuenta === cViv).puede_debitar, true);
+
+  // Pagar la cuota desde su ahorro
+  assert.equal((await api("POST", "/app-socio/pagar-cuota", { id_prestamo: idP, id_cuenta: cAport, monto: 100 }, t)).s, 400);
+  assert.equal((await api("POST", "/app-socio/pagar-cuota", { id_prestamo: idP, id_cuenta: cViv, monto: 999999 }, t)).s, 400);
+  const otra = (await pool.query("SELECT id_cuenta FROM cuentas WHERE id_usuario = ? LIMIT 1", [ids.socio]))[0][0].id_cuenta;
+  assert.equal((await api("POST", "/app-socio/pagar-cuota", { id_prestamo: idP, id_cuenta: otra, monto: 100 }, t)).s, 404);
+  const ajeno = (await pool.query("SELECT id_prestamo FROM prestamos WHERE id_usuario <> ? LIMIT 1", [id]))[0][0];
+  if (ajeno) assert.equal((await api("POST", "/app-socio/pagar-cuota", { id_prestamo: ajeno.id_prestamo, id_cuenta: cViv, monto: 100 }, t)).s, 404);
+
+  const pago = await api("POST", "/app-socio/pagar-cuota", { id_prestamo: idP, id_cuenta: cViv, monto: 150 }, t);
+  assert.equal(pago.s, 201, pago.b?.message);
+  cerca(pago.b.saldo_cuenta, 4850);
+  assert.ok(pago.b.id_recibo);
+  const [[pp]] = await pool.query("SELECT metodo_pago FROM pagos_prestamo WHERE id_prestamo = ? ORDER BY id_pago DESC LIMIT 1", [idP]);
+  assert.equal(pp.metodo_pago, "debito_ahorro");
+  const [movCaja] = await pool.query(
+    "SELECT tipo, metodo, monto FROM caja_movimientos WHERE id_socio = ? AND metodo = 'debito_ahorro' ORDER BY id_movimiento",
+    [id]
+  );
+  assert.equal(movCaja.length, 2, "salida del ahorro y entrada del pago, sin tocar el efectivo");
+  cerca(movCaja.reduce((s, m) => s + (m.tipo === "ingreso" ? 1 : -1) * parseFloat(m.monto), 0), 0);
+  const [[ncaja]] = await pool.query("SELECT COUNT(*) AS n FROM caja_movimientos WHERE id_socio = ? AND metodo = 'efectivo'", [id]);
+  assert.equal(ncaja.n, 0);
+  // Tocar dos veces el botón no paga dos veces
+  assert.equal((await api("POST", "/app-socio/pagar-cuota", { id_prestamo: idP, id_cuenta: cViv, monto: 150 }, t)).s, 409);
+  const [[notif]] = await pool.query("SELECT titulo, id_recibo FROM notificaciones WHERE id_usuario = ? AND tipo = 'pago' ORDER BY id_notificacion DESC LIMIT 1", [id]);
+  assert.equal(notif.titulo, "Pago aplicado");
+  assert.equal(notif.id_recibo, pago.b.id_recibo);
+
+  // Pasar dinero entre sus cuentas
+  assert.equal((await api("POST", "/app-socio/transferir", { id_cuenta_origen: cViv, id_cuenta_destino: cViv, monto: 10 }, t)).s, 400);
+  assert.equal((await api("POST", "/app-socio/transferir", { id_cuenta_origen: cAport, id_cuenta_destino: cPen, monto: 10 }, t)).s, 400);
+  assert.equal((await api("POST", "/app-socio/transferir", { id_cuenta_origen: cViv, id_cuenta_destino: otra, monto: 10 }, t)).s, 404);
+  const tr = await api("POST", "/app-socio/transferir", { id_cuenta_origen: cViv, id_cuenta_destino: cPen, monto: 300 }, t);
+  assert.equal(tr.s, 200, tr.b?.message);
+  const [[viv]] = await pool.query("SELECT saldo_actual FROM cuentas WHERE id_cuenta = ?", [cViv]);
+  const [[pen]] = await pool.query("SELECT saldo_actual FROM cuentas WHERE id_cuenta = ?", [cPen]);
+  cerca(parseFloat(viv.saldo_actual), 4550);
+  cerca(parseFloat(pen.saldo_actual), 300);
+
+  // Estado de cuenta en PDF
+  const pdf = await fetch(`${base}/api/app-socio/estado-cuenta.pdf`, { headers: { Authorization: `Bearer ${t}` } });
+  assert.equal(pdf.status, 200);
+  assert.match(pdf.headers.get("content-type"), /pdf/);
+  assert.equal(Buffer.from(await pdf.arrayBuffer()).subarray(0, 4).toString(), "%PDF");
+
+  // Notificaciones en el teléfono: suscribir y cancelar
+  assert.equal((await api("POST", "/app-socio/push/suscribir", { subscription: { endpoint: "http://inseguro" } }, t)).s, 400);
+  const sub = { endpoint: "https://push.ejemplo.invalid/abc", keys: { p256dh: "B".repeat(87), auth: "a".repeat(22) } };
+  assert.equal((await api("POST", "/app-socio/push/suscribir", { subscription: sub }, t)).s, 200);
+  assert.equal((await pool.query("SELECT COUNT(*) AS n FROM push_suscripciones WHERE id_usuario = ?", [id]))[0][0].n, 1);
+  assert.equal((await api("POST", "/app-socio/push/cancelar", { endpoint: sub.endpoint }, t)).s, 200);
+  assert.equal((await pool.query("SELECT COUNT(*) AS n FROM push_suscripciones WHERE id_usuario = ?", [id]))[0][0].n, 0);
+
+  assert.equal((await api("PUT", "/configuracion/funciones", { app_socio: false, reportes_supervisor: false }, ids.tSuper)).s, 200);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

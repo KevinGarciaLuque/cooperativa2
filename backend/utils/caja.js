@@ -9,7 +9,8 @@ const { contabilizar, registrarCambio, conSalvaguarda } = require("./contabilida
 const { evaluarMovimiento } = require("./cumplimiento");
 const { sucursalOperacion } = require("./sucursal");
 
-const METODOS = ["efectivo", "transferencia", "cheque", "deposito"];
+// debito_ahorro: el socio pagó desde su cuenta de ahorro en la app (no pasa por la caja física)
+const METODOS = ["efectivo", "transferencia", "cheque", "deposito", "debito_ahorro"];
 
 const normalizarMetodo = (m) => {
   const v = String(m || "efectivo").toLowerCase();

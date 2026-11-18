@@ -8,10 +8,12 @@ import { useAuth } from "../context/AuthContext";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 let cache = null;
 let pedido = null;
+let deToken = null; // la caché es de una sesión: otro usuario en el mismo navegador vuelve a pedirla
 
 export const olvidarFunciones = () => {
   cache = null;
   pedido = null;
+  deToken = null;
 };
 
 export function useFunciones() {
@@ -19,6 +21,8 @@ export function useFunciones() {
   const [funciones, setFunciones] = useState(cache || {});
   useEffect(() => {
     if (!token) return;
+    if (deToken !== token) olvidarFunciones();
+    deToken = token;
     if (cache) {
       setFunciones(cache);
       return;

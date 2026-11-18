@@ -40,6 +40,13 @@ cargarArranque(API_URL).finally(() => {
   );
 });
 
+// El navegador avisa cuando la app se puede instalar: se guarda para ofrecerlo con un botón
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  window.__instalarApp = e;
+  window.dispatchEvent(new Event("app-instalable"));
+});
+
 // Permite instalar la aplicación en el celular (solo en producción)
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {

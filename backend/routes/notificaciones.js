@@ -2,11 +2,25 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { recordatoriosSocio, pendientesPersonal } = require("../utils/avisos");
+
+// GET /api/notificaciones/personal → pendientes del personal según los módulos de su rol
+router.get("/personal", async (req, res) => {
+  try {
+    if (req.usuario.rol === "Socio") return res.status(403).json({ message: "Solo para el personal" });
+    res.json({ success: true, ...(await pendientesPersonal(req)) });
+  } catch (error) {
+    console.error("ERROR AL CALCULAR PENDIENTES:", error);
+    res.status(500).json({ message: "No se pudieron cargar los pendientes" });
+  }
+});
 
 // GET /api/notificaciones  → las últimas 30 y cuántas faltan por leer
 router.get("/", async (req, res) => {
   try {
     const id = req.usuario.id_usuario;
+    // Recordatorios de cuotas y plazos fijos (se generan una sola vez por cuota)
+    if (req.usuario.rol === "Socio") await recordatoriosSocio(id);
     const [rows] = await pool.query(
       `SELECT id_notificacion, tipo, titulo, mensaje, id_recibo, leida, creada_en
        FROM notificaciones WHERE id_usuario = ? ORDER BY id_notificacion DESC LIMIT 30`,

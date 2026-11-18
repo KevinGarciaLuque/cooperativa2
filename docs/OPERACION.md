@@ -314,3 +314,10 @@ Se recomienda un ambiente de ensayo separado del de producción:
 - [ ] Respaldo descargado fuera del servidor esta semana.
 - [ ] Prueba de restauración hecha este mes.
 - [ ] Usuarios que ya no trabajan en la cooperativa, desactivados.
+
+## Campanita, próximos pagos y carrusel de pestañas
+
+- **Socio — Próximos pagos:** en *Resumen* aparece la tarjeta "Próximos pagos" con las cuotas atrasadas y las siguientes de cada préstamo (fecha, monto y cuántos días faltan). Cada préstamo muestra también su "Próxima cuota".
+- **Socio — recordatorios en la campanita:** 3 días antes de que venza una cuota llega "tu cuota vence el …"; si la cuota se atrasa, un aviso de mora; y 7 días antes de que venza un depósito a plazo, un aviso. Cada recordatorio llega una sola vez.
+- **Personal — campanita en la barra superior:** muestra lo que espera atención según los módulos del rol: socios y solicitudes por aprobar, pagos reportados, comprobantes firmados, préstamos por desembolsar, votos pendientes del comité, cuotas que vencen hoy o en 3 días, préstamos atrasados, promesas de pago incumplidas, plazos fijos por vencer, alertas de cumplimiento y turno de caja sin cerrar. Al tocar un aviso se abre su pantalla. El número rojo cuenta solo lo nuevo desde la última vez que se abrió.
+- **Celular:** las pestañas del portal del socio se desplazan solas como carrusel; se detienen al tocarlas (o con el mouse encima) y se pueden deslizar con el dedo.

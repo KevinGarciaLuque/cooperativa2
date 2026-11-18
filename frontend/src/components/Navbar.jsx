@@ -9,6 +9,7 @@ import {
 } from "react-icons/fa";
 import LogoCoop from "./LogoCoop";
 import SelectorSucursal from "./SelectorSucursal";
+import NotificacionesPersonal from "./NotificacionesPersonal";
 import { useAuth } from "../context/AuthContext";
 import { useConfigSitio } from "../hooks/useConfigSitio";
 
@@ -248,6 +249,35 @@ export default function Navbar({ user, onLogout, onMenuClick }) {
           background: rgba(255,255,255,0.13);
           border-color: ${ACCENT}88;
         }
+        .campana-btn {
+          position: relative; width: 40px; height: 40px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          background: rgba(255,255,255,0.08); border: 1.5px solid rgba(255,255,255,0.18);
+          color: #fff; transition: background .15s, border-color .15s;
+        }
+        .campana-btn:hover, .campana-btn[aria-expanded="true"] { background: rgba(168,205,58,0.18); border-color: ${ACCENT}; }
+        .campana-num {
+          position: absolute; top: -5px; right: -5px; min-width: 19px; height: 19px; padding: 0 5px;
+          border-radius: 10px; background: #ef4444; color: #fff; font-size: .68rem; font-weight: 700;
+          display: flex; align-items: center; justify-content: center; border: 2px solid ${NAVBAR_BG};
+        }
+        .campana-panel {
+          position: absolute; right: -8px; top: 50px; width: min(380px, calc(100vw - 24px));
+          background: #fff; border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.28);
+          overflow: hidden; z-index: 1200; border: 1px solid #e2e8f0;
+        }
+        @media (max-width: 575.98px) {
+          .campana-panel { position: fixed; right: 12px; left: 12px; top: 66px; width: auto; }
+        }
+        .campana-cab { display: flex; align-items: baseline; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #1e293b; }
+        .campana-item {
+          width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
+          padding: 10px 14px; background: #fff; border: none; border-bottom: 1px solid #f1f5f9;
+        }
+        .campana-item:hover { background: #f7fbea; }
+        .campana-ico { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .campana-cant { min-width: 28px; padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: .8rem; text-align: center; flex-shrink: 0; }
+        .campana-nuevo { background: #a8cd3a; color: #1a2a00; font-size: .62rem; font-weight: 700; padding: 1px 6px; border-radius: 6px; text-transform: uppercase; }
       `}</style>
 
       <nav
@@ -281,8 +311,11 @@ export default function Navbar({ user, onLogout, onMenuClick }) {
           </Link>
 
           {/* Acciones derecha */}
-          <div className="d-flex align-items-center gap-3">
+          <div className="d-flex align-items-center gap-2 gap-sm-3">
             {user && user.rol !== "Socio" && <SelectorSucursal token={token} />}
+            {user && user.rol !== "Socio" && token && (
+              <NotificacionesPersonal token={token} idUsuario={user.id_usuario} />
+            )}
             {user ? (
               <div ref={refMenu} style={{ position: "relative" }}>
                 <button

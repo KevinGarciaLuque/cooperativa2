@@ -382,12 +382,10 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
         .sidebar-offcanvas .sidebar-link:hover {
           color: #fff !important;
         }
+        /* Pie fijo al final del menú (ya no flota encima de las últimas opciones) */
         .sidebar-footer {
-          position: absolute;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          padding: 14px 16px;
+          flex-shrink: 0;
+          padding: 10px 16px;
           border-top: 1px solid rgba(255,255,255,0.07);
           color: ${TEXT_MUTED};
           font-size: 0.72rem;
@@ -434,7 +432,7 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
         </div>
 
         {/* Navegación */}
-        <div className="sidebar-scroll" style={{ flex: 1, overflowY: "auto", overflowX: "hidden", paddingBottom: 60 }}>
+        <div className="sidebar-scroll" style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", paddingBottom: 12 }}>
           {!collapsed && <div className="sidebar-section-label">Menú principal</div>}
           <nav>
             <ul className="nav flex-column" style={{ padding: "4px 0" }}>

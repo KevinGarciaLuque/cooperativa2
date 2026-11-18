@@ -2443,6 +2443,50 @@ test("roles: recomendados, permisos por acción, solo lectura y segregación de 
   await pool.query("DELETE FROM usuarios WHERE id_usuario IN (?)", [[asesor.id, auditor.id, jefe.id]]);
 });
 
+test("campanita: recordatorio de cuota y mora al socio (una sola vez) y pendientes del personal", async () => {
+  const [u] = await pool.query(
+    `INSERT INTO usuarios (nombre_completo, dni, telefono, correo, password, rol_id, estado, fecha_registro)
+     VALUES ('Socio Campana', '0801000000555', '98765432', 'campana@prueba.hn', 'x', 2, 'activo', NOW())`
+  );
+  const idSocio = u.insertId;
+  const tSocio = tokenDe(idSocio, "Socio", 2);
+  // Primera cuota vence en 2 días
+  const [p] = await pool.query(
+    `INSERT INTO prestamos (id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado)
+     VALUES (?, 1200, 12, 12, 1200, 'activo', DATE_SUB(DATE_ADD(CURDATE(), INTERVAL 2 DAY), INTERVAL 1 MONTH))`,
+    [idSocio]
+  );
+  const idP = p.insertId;
+  const r1 = await api("GET", "/notificaciones", null, tSocio);
+  assert.equal(r1.s, 200);
+  const recordatorio = r1.b.data.filter((n) => n.tipo === "recordatorio");
+  assert.equal(recordatorio.length, 1);
+  assert.match(recordatorio[0].titulo, new RegExp(`Préstamo #${idP}: tu cuota vence el`));
+
+  const { recordatoriosSocio } = require("../../utils/avisos");
+  await recordatoriosSocio(idSocio, { forzar: true });
+  const [[c1]] = await pool.query("SELECT COUNT(*) AS n FROM notificaciones WHERE id_usuario = ? AND tipo = 'recordatorio'", [idSocio]);
+  assert.equal(c1.n, 1, "no se repite el mismo recordatorio");
+
+  // Ahora la cuota quedó atrás: aviso de mora
+  await pool.query("UPDATE prestamos SET fecha_otorgado = DATE_SUB(CURDATE(), INTERVAL 70 DAY) WHERE id_prestamo = ?", [idP]);
+  await recordatoriosSocio(idSocio, { forzar: true });
+  const [[c2]] = await pool.query("SELECT COUNT(*) AS n FROM notificaciones WHERE id_usuario = ? AND tipo = 'mora'", [idSocio]);
+  assert.equal(c2.n, 1);
+
+  // Personal: ve los pendientes de sus módulos; el socio no puede pedirlos
+  assert.equal((await api("GET", "/notificaciones/personal", null, tSocio)).s, 403);
+  const per = await api("GET", "/notificaciones/personal", null, ids.tAdmin);
+  assert.equal(per.s, 200, per.b?.message);
+  const mora = per.b.items.find((i) => i.clave === "prestamos_mora");
+  assert.ok(mora && mora.cantidad >= 1, "aparece el préstamo atrasado");
+  assert.equal(mora.ruta, "/cobranza");
+  assert.equal(per.b.total, per.b.items.reduce((t, i) => t + i.cantidad, 0));
+
+  await pool.query("UPDATE prestamos SET estado = 'rechazado' WHERE id_prestamo = ?", [idP]);
+  await pool.query("DELETE FROM notificaciones WHERE id_usuario = ?", [idSocio]);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

@@ -14,6 +14,8 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { numeroSocio } from "../../utils/numeroSocio";
 import PlanPagos from "../../components/PlanPagos";
+import ProximosPagos, { etiquetaVencimiento } from "../../components/ProximosPagos";
+import TabsCarrusel from "../../components/TabsCarrusel";
 import {
   FaUserCircle,
   FaMoneyBillWave,
@@ -86,6 +88,7 @@ export default function SocioPerfil() {
   const [prestamos, setPrestamos]       = useState([]);
   const [ultimoPagoFecha, setUltimoPagoFecha] = useState(null); // último pago a préstamos
   const [moras, setMoras] = useState({}); // id_prestamo -> { dias, mora, porDia }
+  const [proximas, setProximas] = useState({}); // id_prestamo -> { lista: próximas cuotas, total }
   const [entregas, setEntregas] = useState({}); // id_prestamo -> { id_recibo, firmado }
   const [reciboEntrega, setReciboEntrega] = useState(null);
   const [reciboVer, setReciboVer] = useState(null);
@@ -136,6 +139,26 @@ export default function SocioPerfil() {
         </div>
       </div>
     ) : null;
+
+  // Próxima cuota del préstamo (la primera sin pagar del plan)
+  const ProximaCuota = ({ info }) => {
+    const c = info?.lista?.[0];
+    if (!c) return null;
+    const e = etiquetaVencimiento(c.fecha);
+    return (
+      <div
+        className="rounded-3 p-2 px-3 mt-2 d-flex align-items-center justify-content-between gap-2 flex-wrap"
+        style={{ background: "#f5f3ff", border: "1px solid #ddd6fe" }}
+      >
+        <div className="small" style={{ color: "#4c1d95" }}>
+          <FaCalendarAlt className="me-1" />
+          {c.estado === "vencida" ? "Cuota pendiente del" : "Próxima cuota:"}{" "}
+          <strong>{c.fecha.split("-").reverse().join("/")}</strong> · {simboloMoneda()} {fmt(c.monto)}
+        </div>
+        <span className="badge rounded-pill" style={{ background: e.fondo, color: e.color, fontWeight: 600 }}>{e.texto}</span>
+      </div>
+    );
+  };
 
   const handleFotoChange = async (e) => {
     const file = e.target.files[0];
@@ -224,25 +247,50 @@ export default function SocioPerfil() {
           ["activo", "mora"].includes((p.estado || "").toLowerCase())
         );
         const moraMap = {};
+        const proxMap = {};
         await Promise.all(
           vigentes.map(async (p) => {
-            try {
-              const r = await axios.get(`${API_URL}/pagos/prestamo/${p.id_prestamo}/proximo-pago`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              const pp = r.data.proximo_pago;
-              if (pp && pp.dias_mora > 0) {
-                moraMap[p.id_prestamo] = {
-                  dias: pp.dias_mora,
-                  mora: parseFloat(pp.interes_moratorio || 0),
-                  porDia: parseFloat(pp.mora_por_dia || 0),
-                };
-              }
-            } catch {
-              // sin datos de mora para este préstamo
+            const [rPago, rPlan] = await Promise.all([
+              axios
+                .get(`${API_URL}/pagos/prestamo/${p.id_prestamo}/proximo-pago`, { headers: { Authorization: `Bearer ${token}` } })
+                .catch(() => null),
+              axios
+                .get(`${API_URL}/prestamos/${p.id_prestamo}/plan`, { headers: { Authorization: `Bearer ${token}` } })
+                .catch(() => null),
+            ]);
+            const pp = rPago?.data?.proximo_pago;
+            if (pp && pp.dias_mora > 0) {
+              moraMap[p.id_prestamo] = {
+                dias: pp.dias_mora,
+                mora: parseFloat(pp.interes_moratorio || 0),
+                porDia: parseFloat(pp.mora_por_dia || 0),
+              };
+            }
+            // Próximas cuotas: las atrasadas y las 3 siguientes del plan de pagos
+            const plan = rPlan?.data?.plan;
+            if (plan?.length) {
+              const sinPagar = plan.filter((c) => c.estado !== "pagada");
+              const atrasadas = sinPagar.filter((c) => c.estado === "vencida");
+              const siguientes = sinPagar.filter((c) => c.estado !== "vencida").slice(0, atrasadas.length ? 1 : 3);
+              proxMap[p.id_prestamo] = {
+                total: plan.length,
+                lista: [...atrasadas, ...siguientes].map((c) => ({
+                  numero: c.numero,
+                  fecha: String(c.fecha_vencimiento).substring(0, 10),
+                  monto: parseFloat(c.cuota || 0),
+                  estado: c.estado,
+                })),
+              };
+            } else if (pp?.fecha_vencimiento) {
+              // Plazo indefinido: se paga el interés cada mes
+              proxMap[p.id_prestamo] = {
+                total: null,
+                lista: [{ numero: null, fecha: pp.fecha_vencimiento, monto: parseFloat(pp.cuota_mensual || 0), estado: pp.dias_mora > 0 ? "vencida" : "pendiente" }],
+              };
             }
           })
         );
+        setProximas(proxMap);
         setMoras(moraMap);
 
         // Comprobantes de entrega (desembolso) y si ya están firmados
@@ -338,8 +386,15 @@ export default function SocioPerfil() {
         .sp-tab-btn:hover { background: #e5f0d6; color: ${AZUL}; }
         .sp-tab-btn.active { background: ${VERDE}; color: #1a2a00; font-weight: 700; box-shadow: 0 2px 8px #a8cd3a55; }
         /* Móvil: pestañas con desplazamiento horizontal y tarjetas más compactas */
+        .sp-tabs { display: inline-flex; max-width: 100%; }
+        .sp-tabs-juego { display: flex; flex-wrap: wrap; gap: .5rem; }
         @media (max-width: 575.98px) {
-          .sp-tabs { flex-wrap: nowrap !important; overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; }
+          .sp-tabs { display: flex; gap: .5rem; overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch;
+            scrollbar-width: none; overscroll-behavior-x: contain; }
+          .sp-tabs::-webkit-scrollbar { display: none; }
+          .sp-tabs-juego { flex-wrap: nowrap; flex: 0 0 auto; }
+          .sp-tabs-carrusel { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+            mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); }
           .sp-tab-btn { padding: .5rem .9rem; font-size: .88rem; white-space: nowrap; flex: 0 0 auto; }
           .sp-table thead th, .sp-table tbody td { padding: .55rem .6rem; font-size: .8rem; }
         }
@@ -471,18 +526,7 @@ export default function SocioPerfil() {
           </div>
 
           {/* ===== TABS ===== */}
-          <div className="sp-tabs d-flex gap-2 flex-wrap mb-4 p-1"
-            style={{ background: "#fff", borderRadius: "2rem", display: "inline-flex", boxShadow: "0 2px 8px #0000000d" }}>
-            {tabs.map((t) => (
-              <button
-                key={t.key}
-                className={`sp-tab-btn ${tab === t.key ? "active" : ""}`}
-                onClick={() => setTab(t.key)}
-              >
-                {t.icon} {t.label}
-              </button>
-            ))}
-          </div>
+          <TabsCarrusel tabs={tabs} activo={tab} onCambiar={setTab} />
 
           {/* ===== MENSAJES ===== */}
           {msg && (
@@ -603,6 +647,17 @@ export default function SocioPerfil() {
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+              {/* Próximos pagos: siempre arriba, es lo primero que el socio necesita saber */}
+              {Object.keys(proximas).length > 0 && (
+                <div className="col-12" style={{ order: 0 }}>
+                  <ProximosPagos
+                    prestamos={prestamos}
+                    cuotas={proximas}
+                    loading={loading}
+                    onVerPlan={() => setTab("prestamos")}
+                  />
                 </div>
               )}
               {/* Cuentas */}
@@ -746,6 +801,7 @@ export default function SocioPerfil() {
                                   <div className="sp-progress-fill" style={{ width: `${progreso}%` }} />
                                 </div>
                                 <div className="small text-muted mt-1 text-end">{progreso.toFixed(0)}% pagado</div>
+                                <ProximaCuota info={proximas[p.id_prestamo]} />
                                 <AvisoMora mora={moras[p.id_prestamo]} />
                               </div>
                             </div>
@@ -897,6 +953,7 @@ export default function SocioPerfil() {
                         </div>
                       </div>
 
+                      <ProximaCuota info={proximas[p.id_prestamo]} />
                       <AvisoMora mora={moras[p.id_prestamo]} />
                       <div className="mb-2" />
 

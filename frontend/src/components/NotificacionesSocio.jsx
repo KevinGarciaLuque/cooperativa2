@@ -10,6 +10,8 @@ import {
   FaHandHoldingUsd,
   FaInfoCircle,
   FaReceipt,
+  FaCalendarAlt,
+  FaExclamationTriangle,
 } from "react-icons/fa";
 import { localeApp } from "../utils/pais";
 
@@ -21,6 +23,8 @@ const ICONOS = {
   aportacion: [<FaPiggyBank key="i" />, "#2563eb", "#dbeafe"],
   prestamo: [<FaHandHoldingUsd key="i" />, "#d97706", "#fef3c7"],
   aviso: [<FaInfoCircle key="i" />, "#475569", "#e2e8f0"],
+  recordatorio: [<FaCalendarAlt key="i" />, "#7c3aed", "#ede9fe"],
+  mora: [<FaExclamationTriangle key="i" />, "#dc2626", "#fee2e2"],
 };
 
 // "hace 5 min", "ayer", "12 oct"

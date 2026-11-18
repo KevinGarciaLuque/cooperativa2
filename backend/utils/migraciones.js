@@ -1196,6 +1196,30 @@ const MIGRACIONES = [
       }
     },
   },
+  {
+    id: "2026_11_020_permisos_por_accion",
+    descripcion: "Permisos por acción, roles de solo lectura y quién registró cada crédito",
+    async up(conn) {
+      const agregar = async (tabla, nombre, def) => {
+        const [[e]] = await conn.query(
+          `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+          [tabla, nombre]
+        );
+        if (!e.n) await conn.query(`ALTER TABLE ${tabla} ADD COLUMN ${nombre} ${def}`);
+      };
+      await agregar("roles", "solo_lectura", "TINYINT(1) NOT NULL DEFAULT 0");
+      await agregar("prestamos", "creado_por", "INT NULL");
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS permisos_acciones (
+          rol_id INT NOT NULL,
+          accion VARCHAR(40) NOT NULL,
+          activo TINYINT(1) NOT NULL DEFAULT 1,
+          PRIMARY KEY (rol_id, accion)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

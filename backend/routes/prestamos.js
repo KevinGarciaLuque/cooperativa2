@@ -432,6 +432,7 @@ router.post("/solicitar", async (req, res) => {
     );
 
     const nuevoPrestamoId = result.insertId;
+    await connection.query("UPDATE prestamos SET creado_por = ? WHERE id_prestamo = ?", [req.usuario?.id_usuario || id_usuario, nuevoPrestamoId]);
 
     // Registrar en bitácora
     await connection.query(
@@ -1039,6 +1040,7 @@ router.post("/", async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id_usuario, montoNum, tasaNum, tipoTasaGuardar, tasaOriginalGuardar, plazoNum, montoNum, estadoPrestamo, fechaOtorgado, producto?.id_producto || null]
     );
+    await connection.query("UPDATE prestamos SET creado_por = ? WHERE id_prestamo = ?", [req.usuario?.id_usuario || null, result.insertId]);
     if (ampliados && Object.values(ampliados).some((v) => v != null)) {
       await connection.query(
         `UPDATE prestamos SET linea_credito = ?, destino = ?, id_promotor = ?, numero_pagare = ?, numero_acta = ?, numero_cheque = ?,

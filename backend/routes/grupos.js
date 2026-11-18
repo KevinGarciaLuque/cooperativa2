@@ -293,11 +293,12 @@ router.post("/:id(\\d+)/creditos", async (req, res) => {
     for (const m of montos) {
       await conn.query(
         `INSERT INTO prestamos (id_usuario, monto, tasa_interes, tipo_tasa, tasa_original, plazo_meses, saldo_restante, estado,
-                                fecha_otorgado, id_producto, id_credito_grupal, linea_credito, destino, id_promotor, numero_pagare, numero_acta)
-         VALUES (?, ?, ?, 'nominal_mensual', ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?, ?, ?)`,
+                                fecha_otorgado, id_producto, id_credito_grupal, linea_credito, destino, id_promotor, numero_pagare, numero_acta, creado_por)
+         VALUES (?, ?, ?, 'nominal_mensual', ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           m.id_usuario, m.monto, parseFloat((tasa * 12).toFixed(4)), tasa, plazo, m.monto, fecha, producto, idCredito,
           texto(b.linea_credito, 50), texto(b.destino, 150), g.id_promotor, texto(b.numero_pagare, 30), texto(b.numero_acta, 30),
+          req.usuario.id_usuario,
         ]
       );
     }

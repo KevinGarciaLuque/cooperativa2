@@ -112,6 +112,7 @@ const insertarSolicitud = async (conn, idUsuario, d) => {
      VALUES (?, ?, ?, 'nominal_mensual', ?, ?, ?, 'pendiente', ?)`,
     [idUsuario, d.monto, tasaAnual, tasaMensual, d.plazo, d.monto, d.producto?.id_producto || null]
   );
+  await conn.query("UPDATE prestamos SET creado_por = ? WHERE id_prestamo = ?", [idUsuario, pr.insertId]);
 
   await conn.query(
     `INSERT INTO solicitudes_prestamo

@@ -2384,6 +2384,65 @@ test("frecuencia de pago por producto: cuotas semanales y quincenales con su int
   }
 });
 
+test("roles: recomendados, permisos por acción, solo lectura y segregación de funciones", async () => {
+  // Roles recomendados (solo el Super Administrador)
+  assert.equal((await api("POST", "/permisos/roles-recomendados", {}, ids.tAdmin)).s, 403);
+  const rec = await api("POST", "/permisos/roles-recomendados", {}, ids.tSuper);
+  assert.equal(rec.s, 200, rec.b?.message);
+  assert.ok(rec.b.creados.includes("Cajero") && rec.b.creados.includes("Auditor"));
+  const rolDe = async (n) => (await pool.query("SELECT id_rol FROM roles WHERE nombre = ?", [n]))[0][0].id_rol;
+  const usuario = async (nombre, dni, rol) => {
+    const [r] = await pool.query(
+      `INSERT INTO usuarios (nombre_completo, dni, telefono, correo, password, rol_id, estado, fecha_registro) VALUES (?, ?, '98765432', ?, 'x', ?, 'activo', NOW())`,
+      [nombre, dni, `${dni}@prueba.hn`, await rolDe(rol)]
+    );
+    return { id: r.insertId, t: tokenDe(r.insertId, rol, await rolDe(rol)) };
+  };
+  const asesor = await usuario("Asesor Prueba", "0801000000201", "Asesor de Crédito");
+  const auditor = await usuario("Auditor Prueba", "0801000000202", "Auditor");
+  const jefe = await usuario("Jefe Prueba", "0801000000203", "Jefe de Agencia");
+  const acc = await api("GET", `/permisos/${await rolDe("Cajero")}/acciones`, null, ids.tSuper);
+  assert.equal(acc.b.acciones["pagos.registrar"], true);
+  assert.equal(acc.b.acciones["pagos.anular"], false);
+
+  // Apagada: nadie pierde nada
+  const nuevo = (t) => api("POST", "/prestamos", { id_usuario: ids.socio, monto: 1000, tasa_interes: 24, plazo_meses: 6 }, t);
+  const idDe = (r) => r.b.id_prestamo || r.b.data?.id_prestamo || r.b.prestamo?.id_prestamo;
+  const p0 = await nuevo(ids.tAdmin);
+  assert.equal(p0.s, 201);
+
+  // Encendida: el asesor registra pero no aprueba; el auditor solo consulta
+  assert.equal((await api("PUT", "/configuracion/funciones", { permisos_por_accion: true }, ids.tSuper)).s, 200);
+  const pa = await nuevo(asesor.t);
+  assert.equal(pa.s, 201, pa.b?.message);
+  const noAprueba = await api("PATCH", `/prestamos/${idDe(pa)}/aprobar`, {}, asesor.t);
+  assert.equal(noAprueba.s, 403);
+  assert.match(noAprueba.b.message, /aprobar créditos/);
+  assert.equal((await api("GET", "/prestamos", null, auditor.t)).s, 200);
+  const audita = await nuevo(auditor.t);
+  assert.equal(audita.s, 403);
+  assert.match(audita.b.message, /solo lectura/);
+  assert.equal((await api("PATCH", `/prestamos/${idDe(pa)}/aprobar`, {}, ids.tAdmin)).s, 200, "rol sin configurar conserva todo");
+
+  // Segregación: quien registró no aprueba ni anula lo suyo
+  assert.equal((await api("PUT", "/configuracion/funciones", { segregacion_funciones: true }, ids.tSuper)).s, 200);
+  const p1 = await nuevo(ids.tAdmin);
+  const propio = await api("PATCH", `/prestamos/${idDe(p1)}/aprobar`, {}, ids.tAdmin);
+  assert.equal(propio.s, 403);
+  assert.match(propio.b.message, /segregación/);
+  assert.equal((await api("PATCH", `/prestamos/${idDe(p1)}/aprobar`, {}, jefe.t)).s, 200, "otra persona sí");
+  assert.equal((await api("POST", `/prestamos/${idDe(p1)}/desembolsar`, { metodo: "efectivo" }, jefe.t)).s, 200);
+  const pago = await api("POST", "/pagos", { id_prestamo: idDe(p1), monto_pagado: 100, metodo_pago: "efectivo" }, ids.tAdmin);
+  assert.equal(pago.s, 201, pago.b?.message);
+  assert.equal((await api("DELETE", `/pagos/${pago.b.id_pago}`, { motivo: "Prueba" }, ids.tAdmin)).s, 403);
+  assert.equal((await api("DELETE", `/pagos/${pago.b.id_pago}`, { motivo: "Prueba de segregación" }, jefe.t)).s, 200);
+
+  // Limpieza
+  assert.equal((await api("PUT", "/configuracion/funciones", { permisos_por_accion: false, segregacion_funciones: false }, ids.tSuper)).s, 200);
+  await pool.query("UPDATE prestamos SET estado = 'rechazado' WHERE id_prestamo IN (?)", [[idDe(p0), idDe(pa), idDe(p1)]]);
+  await pool.query("DELETE FROM usuarios WHERE id_usuario IN (?)", [[asesor.id, auditor.id, jefe.id]]);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

@@ -215,6 +215,13 @@ El catálogo base está en `backend/utils/contabilidad.js`; el contador puede ag
   última ajusta); cargo automático en cada pago (monto fijo o %, con su concepto: entra a caja aparte). Todo
   se copia al préstamo al desembolsarlo: los préstamos ya entregados no cambian. Además, el código de los
   créditos con formato propio (por ejemplo {prod}-{aa}-{n}) y fecha de recepción y n.º de solicitud.
+- **Permisos por acción y roles recomendados** (Control de Accesos → Acciones del rol): además de los
+  módulos, a cada rol se le quitan acciones (aprobar, desembolsar, anular pagos, condonar, etc.). Un rol
+  sin configurar conserva todo. "Solo lectura" (auditor, junta de vigilancia) consulta todo sin cambiar
+  nada. "Crear roles recomendados" agrega Gerente General, Jefe de Agencia, Cajero, Asesor de Crédito,
+  Gestor de Cobranza, Oficial de Cumplimiento, Atención al Socio y Auditor con sus permisos.
+- **Segregación de funciones**: quien registra un crédito no lo aprueba ni lo desembolsa; quien registra un
+  pago, depósito o aportación no lo anula ni lo corrige. El Super Administrador queda fuera de esta regla.
 - **Reportes ampliados** (menú "Reportes de cartera"): proyección de cobros, créditos vencidos, pendientes de
   cerrar, cerrados, cartera agrupada (promotor, línea, municipio, sucursal, producto, individual/grupal) e
   historial crediticio de un socio; en pantalla y en Excel, por sucursal.

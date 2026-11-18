@@ -295,4 +295,6 @@ const guardiaApi = async (req, res, next) => {
 // Fuerza que el cambio de estado de un usuario se vea de inmediato
 const invalidarEstado = (idUsuario) => cacheEstado.delete(idUsuario);
 
-module.exports = { guardiaApi, limpiarRespuestas, invalidarEstado };
+const invalidarPermisos = () => cachePermisos.clear();
+
+module.exports = { guardiaApi, limpiarRespuestas, invalidarEstado, invalidarPermisos };

@@ -158,6 +158,7 @@ router.post("/", soloSuperAdmin, async (req, res) => {
       [socio.id_usuario, c.monto_nuevo, redondear(c.tasa_mensual * 12), c.tasa_mensual, c.plazo_meses, c.monto_nuevo, req.usuario.id_usuario]
     );
     const idNuevo = nuevo.insertId;
+    await connection.query("UPDATE prestamos SET creado_por = ? WHERE id_prestamo = ?", [req.usuario.id_usuario, idNuevo]);
 
     // Los préstamos anteriores quedan consolidados, con su historial intacto
     await connection.query(

@@ -30,6 +30,16 @@ const CATALOGO = [
     descripcion: "Por producto: mora y días de gracia propios, cargos automáticos (seguro, gastos), redondeo de cuota; código del crédito con formato propio.",
   },
   {
+    clave: "permisos_por_accion",
+    nombre: "Permisos por acción y roles recomendados",
+    descripcion: "Quitar a un rol acciones como aprobar, desembolsar o anular; roles de solo lectura (auditor); crear los roles recomendados.",
+  },
+  {
+    clave: "segregacion_funciones",
+    nombre: "Segregación de funciones",
+    descripcion: "Quien registra un crédito no lo aprueba ni lo desembolsa; quien registra un pago o depósito no lo anula ni lo corrige.",
+  },
+  {
     clave: "reportes_ampliados",
     nombre: "Reportes ampliados",
     descripcion: "Historial crediticio, proyección de cobros, créditos vencidos, por cerrar y cerrados, por promotor y línea.",

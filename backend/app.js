@@ -169,6 +169,7 @@ if (!enPruebas) {
 app.use("/api", limpiarRespuestas);
 app.use("/api", guardiaApi);
 app.use("/api", require("./middleware/turnoCaja").exigirTurno);
+app.use("/api", require("./middleware/acciones").controlAcciones);
 
 // Rutas principales
 app.use("/api/usuarios", require("./routes/usuarios"));

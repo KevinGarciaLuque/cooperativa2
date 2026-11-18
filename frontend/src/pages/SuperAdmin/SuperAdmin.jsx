@@ -13,6 +13,7 @@ import {
 } from "react-icons/fa";
 
 import PanelFunciones from "../../components/PanelFunciones";
+import AccionesRol from "../../components/AccionesRol";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -373,6 +374,7 @@ export default function SuperAdmin() {
         </div>
       </div>
 
+      <AccionesRol token={token} rol={rolSeleccionado} mostrarAlerta={mostrarAlerta} onRolesCreados={() => cargarDatos()} />
       <PanelFunciones token={token} mostrarAlerta={mostrarAlerta} />
     </div>
   );

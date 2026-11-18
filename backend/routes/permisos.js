@@ -80,6 +80,78 @@ router.get("/todos/roles", verificarToken, soloSuperAdmin, async (req, res) => {
 // GET /api/permisos/:rol_id
 // Obtiene los permisos de un rol específico
 // ============================================================
+// ── Permisos por acción (función "permisos_por_accion") ─────────────────────
+const acciones = require("../utils/acciones");
+
+// GET /api/permisos/acciones/catalogo
+router.get("/acciones/catalogo", verificarToken, soloSuperAdmin, (req, res) => {
+  res.json({ success: true, data: acciones.ACCIONES, recomendados: acciones.ROLES_RECOMENDADOS.map((r) => ({ nombre: r.nombre, descripcion: r.descripcion })) });
+});
+
+// GET /api/permisos/:rol_id/acciones → { solo_lectura, acciones: { clave: true|false } } (sin configurar = true)
+router.get("/:rol_id/acciones", verificarToken, soloSuperAdmin, async (req, res) => {
+  const d = await acciones.datosDelRol(parseInt(req.params.rol_id));
+  res.json({
+    success: true,
+    solo_lectura: d.solo_lectura,
+    acciones: Object.fromEntries(acciones.ACCIONES.map((a) => [a.clave, d.acciones[a.clave] !== false])),
+  });
+});
+
+// PUT /api/permisos/:rol_id/acciones  { solo_lectura, acciones: { clave: bool } }
+router.put("/:rol_id/acciones", verificarToken, soloSuperAdmin, async (req, res) => {
+  try {
+    const rolId = parseInt(req.params.rol_id);
+    const [[rol]] = await pool.query("SELECT nombre FROM roles WHERE id_rol = ?", [rolId]);
+    if (!rol) return res.status(404).json({ message: "Rol no encontrado" });
+    if (["Super Administrador", "Socio"].includes(rol.nombre)) {
+      return res.status(400).json({ message: "Ese rol no usa permisos por acción." });
+    }
+    await pool.query("UPDATE roles SET solo_lectura = ? WHERE id_rol = ?", [req.body?.solo_lectura ? 1 : 0, rolId]);
+    for (const [clave, valor] of Object.entries(req.body?.acciones || {})) {
+      if (!acciones.CLAVES.has(clave)) continue;
+      await pool.query(
+        "INSERT INTO permisos_acciones (rol_id, accion, activo) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE activo = VALUES(activo)",
+        [rolId, clave, valor ? 1 : 0]
+      );
+    }
+    acciones.olvidarRol(rolId);
+    await pool.query("INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())", [
+      req.usuario.id_usuario,
+      "Permisos por acción",
+      `Rol ${rol.nombre}: ${req.body?.solo_lectura ? "solo lectura; " : ""}${Object.entries(req.body?.acciones || {}).filter(([, v]) => !v).map(([k]) => k).join(", ") || "todas las acciones"}${Object.values(req.body?.acciones || {}).some((v) => !v) ? " quitadas" : ""}`,
+    ]);
+    res.json({ success: true, message: "Permisos del rol guardados." });
+  } catch (error) {
+    console.error("ERROR AL GUARDAR ACCIONES:", error);
+    res.status(500).json({ message: "No se pudieron guardar los permisos" });
+  }
+});
+
+// POST /api/permisos/roles-recomendados → crea los roles que falten con sus permisos
+router.post("/roles-recomendados", verificarToken, soloSuperAdmin, async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const creados = await acciones.crearRolesRecomendados(conn);
+    await conn.query("INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())", [
+      req.usuario.id_usuario,
+      "Roles recomendados",
+      creados.length ? `Creados: ${creados.join(", ")}` : "Ya existían; se actualizó el Contador",
+    ]);
+    await conn.commit();
+    require("../middleware/seguridad").invalidarPermisos();
+    acciones.olvidarRol();
+    res.json({ success: true, creados, message: creados.length ? `Roles creados: ${creados.join(", ")}.` : "Los roles recomendados ya existían." });
+  } catch (error) {
+    await conn.rollback().catch(() => {});
+    console.error("ERROR AL CREAR ROLES:", error);
+    res.status(500).json({ message: "No se pudieron crear los roles" });
+  } finally {
+    conn.release();
+  }
+});
+
 router.get("/:rol_id", verificarToken, async (req, res) => {
   const { rol_id } = req.params;
 

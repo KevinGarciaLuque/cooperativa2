@@ -197,7 +197,16 @@ El catálogo base está en `backend/utils/contabilidad.js`; el contador puede ag
   desembolsan a todos desde el crédito. El **pago grupal** registra lo que paga cada integrante en una sola
   operación: si uno no es válido, no se registra ninguno; cada pago entra a caja, a contabilidad y emite su
   recibo. No se puede sacar del grupo a quien tiene un crédito grupal vigente.
-- Próximamente: pagos ampliados, contrato en Word y reportes ampliados.
+- **Pagos ampliados** (menú "Pago rápido"): número de boleta, lugar de pago y otros cargos (seguro, gastos
+  administrativos) al registrar un pago; los otros cargos entran a caja aparte, no rebajan el préstamo y se
+  devuelven si se anula el pago. **Pago rápido**: todos los préstamos de un socio en una sola operación (todo o
+  nada). **Conciliación de boletas**: marcar como conciliados los pagos por depósito, transferencia o cheque.
+- **Contrato y pagaré en Word**: botones en el detalle del préstamo. Las plantillas están en Productos de
+  crédito (Super Administrador): se bajan, se editan en Word con marcadores como {socio_nombre} o
+  {monto_letras} y se suben; el sistema las prueba antes de guardarlas.
+- **Reportes ampliados** (menú "Reportes de cartera"): proyección de cobros, créditos vencidos, pendientes de
+  cerrar, cerrados, cartera agrupada (promotor, línea, municipio, sucursal, producto, individual/grupal) e
+  historial crediticio de un socio; en pantalla y en Excel, por sucursal.
 
 ## Varias sucursales
 

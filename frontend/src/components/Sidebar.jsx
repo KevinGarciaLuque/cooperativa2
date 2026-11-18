@@ -34,6 +34,7 @@ import {
   FaUserSecret,
   FaGavel,
   FaBolt,
+  FaChartBar,
 } from "react-icons/fa";
 import LogoCoop from "./LogoCoop";
 import { useFunciones } from "../hooks/useFunciones";
@@ -68,6 +69,7 @@ const TODOS_MODULOS = [
   { key: "pagos",         to: "/pagos-ampliados", icon: <FaBolt />,        label: "Pago rápido", funcion: "pagos_ampliados" },
   { key: "pagos",         to: "/pagos",         icon: <FaMoneyCheckAlt />,  label: "Pagos" },
   { key: "movimientos",   to: "/movimientos",   icon: <FaExchangeAlt />,    label: "Movimientos" },
+  { key: "reportes",      to: "/reportes-cartera", icon: <FaChartBar />,   label: "Reportes de cartera", funcion: "reportes_ampliados" },
   { key: "reportes",      to: "/reportes",      icon: <FaFileAlt />,        label: "Reportes" },
   { key: "actividades",   to: "/actividades",   icon: <FaTasks />,          label: "Actividades" },
   { key: "liquidaciones", to: "/liquidaciones", icon: <FaChartPie />,       label: "Liquidaciones" },

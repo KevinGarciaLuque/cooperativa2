@@ -41,6 +41,7 @@ const MODULO_POR_PREFIJO = {
   grupos: "prestamos",
   "pagos-ampliados": "pagos",
   "documentos-credito": "prestamos",
+  "reportes-ampliados": "reportes",
   contabilidad: "contabilidad",
   recibos: "pagos",
   "pagos-reportados": "pagos",

@@ -28,7 +28,6 @@ const CATALOGO = [
     clave: "reportes_ampliados",
     nombre: "Reportes ampliados",
     descripcion: "Historial crediticio, proyección de cobros, créditos vencidos, por cerrar y cerrados, por promotor y línea.",
-    proximamente: true,
   },
 ];
 

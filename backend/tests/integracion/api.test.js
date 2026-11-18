@@ -2214,6 +2214,26 @@ test("contrato y pagaré en Word: plantilla llena con los datos del préstamo y 
   assert.equal((await api("PUT", "/configuracion/funciones", { contratos_word: false }, ids.tSuper)).s, 200);
 });
 
+test("reportes ampliados: historial, proyección, vencidos, por cerrar, cerrados y cartera agrupada", async () => {
+  assert.equal((await api("GET", "/reportes-ampliados/vencidos", null, ids.tAdmin)).s, 403, "apagada");
+  assert.equal((await api("PUT", "/configuracion/funciones", { reportes_ampliados: true }, ids.tSuper)).s, 200);
+  assert.equal((await api("GET", "/reportes-ampliados/historial", null, ids.tAdmin)).s, 400, "pide el socio");
+  const hist = await api("GET", `/reportes-ampliados/historial?id_usuario=${ids.socio}`, null, ids.tAdmin);
+  assert.equal(hist.s, 200, hist.b?.message);
+  assert.ok(hist.b.filas.length > 0);
+  for (const tipo of ["proyeccion", "vencidos", "por_cerrar", "cerrados", "cartera?por=linea", "cartera?por=tipo", "cartera?por=municipio"]) {
+    const r = await api("GET", `/reportes-ampliados/${tipo}`, null, ids.tAdmin);
+    assert.equal(r.s, 200, `${tipo}: ${r.b?.message}`);
+    assert.ok(Array.isArray(r.b.filas) && Array.isArray(r.b.columnas));
+  }
+  const tipo = await api("GET", "/reportes-ampliados/cartera?por=tipo", null, ids.tAdmin);
+  assert.ok(tipo.b.filas.some((f) => ["Individual", "Grupal"].includes(f.grupo)));
+  const xls = await fetch(`${base}/api/reportes-ampliados/proyeccion?formato=excel`, { headers: { Authorization: `Bearer ${ids.tAdmin}` } });
+  assert.equal(xls.status, 200);
+  assert.match(xls.headers.get("content-type"), /spreadsheet/);
+  assert.equal((await api("PUT", "/configuracion/funciones", { reportes_ampliados: false }, ids.tSuper)).s, 200);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

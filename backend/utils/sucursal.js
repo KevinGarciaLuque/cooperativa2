@@ -72,6 +72,37 @@ const deSociosDeSucursal = async (req, columna) => {
   };
 };
 
+// Para pantallas con muchas consultas (dashboard): devuelve una función como pool.query que,
+// con una sucursal elegida, lee las tablas de socios solo con los datos de los socios de esa
+// sucursal. Cada "FROM/JOIN tabla" se cambia por una subconsulta filtrada con el mismo nombre
+// (o alias), así la consulta original no cambia. Los ids van como números (no hay texto del
+// usuario en el SQL). Actividades y liquidaciones son de toda la cooperativa: no se filtran.
+const TABLAS_DE_SOCIOS = ["usuarios", "prestamos", "aportaciones", "cuentas", "pagos_prestamo", "movimientos_cuenta", "liquidacion_socios"];
+const PALABRAS = new Set(["where", "left", "right", "inner", "join", "on", "group", "order", "limit", "having", "cross", "union", "and", "or", "set"]);
+const consultaPorSucursal = async (req, conn = pool) => {
+  const id = parseInt(await sucursalVista(req));
+  if (!id) return (sql, params) => conn.query(sql, params);
+  const principal = parseInt(await sucursalPrincipal()) || 0;
+  const socios = `SELECT su.id_usuario FROM usuarios su WHERE IFNULL(su.id_sucursal, ${principal}) = ${id}`;
+  const sub = {
+    usuarios: `SELECT * FROM usuarios WHERE IFNULL(id_sucursal, ${principal}) = ${id}`,
+    prestamos: `SELECT * FROM prestamos WHERE id_usuario IN (${socios})`,
+    aportaciones: `SELECT * FROM aportaciones WHERE id_usuario IN (${socios})`,
+    cuentas: `SELECT * FROM cuentas WHERE id_usuario IN (${socios})`,
+    liquidacion_socios: `SELECT * FROM liquidacion_socios WHERE id_usuario IN (${socios})`,
+    pagos_prestamo: `SELECT * FROM pagos_prestamo WHERE id_prestamo IN (SELECT sp.id_prestamo FROM prestamos sp WHERE sp.id_usuario IN (${socios}))`,
+    movimientos_cuenta: `SELECT * FROM movimientos_cuenta WHERE id_cuenta IN (SELECT sc.id_cuenta FROM cuentas sc WHERE sc.id_usuario IN (${socios}))`,
+  };
+  const re = new RegExp(`\\b(FROM|JOIN)\\s+(${TABLAS_DE_SOCIOS.join("|")})\\b(\\s+(?:AS\\s+)?([A-Za-z_][A-Za-z0-9_]*))?`, "gi");
+  const reescribir = (sql) =>
+    sql.replace(re, (todo, palabra, tabla, conAlias, alias) => {
+      const t = tabla.toLowerCase();
+      if (alias && !PALABRAS.has(alias.toLowerCase())) return `${palabra} (${sub[t]}) AS ${alias}`;
+      return `${palabra} (${sub[t]}) AS ${tabla}${conAlias || ""}`;
+    });
+  return (sql, params) => conn.query(reescribir(sql), params);
+};
+
 // Condición SQL para la sucursal donde se hizo un movimiento de caja (alias de caja_movimientos)
 const filtroCaja = async (req, alias = "c") => {
   const id = await sucursalVista(req);
@@ -109,5 +140,6 @@ module.exports = {
   filtroSocio,
   filtroCaja,
   deSociosDeSucursal,
+  consultaPorSucursal,
   sucursalOperacion,
 };

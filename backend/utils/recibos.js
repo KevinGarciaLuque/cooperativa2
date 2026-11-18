@@ -1,10 +1,15 @@
 // Emisión de recibos numerados. Se llama dentro de la transacción de la operación.
+const { sucursalOperacion } = require("./sucursal");
+const { turnoAbierto } = require("./caja");
 const crearRecibo = async (conn, r) => {
   try {
+    // Sucursal donde se emite: el turno de quien lo emite, su sucursal, la del socio o la principal
+    const turno = await turnoAbierto(conn, r.emitido_por);
+    const idSucursal = await sucursalOperacion(conn, r.emitido_por, r.id_socio, turno);
     const [res] = await conn.query(
       `INSERT INTO recibos
-         (tipo, referencia_tipo, referencia_id, id_socio, monto, metodo, concepto, detalle, fecha, emitido_por)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, NOW()), ?)`,
+         (tipo, referencia_tipo, referencia_id, id_socio, monto, metodo, concepto, detalle, fecha, emitido_por, id_sucursal)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, NOW()), ?, ?)`,
       [
         r.tipo,
         r.referencia_tipo || null,
@@ -16,6 +21,7 @@ const crearRecibo = async (conn, r) => {
         r.detalle ? JSON.stringify(r.detalle) : null,
         r.fecha || null,
         r.emitido_por || null,
+        idSucursal || null,
       ]
     );
     return res.insertId;

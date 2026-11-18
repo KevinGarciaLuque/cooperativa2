@@ -1013,6 +1013,19 @@ const MIGRACIONES = [
       if (!ic.n) await conn.query("ALTER TABLE caja_movimientos ADD INDEX idx_caja_sucursal (id_sucursal, fecha)");
     },
   },
+  {
+    id: "2026_11_012_recibos_sucursal",
+    descripcion: "Sucursal donde se emitió cada recibo",
+    async up(conn) {
+      const [[e]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recibos' AND COLUMN_NAME = 'id_sucursal'`
+      );
+      if (!e.n) await conn.query("ALTER TABLE recibos ADD COLUMN id_sucursal INT NULL");
+      const [[p]] = await conn.query("SELECT id_sucursal FROM sucursales ORDER BY id_sucursal LIMIT 1");
+      if (p) await conn.query("UPDATE recibos SET id_sucursal = ? WHERE id_sucursal IS NULL", [p.id_sucursal]);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

@@ -27,6 +27,8 @@ const formatear = (r, cooperativa) => {
     anulado: !!r.anulado,
     socio: r.socio_nombre ? { nombre: r.socio_nombre, dni: r.socio_dni, numero: r.socio_numero || null, telefono: r.socio_telefono || null } : null,
     emitido_por: r.emisor_nombre || null,
+    // Solo si la cooperativa tiene más de una sucursal
+    sucursal: r.total_sucursales > 1 ? r.sucursal_nombre || null : null,
     comprobante_firmado: r.firmado_en ? { subido_en: r.firmado_en, revisado: !!r.firmado_revisado_en } : null,
     firma_digital: r.firmado_digital_en ? { firmado_en: r.firmado_digital_en } : null,
     cooperativa,
@@ -62,6 +64,8 @@ const nombreCooperativa = async () => {
 
 const SELECT_RECIBO = `
   SELECT r.*, s.nombre_completo AS socio_nombre, s.dni AS socio_dni, s.numero_socio AS socio_numero, s.telefono AS socio_telefono, e.nombre_completo AS emisor_nombre,
+         (SELECT su.nombre FROM sucursales su WHERE su.id_sucursal = r.id_sucursal) AS sucursal_nombre,
+         (SELECT COUNT(*) FROM sucursales su2 WHERE su2.activa = 1) AS total_sucursales,
          (SELECT MAX(c.subido_en) FROM comprobantes_firmados c WHERE c.id_recibo = r.id_recibo) AS firmado_en,
          (SELECT c.revisado_en FROM comprobantes_firmados c WHERE c.id_recibo = r.id_recibo
             ORDER BY c.id_comprobante DESC LIMIT 1) AS firmado_revisado_en,

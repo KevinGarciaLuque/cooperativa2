@@ -191,12 +191,15 @@ El catálogo base está en `backend/utils/contabilidad.js`; el contador puede ag
 - **Cada socio pertenece a una sucursal** (se elige al registrarse o en Usuarios). Su cartera
   (préstamos, cuentas, aportaciones, solicitudes, cobranza) aparece en las listas de esa sucursal,
   pero **puede pagar y depositar en cualquiera**: buscándolo por nombre, DNI o número se le atiende.
-- **El personal** elige arriba qué sucursal ver ("Todas las sucursales" o una). Listas, dashboard,
-  cobranza, caja y reportes en Excel muestran solo esa sucursal.
+- **El personal** elige arriba qué sucursal ver ("Todas las sucursales" o una). Listas, todo el
+  dashboard (indicadores, gráficos, alertas y rankings), cobranza, caja y reportes en Excel (incluido
+  el flujo de caja) muestran solo esa sucursal. Las actividades (rifas, ventas) son de toda la
+  cooperativa y aparecen igual en todas.
 - **"Solo ve su sucursal"** (Usuarios, lo marca el Administrador): ese usuario ve siempre su sucursal en
   las listas, aunque puede buscar y atender a socios de otras.
 - **Caja:** cada movimiento queda en la sucursal donde se hizo (la del turno del cajero, o la sucursal del
   usuario). El cierre diario es de toda la cooperativa (con "Todas"); cada cajero cierra su turno.
+- **Recibos:** con más de una sucursal, cada recibo dice en qué sucursal se emitió.
 - La contabilidad es una sola para toda la cooperativa.
 
 ## Sucursales y turnos de caja

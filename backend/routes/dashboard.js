@@ -2,7 +2,7 @@ const express = require("express");
 const { hoyISO, anioMesActual } = require("../utils/fechas");
 const router = express.Router();
 const pool = require("../db");
-const { deSociosDeSucursal } = require("../utils/sucursal");
+const { deSociosDeSucursal, consultaPorSucursal } = require("../utils/sucursal");
 
 // ============================================
 // ENDPOINT 1: KPIs PRINCIPALES
@@ -150,12 +150,12 @@ router.get("/kpis", async (req, res) => {
 // CIERRE MENSUAL: resumen de cualquier mes
 // GET /api/dashboard/cierre-mensual?anio=2026&mes=9
 // ============================================
-const resumenMes = async (anio, mes) => {
+const resumenMes = async (anio, mes, q) => {
   const desde = new Date(Date.UTC(anio, mes - 1, 1)).toISOString().substring(0, 10);
   const hasta = new Date(Date.UTC(anio, mes, 1)).toISOString().substring(0, 10);
   const rango = [desde, hasta];
 
-  const [[pagos]] = await pool.query(
+  const [[pagos]] = await q(
     `SELECT COUNT(*) AS cantidad,
             IFNULL(SUM(monto_pagado), 0) AS total,
             IFNULL(SUM(monto_capital), 0) AS capital,
@@ -167,12 +167,12 @@ const resumenMes = async (anio, mes) => {
      FROM pagos_prestamo WHERE fecha_pago >= ? AND fecha_pago < ?`,
     rango
   );
-  const [[aportes]] = await pool.query(
+  const [[aportes]] = await q(
     `SELECT COUNT(*) AS cantidad, IFNULL(SUM(monto), 0) AS total
      FROM aportaciones WHERE fecha >= ? AND fecha < ?`,
     rango
   );
-  const [[actividades]] = await pool.query(
+  const [[actividades]] = await q(
     `SELECT COUNT(*) AS cantidad, IFNULL(SUM(monto), 0) AS total
      FROM actividades WHERE fecha >= ? AND fecha < ?`,
     rango
@@ -182,6 +182,8 @@ const resumenMes = async (anio, mes) => {
 
 router.get("/cierre-mensual", async (req, res) => {
   try {
+    // Con una sucursal elegida, solo los datos de sus socios
+    const q = await consultaPorSucursal(req);
     const hoy = new Date();
     const anio = parseInt(req.query.anio) || anioMesActual().anio;
     const mes = parseInt(req.query.mes) || anioMesActual().mes;
@@ -189,10 +191,10 @@ router.get("/cierre-mensual", async (req, res) => {
       return res.status(400).json({ message: "Mes o año inválido" });
     }
 
-    const actual = await resumenMes(anio, mes);
-    const anterior = await resumenMes(mes === 1 ? anio - 1 : anio, mes === 1 ? 12 : mes - 1);
+    const actual = await resumenMes(anio, mes, q);
+    const anterior = await resumenMes(mes === 1 ? anio - 1 : anio, mes === 1 ? 12 : mes - 1, q);
 
-    const [prestamosOtorgados] = await pool.query(
+    const [prestamosOtorgados] = await q(
       `SELECT COUNT(*) AS cantidad, IFNULL(SUM(monto), 0) AS monto
        FROM prestamos
        WHERE fecha_otorgado >= ? AND fecha_otorgado < ?
@@ -200,19 +202,19 @@ router.get("/cierre-mensual", async (req, res) => {
       actual.rango
     );
 
-    const [nuevosSocios] = await pool.query(
+    const [nuevosSocios] = await q(
       `SELECT COUNT(*) AS cantidad FROM usuarios
        WHERE rol_id != 1 AND fecha_registro >= ? AND fecha_registro < ?`,
       actual.rango
     );
 
-    const [liquidaciones] = await pool.query(
+    const [liquidaciones] = await q(
       `SELECT IFNULL(SUM(monto_total), 0) AS total FROM liquidaciones
        WHERE fecha >= ? AND fecha < ?`,
       actual.rango
     );
 
-    const [actividadesPorTipo] = await pool.query(
+    const [actividadesPorTipo] = await q(
       `SELECT tipo, IFNULL(SUM(monto), 0) AS total
        FROM actividades WHERE fecha >= ? AND fecha < ?
        GROUP BY tipo ORDER BY total DESC`,
@@ -220,7 +222,7 @@ router.get("/cierre-mensual", async (req, res) => {
     );
 
     // Intereses y total pagado por socio
-    const [porSocio] = await pool.query(
+    const [porSocio] = await q(
       `SELECT u.id_usuario, u.nombre_completo,
               COUNT(*) AS pagos,
               IFNULL(SUM(pp.monto_pagado), 0) AS total_pagado,
@@ -236,7 +238,7 @@ router.get("/cierre-mensual", async (req, res) => {
     );
 
     // Intereses por día del mes
-    const [porDia] = await pool.query(
+    const [porDia] = await q(
       `SELECT DAY(fecha_pago) AS dia,
               IFNULL(SUM(monto_interes), 0) AS interes,
               IFNULL(SUM(monto_pagado), 0) AS total
@@ -296,10 +298,12 @@ router.get("/cierre-mensual", async (req, res) => {
 // ============================================
 router.get("/series-tiempo", async (req, res) => {
   try {
+    // Con una sucursal elegida, solo los datos de sus socios
+    const q = await consultaPorSucursal(req);
     const { meses = 12 } = req.query;
 
     // Socios por mes (últimos N meses)
-    const [sociosPorMes] = await pool.query(
+    const [sociosPorMes] = await q(
       `SELECT 
        DATE_FORMAT(fecha_registro, '%Y-%m') as mes,
        COUNT(*) as nuevos_socios
@@ -312,7 +316,7 @@ router.get("/series-tiempo", async (req, res) => {
     );
 
     // Aportaciones por mes
-    const [aportacionesPorMes] = await pool.query(
+    const [aportacionesPorMes] = await q(
       `SELECT 
        DATE_FORMAT(fecha, '%Y-%m') as mes,
        COUNT(*) as cantidad,
@@ -325,7 +329,7 @@ router.get("/series-tiempo", async (req, res) => {
     );
 
     // Préstamos desembolsados por mes
-    const [prestamosPorMes] = await pool.query(
+    const [prestamosPorMes] = await q(
       `SELECT 
        DATE_FORMAT(fecha_otorgado, '%Y-%m') as mes,
        COUNT(*) as cantidad,
@@ -339,7 +343,7 @@ router.get("/series-tiempo", async (req, res) => {
     );
 
     // Pagos recibidos por mes
-    const [pagosPorMes] = await pool.query(
+    const [pagosPorMes] = await q(
       `SELECT 
        DATE_FORMAT(fecha_pago, '%Y-%m') as mes,
        COUNT(*) as cantidad,
@@ -352,7 +356,7 @@ router.get("/series-tiempo", async (req, res) => {
     );
 
     // Actividades por mes
-    const [actividadesPorMes] = await pool.query(
+    const [actividadesPorMes] = await q(
       `SELECT 
        DATE_FORMAT(fecha, '%Y-%m') as mes,
        COUNT(*) as cantidad,
@@ -401,8 +405,10 @@ router.get("/series-tiempo", async (req, res) => {
 // ============================================
 router.get("/alertas", async (req, res) => {
   try {
+    // Con una sucursal elegida, solo los datos de sus socios
+    const q = await consultaPorSucursal(req);
     // Préstamos en mora
-    const [prestamosMora] = await pool.query(
+    const [prestamosMora] = await q(
       `SELECT 
        p.id_prestamo,
        p.monto,
@@ -421,7 +427,7 @@ router.get("/alertas", async (req, res) => {
     );
 
     // Préstamos próximos a vencer (próximos 7 días)
-    const [proximosVencer] = await pool.query(
+    const [proximosVencer] = await q(
       `SELECT 
        p.id_prestamo,
        p.monto,
@@ -447,7 +453,7 @@ router.get("/alertas", async (req, res) => {
     );
 
     // Socios sin aportaciones en los últimos 3 meses
-    const [sociosSinAportaciones] = await pool.query(
+    const [sociosSinAportaciones] = await q(
       `SELECT 
        u.id_usuario,
        u.nombre_completo,
@@ -466,7 +472,7 @@ router.get("/alertas", async (req, res) => {
     );
 
     // Liquidaciones pendientes de desembolso
-    const [liquidacionesPendientes] = await pool.query(
+    const [liquidacionesPendientes] = await q(
       `SELECT 
        ls.id_liquidacion,
        l.fecha,
@@ -484,7 +490,7 @@ router.get("/alertas", async (req, res) => {
     );
 
     // Cuentas de socios con saldo bajo en Aportaciones (menos de 1000)
-    const [saldosBajos] = await pool.query(
+    const [saldosBajos] = await q(
       `SELECT 
        c.id_cuenta,
        c.saldo_actual as saldo,
@@ -563,8 +569,10 @@ router.get("/alertas", async (req, res) => {
 // ============================================
 router.get("/distribuciones", async (req, res) => {
   try {
+    // Con una sucursal elegida, solo los datos de sus socios
+    const q = await consultaPorSucursal(req);
     // Préstamos por estado
-    const [prestamosPorEstado] = await pool.query(
+    const [prestamosPorEstado] = await q(
       `SELECT 
        estado,
        COUNT(*) as cantidad,
@@ -574,7 +582,7 @@ router.get("/distribuciones", async (req, res) => {
     );
 
     // Actividades por tipo
-    const [actividadesPorTipo] = await pool.query(
+    const [actividadesPorTipo] = await q(
       `SELECT 
        tipo,
        COUNT(*) as cantidad,
@@ -584,7 +592,7 @@ router.get("/distribuciones", async (req, res) => {
     );
 
     // Liquidaciones resumen
-    const [liquidacionesResumen] = await pool.query(
+    const [liquidacionesResumen] = await q(
       `SELECT 
        'total' as tipo,
        COUNT(*) as cantidad,
@@ -593,7 +601,7 @@ router.get("/distribuciones", async (req, res) => {
     );
 
     // Movimientos por tipo de operación
-    const [movimientosPorTipo] = await pool.query(
+    const [movimientosPorTipo] = await q(
       `SELECT 
        tipo_movimiento,
        COUNT(*) as cantidad,
@@ -604,7 +612,7 @@ router.get("/distribuciones", async (req, res) => {
     );
 
     // Socios por rol
-    const [sociosPorRol] = await pool.query(
+    const [sociosPorRol] = await q(
       `SELECT 
        r.nombre as rol,
        COUNT(*) as cantidad
@@ -651,8 +659,10 @@ router.get("/distribuciones", async (req, res) => {
 // ============================================
 router.get("/resumen-ejecutivo", async (req, res) => {
   try {
+    // Con una sucursal elegida, solo los datos de sus socios
+    const q = await consultaPorSucursal(req);
     // Crecimiento de socios (comparación mes actual vs mes anterior)
-    const [sociosMesActual] = await pool.query(
+    const [sociosMesActual] = await q(
       `SELECT COUNT(*) as total 
        FROM usuarios 
        WHERE MONTH(fecha_registro) = MONTH(CURRENT_DATE())
@@ -660,7 +670,7 @@ router.get("/resumen-ejecutivo", async (req, res) => {
        AND rol_id != 1`
     );
 
-    const [sociosMesAnterior] = await pool.query(
+    const [sociosMesAnterior] = await q(
       `SELECT COUNT(*) as total 
        FROM usuarios 
        WHERE MONTH(fecha_registro) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))
@@ -673,14 +683,14 @@ router.get("/resumen-ejecutivo", async (req, res) => {
       : 0;
 
     // Comparación de aportaciones
-    const [aportacionesMesActual] = await pool.query(
+    const [aportacionesMesActual] = await q(
       `SELECT IFNULL(SUM(monto), 0) as total 
        FROM aportaciones 
        WHERE MONTH(fecha) = MONTH(CURRENT_DATE())
        AND YEAR(fecha) = YEAR(CURRENT_DATE())`
     );
 
-    const [aportacionesMesAnterior] = await pool.query(
+    const [aportacionesMesAnterior] = await q(
       `SELECT IFNULL(SUM(monto), 0) as total 
        FROM aportaciones 
        WHERE MONTH(fecha) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))
@@ -692,7 +702,7 @@ router.get("/resumen-ejecutivo", async (req, res) => {
       : 0;
 
     // Comparación de préstamos
-    const [prestamosMesActual] = await pool.query(
+    const [prestamosMesActual] = await q(
       `SELECT COUNT(*) as cantidad, IFNULL(SUM(monto), 0) as monto 
        FROM prestamos 
        WHERE MONTH(fecha_otorgado) = MONTH(CURRENT_DATE())
@@ -700,7 +710,7 @@ router.get("/resumen-ejecutivo", async (req, res) => {
        AND estado IN ('activo', 'mora', 'pagado')`
     );
 
-    const [prestamosMesAnterior] = await pool.query(
+    const [prestamosMesAnterior] = await q(
       `SELECT COUNT(*) as cantidad, IFNULL(SUM(monto), 0) as monto 
        FROM prestamos 
        WHERE MONTH(fecha_otorgado) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))
@@ -713,14 +723,14 @@ router.get("/resumen-ejecutivo", async (req, res) => {
       : 0;
 
     // Tasa de recuperación (pagos vs saldo)
-    const [totalPagos] = await pool.query(
+    const [totalPagos] = await q(
       `SELECT IFNULL(SUM(monto_pagado), 0) as total 
        FROM pagos_prestamo 
        WHERE MONTH(fecha_pago) = MONTH(CURRENT_DATE())
        AND YEAR(fecha_pago) = YEAR(CURRENT_DATE())`
     );
 
-    const [totalSaldoPendiente] = await pool.query(
+    const [totalSaldoPendiente] = await q(
       `SELECT IFNULL(SUM(saldo_restante), 0) as total 
        FROM prestamos 
        WHERE estado IN ('activo', 'mora')`
@@ -771,10 +781,12 @@ router.get("/resumen-ejecutivo", async (req, res) => {
 // ============================================
 router.get("/rankings", async (req, res) => {
   try {
+    // Con una sucursal elegida, solo los datos de sus socios
+    const q = await consultaPorSucursal(req);
     const { limite = 5 } = req.query;
 
     // Top socios por aportaciones
-    const [topAportadores] = await pool.query(
+    const [topAportadores] = await q(
       `SELECT 
        u.id_usuario,
        u.nombre_completo,
@@ -792,7 +804,7 @@ router.get("/rankings", async (req, res) => {
     );
 
     // Top socios con más préstamos
-    const [topPrestatarios] = await pool.query(
+    const [topPrestatarios] = await q(
       `SELECT 
        u.id_usuario,
        u.nombre_completo,
@@ -808,7 +820,7 @@ router.get("/rankings", async (req, res) => {
     );
 
     // Top deudores (mayor saldo pendiente)
-    const [topDeudores] = await pool.query(
+    const [topDeudores] = await q(
       `SELECT 
        u.id_usuario,
        u.nombre_completo,
@@ -826,7 +838,7 @@ router.get("/rankings", async (req, res) => {
     );
 
     // Actividades más rentables
-    const [actividadesRentables] = await pool.query(
+    const [actividadesRentables] = await q(
       `SELECT 
        tipo,
        nombre,
@@ -839,7 +851,7 @@ router.get("/rankings", async (req, res) => {
     );
 
     // Top socios por intereses generados
-    const [topIntereses] = await pool.query(
+    const [topIntereses] = await q(
       `SELECT 
        u.id_usuario,
        u.nombre_completo,
@@ -856,7 +868,7 @@ router.get("/rankings", async (req, res) => {
     );
 
     // Total general de intereses generados por todos los usuarios
-    const [totalInteresesGlobal] = await pool.query(
+    const [totalInteresesGlobal] = await q(
       `SELECT IFNULL(SUM(pp.monto_interes), 0) as total_global
        FROM pagos_prestamo pp`
     );

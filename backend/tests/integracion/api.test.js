@@ -1968,6 +1968,28 @@ test("sucursales: cada socio en la suya, el personal elige qué ver y el restrin
   const kSur = (await conSucursal("/dashboard/kpis", ids.tAdmin, sur)).b;
   assert.ok(kSur.socios.total < kTodas.socios.total);
 
+  // El resto del dashboard también se filtra (y sus consultas siguen siendo válidas)
+  for (const ruta of ["/dashboard/series-tiempo", "/dashboard/alertas", "/dashboard/distribuciones", "/dashboard/resumen-ejecutivo", "/dashboard/rankings", "/dashboard/cierre-mensual"]) {
+    const r2 = await conSucursal(ruta, ids.tAdmin, sur);
+    assert.equal(r2.s, 200, `${ruta}: ${r2.b?.message} ${r2.b?.error || ""}`);
+  }
+  const rankTodas = (await conSucursal("/dashboard/rankings", ids.tAdmin)).b;
+  const rankSur = (await conSucursal("/dashboard/rankings", ids.tAdmin, sur)).b;
+  assert.notDeepEqual(rankSur, rankTodas);
+
+  // Flujo de caja en Excel por sucursal
+  const flujo = await fetch(`${base}/api/reportes/flujo-caja`, { headers: { Authorization: `Bearer ${ids.tAdmin}`, "X-Sucursal": String(sur) } });
+  assert.equal(flujo.status, 200);
+
+  // El recibo de una aportación del socio de Sur, cobrada en la principal, dice la sucursal donde se emitió
+  const apo = await api("POST", "/aportaciones", { id_usuario: ids.socio2, monto: 15, metodo_pago: "efectivo" }, tCajera);
+  assert.equal(apo.s, 201, apo.b?.message);
+  const [[rec]] = await pool.query("SELECT id_recibo, id_sucursal FROM recibos WHERE id_socio = ? ORDER BY id_recibo DESC LIMIT 1", [ids.socio2]);
+  assert.equal(rec.id_sucursal, principal.id_sucursal);
+  const verRec = await api("GET", `/recibos/${rec.id_recibo}`, null, ids.tAdmin);
+  assert.equal(verRec.s, 200);
+  assert.equal((verRec.b.data || verRec.b).sucursal, "Oficina principal");
+
   // Limpieza
   await pool.query("UPDATE usuarios SET id_sucursal = ? WHERE id_usuario = ?", [principal.id_sucursal, ids.socio2]);
   await pool.query("DELETE FROM usuarios WHERE id_usuario = ?", [r.insertId]);

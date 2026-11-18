@@ -3,7 +3,7 @@ const { hoyISO } = require("../utils/fechas");
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
-const { filtroSocio } = require("../utils/sucursal");
+const { filtroSocio, consultaPorSucursal, sucursalVista } = require("../utils/sucursal");
 const ExcelJS = require("exceljs");
 const { dinero, locale } = require("../utils/pais");
 
@@ -876,6 +876,14 @@ router.get("/liquidaciones", async (req, res) => {
 router.get("/flujo-caja", async (req, res) => {
   try {
     const { fecha_inicio = '', fecha_fin = '' } = req.query;
+    // Con una sucursal elegida: lo de los socios de esa sucursal
+    const q = await consultaPorSucursal(req);
+    const idSucursal = await sucursalVista(req);
+    let nombreSucursal = "";
+    if (idSucursal) {
+      const [[suc]] = await pool.query("SELECT nombre FROM sucursales WHERE id_sucursal = ?", [idSucursal]);
+      nombreSucursal = suc?.nombre || "";
+    }
 
     let whereClause = "WHERE 1=1";
     let params = [];
@@ -898,7 +906,9 @@ router.get("/flujo-caja", async (req, res) => {
     const fechaReporte = fecha_inicio && fecha_fin 
       ? `Período: ${fecha_inicio} al ${fecha_fin}` 
       : `Fecha de generación: ${new Date().toLocaleDateString(locale())}`;
-    worksheet.getCell('A2').value = fechaReporte;
+    worksheet.getCell('A2').value = nombreSucursal
+      ? `${fechaReporte} · Sucursal: ${nombreSucursal} (socios de la sucursal; las actividades son de toda la cooperativa)`
+      : fechaReporte;
     worksheet.getCell('A2').alignment = { horizontal: 'center' };
 
     worksheet.addRow([]);
@@ -917,7 +927,7 @@ router.get("/flujo-caja", async (req, res) => {
     currentRow++;
 
     // Aportaciones
-    const [ingresoAportaciones] = await pool.query(
+    const [ingresoAportaciones] = await q(
       `SELECT IFNULL(SUM(monto), 0) as total 
        FROM aportaciones ${whereClause}`,
       params
@@ -926,7 +936,7 @@ router.get("/flujo-caja", async (req, res) => {
     currentRow++;
 
     // Pagos de préstamos (capital + intereses)
-    const [ingresoPagos] = await pool.query(
+    const [ingresoPagos] = await q(
       `SELECT IFNULL(SUM(monto_pagado), 0) as total 
        FROM pagos_prestamo ${whereClause}`,
       params
@@ -935,7 +945,7 @@ router.get("/flujo-caja", async (req, res) => {
     currentRow++;
 
     // Actividades (rifas, ventas, etc)
-    const [ingresoActividades] = await pool.query(
+    const [ingresoActividades] = await q(
       `SELECT IFNULL(SUM(monto), 0) as total 
        FROM actividades ${whereClause}`,
       params
@@ -971,7 +981,7 @@ router.get("/flujo-caja", async (req, res) => {
       egresoWhereClause += ` AND DATE(fecha_aprobacion) BETWEEN ? AND ?`;
     }
     
-    const [egresoPrestamos] = await pool.query(
+    const [egresoPrestamos] = await q(
       `SELECT IFNULL(SUM(monto), 0) as total 
        FROM prestamos 
        ${egresoWhereClause}`,
@@ -986,7 +996,7 @@ router.get("/flujo-caja", async (req, res) => {
       liqWhereClause += ` AND DATE(l.fecha) BETWEEN ? AND ?`;
     }
     
-    const [egresoLiquidaciones] = await pool.query(
+    const [egresoLiquidaciones] = await q(
       `SELECT IFNULL(SUM(ls.monto_recibido), 0) as total 
        FROM liquidacion_socios ls
        INNER JOIN liquidaciones l ON ls.id_liquidacion = l.id_liquidacion

@@ -406,6 +406,12 @@ export default function ReciboModal({ idRecibo, referenciaTipo, referenciaId, fi
                     <span className="text-muted">Fecha</span>
                     <span>{formatearFecha(recibo.fecha)}</span>
                   </div>
+                  {recibo.sucursal && (
+                    <div className="d-flex justify-content-between py-1 border-bottom">
+                      <span className="text-muted">Sucursal</span>
+                      <span>{recibo.sucursal}</span>
+                    </div>
+                  )}
                   {recibo.socio && (
                     <>
                       <div className="d-flex justify-content-between py-1 border-bottom">

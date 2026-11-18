@@ -50,40 +50,51 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 // Todos los módulos del sistema (lista maestra)
 const TODOS_MODULOS = [
-  { key: "dashboard",     to: "/dashboard",     icon: <FaTachometerAlt />, label: "Dashboard" },
-  { key: "ventanilla",    to: "/ventanilla",    icon: <FaConciergeBell />,  label: "Ventanilla" },
-  { key: "usuarios",      to: "/usuarios",      icon: <FaUsers />,          label: "Usuarios" },
-  { key: "roles",         to: "/roles",         icon: <FaUserShield />,     label: "Roles" },
-  { key: "cuentas",       to: "/cuentas",       icon: <FaUniversity />,     label: "Cuentas" },
-  { key: "cuentas",       to: "/ahorro",        icon: <FaPiggyBank />,      label: "Ahorro y plazo fijo" },
-  { key: "prestamos",     to: "/prestamos",     icon: <FaHandHoldingUsd />, label: "Préstamos" },
-  { key: "aportaciones",  to: "/aportaciones",  icon: <FaPiggyBank />,      label: "Aportaciones" },
-  { key: "prestamos",     to: "/solicitudes",    icon: <FaInbox />,          label: "Solicitudes" },
-  { key: "prestamos",     to: "/creditos-grupales", icon: <FaUsers />,       label: "Créditos grupales", funcion: "creditos_grupales" },
-  { key: "prestamos",     to: "/comite-credito", icon: <FaGavel />,         label: "Comité de crédito" },
-  { key: "contabilidad",  to: "/contabilidad",  icon: <FaBalanceScale />,   label: "Contabilidad" },
-  { key: "contabilidad",  to: "/libros-contables", icon: <FaBook />,      label: "Libros contables" },
-  { key: "cumplimiento",  to: "/cumplimiento",  icon: <FaUserSecret />,     label: "Cumplimiento", reservado: true },
-  { key: "cobranza",      to: "/cobranza",      icon: <FaPhoneAlt />,       label: "Cobranza" },
-  { key: "caja",          to: "/caja",          icon: <FaCashRegister />,   label: "Caja" },
-  { key: "pagos",         to: "/pagos-ampliados", icon: <FaBolt />,        label: "Pago rápido", funcion: "pagos_ampliados" },
-  { key: "pagos",         to: "/pagos",         icon: <FaMoneyCheckAlt />,  label: "Pagos" },
-  { key: "movimientos",   to: "/movimientos",   icon: <FaExchangeAlt />,    label: "Movimientos" },
-  { key: "reportes",      to: "/reportes-cartera", icon: <FaChartBar />,   label: "Reportes de cartera", funcion: "reportes_ampliados" },
-  { key: "reportes",      to: "/reportes",      icon: <FaFileAlt />,        label: "Reportes" },
-  { key: "actividades",   to: "/actividades",   icon: <FaTasks />,          label: "Actividades" },
-  { key: "liquidaciones", to: "/liquidaciones", icon: <FaChartPie />,       label: "Liquidaciones" },
-  { key: "bitacora",      to: "/bitacora",      icon: <FaClipboardList />,  label: "Bitácora" },
-  { key: "basedatos",     to: "/basedatos",     icon: <FaDatabase />,       label: "Base de Datos" },
+  { key: "dashboard",     to: "/dashboard", grupo: "principal",     icon: <FaTachometerAlt />, label: "Dashboard" },
+  { key: "ventanilla",    to: "/ventanilla", grupo: "principal",    icon: <FaConciergeBell />,  label: "Ventanilla" },
+  { key: "usuarios",      to: "/usuarios", grupo: "administracion",      icon: <FaUsers />,          label: "Usuarios" },
+  { key: "roles",         to: "/roles", grupo: "administracion",         icon: <FaUserShield />,     label: "Roles" },
+  { key: "cuentas",       to: "/cuentas", grupo: "ahorro",       icon: <FaUniversity />,     label: "Cuentas" },
+  { key: "cuentas",       to: "/ahorro", grupo: "ahorro",        icon: <FaPiggyBank />,      label: "Ahorro y plazo fijo" },
+  { key: "prestamos",     to: "/prestamos", grupo: "creditos",     icon: <FaHandHoldingUsd />, label: "Préstamos" },
+  { key: "aportaciones",  to: "/aportaciones", grupo: "ahorro",  icon: <FaPiggyBank />,      label: "Aportaciones" },
+  { key: "prestamos",     to: "/solicitudes", grupo: "creditos",    icon: <FaInbox />,          label: "Solicitudes" },
+  { key: "prestamos",     to: "/creditos-grupales", grupo: "creditos", icon: <FaUsers />,       label: "Créditos grupales", funcion: "creditos_grupales" },
+  { key: "prestamos",     to: "/comite-credito", grupo: "creditos", icon: <FaGavel />,         label: "Comité de crédito" },
+  { key: "contabilidad",  to: "/contabilidad", grupo: "contabilidad",  icon: <FaBalanceScale />,   label: "Contabilidad" },
+  { key: "contabilidad",  to: "/libros-contables", grupo: "contabilidad", icon: <FaBook />,      label: "Libros contables" },
+  { key: "cumplimiento",  to: "/cumplimiento", grupo: "administracion",  icon: <FaUserSecret />,     label: "Cumplimiento", reservado: true },
+  { key: "cobranza",      to: "/cobranza", grupo: "creditos",      icon: <FaPhoneAlt />,       label: "Cobranza" },
+  { key: "caja",          to: "/caja", grupo: "caja",          icon: <FaCashRegister />,   label: "Caja" },
+  { key: "pagos",         to: "/pagos-ampliados", grupo: "caja", icon: <FaBolt />,        label: "Pago rápido", funcion: "pagos_ampliados" },
+  { key: "pagos",         to: "/pagos", grupo: "caja",         icon: <FaMoneyCheckAlt />,  label: "Pagos" },
+  { key: "movimientos",   to: "/movimientos", grupo: "caja",   icon: <FaExchangeAlt />,    label: "Movimientos" },
+  { key: "reportes",      to: "/reportes-cartera", grupo: "contabilidad", icon: <FaChartBar />,   label: "Reportes de cartera", funcion: "reportes_ampliados" },
+  { key: "reportes",      to: "/reportes", grupo: "contabilidad",      icon: <FaFileAlt />,        label: "Reportes" },
+  { key: "actividades",   to: "/actividades", grupo: "contabilidad",   icon: <FaTasks />,          label: "Actividades" },
+  { key: "liquidaciones", to: "/liquidaciones", grupo: "caja", icon: <FaChartPie />,       label: "Liquidaciones" },
+  { key: "bitacora",      to: "/bitacora", grupo: "administracion",      icon: <FaClipboardList />,  label: "Bitácora" },
+  { key: "basedatos",     to: "/basedatos", grupo: "administracion",     icon: <FaDatabase />,       label: "Base de Datos" },
+];
+
+// Grupos del menú del personal, en el orden en que se muestran
+const GRUPOS = [
+  { id: "principal", label: "Principal" },
+  { id: "creditos", label: "Créditos" },
+  { id: "ahorro", label: "Ahorro y aportaciones" },
+  { id: "caja", label: "Caja y pagos" },
+  { id: "contabilidad", label: "Contabilidad y reportes" },
+  { id: "administracion", label: "Administración" },
+  { id: "configuracion", label: "Configuración" },
 ];
 
 // Menú completo para Super Administrador (todos los módulos + control de accesos)
 const menuSuperAdmin = [
   ...TODOS_MODULOS,
-  { to: "/parametros-financieros", icon: <FaSlidersH />, label: "Parámetros" },
-  { to: "/productos-credito", icon: <FaLayerGroup />, label: "Productos de crédito" },
-  { to: "/politicas", icon: <FaBook />, label: "Políticas" },
-  { to: "/superadmin", icon: <FaShieldAlt />, label: "Control de Accesos" },
+  { to: "/parametros-financieros", grupo: "configuracion", icon: <FaSlidersH />, label: "Parámetros" },
+  { to: "/productos-credito", grupo: "configuracion", icon: <FaLayerGroup />, label: "Productos de crédito" },
+  { to: "/politicas", grupo: "configuracion", icon: <FaBook />, label: "Políticas" },
+  { to: "/superadmin", grupo: "configuracion", icon: <FaShieldAlt />, label: "Control de Accesos" },
 ];
 
 // Menú para Socio
@@ -183,6 +194,50 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
 
   const w = collapsed && isDesktop ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH;
 
+  // Secciones: el socio ve una sola lista; el personal, sus módulos agrupados
+  const secciones =
+    user?.rol === "Socio"
+      ? [{ id: "socio", label: "Menú principal", items: menu }]
+      : GRUPOS.map((g) => ({ ...g, items: menu.filter((m) => m.grupo === g.id) })).filter((g) => g.items.length);
+
+  const listaMenu = (movil = false) => {
+    const plegado = collapsed && !movil;
+    return secciones.map((sec, i) => (
+      <div key={sec.id}>
+        {plegado ? (
+          i > 0 && <div className="sidebar-divider" />
+        ) : (
+          <div className="sidebar-section-label">{sec.label}</div>
+        )}
+        <nav aria-label={sec.label}>
+          <ul className="nav flex-column" style={{ padding: "2px 0" }}>
+            {sec.items.map(({ to, icon, label }) => (
+              <li className="nav-item" key={to}>
+                <NavLink
+                  to={to}
+                  title={plegado ? label : undefined}
+                  className={({ isActive }) => "sidebar-link" + (isActive ? " active" : "")}
+                  onClick={movil ? () => setOpen(false) : undefined}
+                >
+                  <span className="sidebar-icon">{icon}</span>
+                  <span className="sidebar-label">{label}</span>
+                  {to === "/solicitudes" && solicitudesPendientes > 0 && (
+                    <span
+                      className="badge rounded-pill ms-auto"
+                      style={{ background: "#e74c3c", color: "#fff", fontSize: ".7rem" }}
+                    >
+                      {solicitudesPendientes}
+                    </span>
+                  )}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
+    ));
+  };
+
   return (
     <>
       <style>{`
@@ -215,13 +270,14 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
           transition: opacity 0.2s;
           white-space: nowrap;
         }
+        .sidebar-divider { height: 1px; margin: 10px 16px; background: rgba(255,255,255,0.09); }
         .sidebar-section-label {
           font-size: 0.65rem;
           font-weight: 700;
           letter-spacing: 1.4px;
           text-transform: uppercase;
           color: ${TEXT_MUTED};
-          padding: 18px 20px 6px;
+          padding: 14px 20px 4px;
           overflow: hidden;
           white-space: nowrap;
           transition: opacity 0.2s;
@@ -433,33 +489,7 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
 
         {/* Navegación */}
         <div className="sidebar-scroll" style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", paddingBottom: 12 }}>
-          {!collapsed && <div className="sidebar-section-label">Menú principal</div>}
-          <nav>
-            <ul className="nav flex-column" style={{ padding: "4px 0" }}>
-              {menu.map(({ to, icon, label }) => (
-                <li className="nav-item" key={to}>
-                  <NavLink
-                    to={to}
-                    title={collapsed ? label : undefined}
-                    className={({ isActive }) =>
-                      "sidebar-link" + (isActive ? " active" : "")
-                    }
-                  >
-                    <span className="sidebar-icon">{icon}</span>
-                    <span className="sidebar-label">{label}</span>
-                    {to === "/solicitudes" && solicitudesPendientes > 0 && (
-                      <span
-                        className="badge rounded-pill ms-auto"
-                        style={{ background: "#e74c3c", color: "#fff", fontSize: ".7rem" }}
-                      >
-                        {solicitudesPendientes}
-                      </span>
-                    )}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
-          </nav>
+          {listaMenu()}
         </div>
 
         {/* Footer */}
@@ -509,33 +539,7 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
           </button>
         </div>
         <div className="offcanvas-body px-0" style={{ overflowX: "hidden" }}>
-          <div className="sidebar-section-label">Menú principal</div>
-          <nav>
-            <ul className="nav flex-column" style={{ padding: "4px 0" }}>
-              {menu.map(({ to, icon, label }) => (
-                <li className="nav-item" key={to}>
-                  <NavLink
-                    to={to}
-                    className={({ isActive }) =>
-                      "sidebar-link" + (isActive ? " active" : "")
-                    }
-                    onClick={() => setOpen(false)}
-                  >
-                    <span className="sidebar-icon">{icon}</span>
-                    <span className="sidebar-label">{label}</span>
-                    {to === "/solicitudes" && solicitudesPendientes > 0 && (
-                      <span
-                        className="badge rounded-pill ms-auto"
-                        style={{ background: "#e74c3c", color: "#fff", fontSize: ".7rem" }}
-                      >
-                        {solicitudesPendientes}
-                      </span>
-                    )}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
-          </nav>
+          {listaMenu(true)}
         </div>
       </div>
 

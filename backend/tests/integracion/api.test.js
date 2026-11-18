@@ -2320,6 +2320,36 @@ test("configuración por producto: mora y gracia propias, cargo automático, red
   await api("PUT", `/productos/${prod.b.data.id_producto}`, { activo: false }, ids.tSuper);
 });
 
+test("interés fijo (flat) por producto: cuota con capital e interés fijos sobre el monto original", async () => {
+  const prod = await api("POST", "/productos", {
+    nombre: "Grupal Flat", tasa_mensual: 2, monto_min: 100, monto_max: 100000, plazo_min: 1, plazo_max: 24, garantia_requerida: "ninguna", metodo_interes: "flat",
+  }, ids.tSuper);
+  assert.equal(prod.s, 201, prod.b?.message);
+  assert.equal(prod.b.data.metodo_interes, "flat");
+  const nuevo = await api("POST", "/prestamos", { id_usuario: ids.socio, monto: 1200, tasa_interes: 24, plazo_meses: 12, estado: "aprobado", id_producto: prod.b.data.id_producto }, ids.tSuper);
+  const id = nuevo.b.id_prestamo || nuevo.b.data?.id_prestamo || nuevo.b.prestamo?.id_prestamo;
+  assert.equal((await api("POST", `/prestamos/${id}/desembolsar`, { metodo: "efectivo" }, ids.tSuper)).s, 200);
+
+  const plan = (await api("GET", `/prestamos/${id}/plan`, null, ids.tAdmin)).b.plan;
+  assert.equal(plan.length, 12);
+  assert.ok(plan.every((c) => c.interes === 24 && c.capital === 100 && c.cuota === 124), "cuotas fijas de 124");
+  const pp = await api("GET", `/pagos/prestamo/${id}/proximo-pago`, null, ids.tAdmin);
+  assert.equal(pp.b.proximo_pago.cuota_mensual, 124);
+
+  const pagar = (monto = 124) => api("POST", "/pagos", { id_prestamo: id, monto_pagado: monto, metodo_pago: "efectivo", tipo_pago: "cuota_fija" }, ids.tAdmin);
+  const p1 = await pagar();
+  assert.equal(p1.s, 201, p1.b?.message);
+  assert.equal(p1.b.detalles.monto_interes, 24);
+  assert.equal(p1.b.detalles.monto_capital, 100);
+  const p2 = await pagar(125);
+  assert.equal(p2.s, 201, p2.b?.message);
+  assert.equal(p2.b.detalles.monto_interes, 24, "el interés no baja con el saldo");
+  assert.equal(p2.b.detalles.saldo_nuevo, 999);
+
+  await pool.query("UPDATE prestamos SET estado = 'pagado', saldo_restante = 0 WHERE id_prestamo = ?", [id]);
+  await api("PUT", `/productos/${prod.b.data.id_producto}`, { activo: false }, ids.tSuper);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

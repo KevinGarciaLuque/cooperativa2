@@ -32,6 +32,7 @@ const normalizar = (p) =>
     cargo_valor: p.cargo_valor == null ? null : num(p.cargo_valor),
     cargo_concepto: p.cargo_concepto || null,
     redondeo_cuota: p.redondeo_cuota == null ? null : num(p.redondeo_cuota),
+    metodo_interes: p.metodo_interes || null,
   };
 
 const CARGOS = { fijo: "Monto fijo por pago", porcentaje: "Porcentaje de cada pago" };
@@ -75,6 +76,8 @@ const validarProducto = (b = {}) => {
   datos.cargo_valor = datos.cargo_tipo ? num(b.cargo_valor) : null;
   datos.cargo_concepto = datos.cargo_tipo ? String(b.cargo_concepto || "").trim().substring(0, 80) || null : null;
   datos.redondeo_cuota = REDONDEOS.includes(num(b.redondeo_cuota)) ? num(b.redondeo_cuota) : null;
+  // "flat": interés fijo sobre el monto original en cada cuota; vacío = sobre saldos (como siempre)
+  datos.metodo_interes = b.metodo_interes === "flat" ? "flat" : null;
   if (datos.mora_tasa_anual != null && !(datos.mora_tasa_anual >= 0 && datos.mora_tasa_anual <= 120)) return { error: "La tasa de mora debe estar entre 0 y 120% anual." };
   if (datos.mora_dias_gracia != null && !(datos.mora_dias_gracia >= 0 && datos.mora_dias_gracia <= 90)) return { error: "Los días de gracia deben estar entre 0 y 90." };
   if (datos.cargo_tipo && !(datos.cargo_valor > 0)) return { error: "Indica el valor del cargo automático." };

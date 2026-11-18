@@ -59,11 +59,12 @@ const calcularInteresMoratorio = (saldo, diasMora, tasaAnual = null) =>
 // Lo que cuesta cancelar hoy todo el préstamo: saldo + interés de los días usados
 // desde el último pago (mínimo un mes) + mora. Pagar antes del plazo pactado no
 // cobra los intereses de los meses que faltan: solo los del tiempo transcurrido.
-const liquidacionAlDia = ({ saldo, tasaAnual, fechaOtorgado, fechaUltimoPago, moraTasa = null, moraGracia = null }) => {
+const liquidacionAlDia = ({ saldo, tasaAnual, fechaOtorgado, fechaUltimoPago, moraTasa = null, moraGracia = null, baseInteres = null }) => {
   const saldoNum = parseFloat(saldo) || 0;
   const base = soloFecha(fechaUltimoPago) || soloFecha(fechaOtorgado) || hoyISO();
   const dias = Math.max(DIAS_MES, diasEntre(base, hoyISO()));
-  const interes = calcularInteresPeriodo(saldoNum, tasaAnual, dias);
+  // baseInteres: monto original en los préstamos de interés fijo ("flat")
+  const interes = calcularInteresPeriodo(baseInteres != null ? parseFloat(baseInteres) : saldoNum, tasaAnual, dias);
   const diasMora = calcularDiasMora(fechaOtorgado, fechaUltimoPago, moraGracia);
   const mora = diasMora > 0 ? parseFloat(calcularInteresMoratorio(saldoNum, diasMora, moraTasa).toFixed(2)) : 0;
   return { dias, interes, diasMora, mora, total: parseFloat((saldoNum + interes + mora).toFixed(2)) };

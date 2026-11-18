@@ -4,7 +4,7 @@
 // préstamos ya entregados. Además recibe su código con el formato de la cooperativa.
 const pool = require("../db");
 
-const CAMPOS = ["mora_tasa_anual", "mora_dias_gracia", "cargo_tipo", "cargo_valor", "cargo_concepto", "redondeo_cuota"];
+const CAMPOS = ["mora_tasa_anual", "mora_dias_gracia", "cargo_tipo", "cargo_valor", "cargo_concepto", "redondeo_cuota", "metodo_interes"];
 
 const formatoCodigo = async (conn = pool) => {
   try {

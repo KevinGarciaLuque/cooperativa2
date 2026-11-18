@@ -6,7 +6,7 @@ const { notificarSocio, crearNotificacion } = require("../utils/notificaciones")
 const jwt = require("jsonwebtoken");
 const { registrarCaja } = require("../utils/caja");
 const { habilitada } = require("../utils/funciones");
-const { redondearCuota } = require("../utils/planPagos");
+const { cuotaDelPrestamo } = require("../utils/planPagos");
 const { cargoAutomatico } = require("../utils/configCredito");
 const { crearRecibo, emitirFiniquito } = require("../utils/recibos");
 const { dinero } = require("../utils/pais");
@@ -268,10 +268,7 @@ const procesarPago = async (connection, body, usuario) => {
     }
 
     // Calcular cuota mensual esperada
-    const cuotaMensual = redondearCuota(
-      calcularCuotaMensual(parseFloat(prestamoData.monto), parseFloat(prestamoData.tasa_interes), parseInt(prestamoData.plazo_meses)),
-      prestamoData.redondeo_cuota
-    );
+    const cuotaMensual = cuotaDelPrestamo(prestamoData);
 
     // Obtener último pago
     const [ultimoPago] = await connection.query(
@@ -322,8 +319,9 @@ const procesarPago = async (connection, body, usuario) => {
       : fechaUltimoPago || soloFecha(prestamoData.fecha_otorgado) || fechaPagoStr;
     const diasInteres = diasDeInteres(modo, fechaBase, fechaPagoStr);
 
+    // Interés fijo ("flat", configuración por producto): sobre el monto original, no sobre el saldo
     const interesDelPeriodo = calcularInteresPeriodo(
-      saldoActual,
+      prestamoData.metodo_interes === "flat" ? parseFloat(prestamoData.monto) : saldoActual,
       prestamoData.tasa_interes,
       diasInteres
     );
@@ -597,10 +595,7 @@ router.get("/prestamo/:id_prestamo/proximo-pago", async (req, res) => {
     }
 
     // Calcular cuota mensual
-    const cuotaMensual = redondearCuota(
-      calcularCuotaMensual(parseFloat(prestamoData.monto), parseFloat(prestamoData.tasa_interes), parseInt(prestamoData.plazo_meses)),
-      prestamoData.redondeo_cuota
-    );
+    const cuotaMensual = cuotaDelPrestamo(prestamoData);
 
     // Obtener último pago
     const [ultimoPago] = await pool.query(
@@ -655,6 +650,7 @@ router.get("/prestamo/:id_prestamo/proximo-pago", async (req, res) => {
       fechaUltimoPago: ultimoPago.length > 0 ? ultimoPago[0].fecha_pago : null,
       moraTasa: prestamoData.mora_tasa_anual,
       moraGracia: prestamoData.mora_dias_gracia,
+      baseInteres: prestamoData.metodo_interes === "flat" ? prestamoData.monto : null,
     });
 
     const cuotasPagadas = totalPagos[0].total;

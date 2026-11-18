@@ -10,7 +10,7 @@
 //
 // La mora que se COBRA no sale de aquí (sigue en calculosPrestamo.js); el plan sirve para
 // mostrar vencimientos y para clasificar la cartera por días de atraso de la cuota.
-const { soloFecha, diasEntre, hoyISO } = require("./calculosPrestamo");
+const { soloFecha, diasEntre, hoyISO, calcularCuotaMensual } = require("./calculosPrestamo");
 
 const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
@@ -34,13 +34,26 @@ const redondearCuota = (cuota, redondeo) => {
   return r > 0 ? r2(Math.ceil(r2(cuota) / r - 1e-9) * r) : cuota;
 };
 
-const generarPlan = ({ monto, tasaAnual, plazo, fechaInicio, redondeo = null }) => {
+const generarPlan = ({ monto, tasaAnual, plazo, fechaInicio, redondeo = null, metodo = null }) => {
   const capitalTotal = r2(monto);
   const n = parseInt(plazo);
   const inicio = soloFecha(fechaInicio);
   if (!(capitalTotal > 0) || !(n > 0) || !inicio) return [];
 
   const i = parseFloat(tasaAnual) / 100 / 12;
+  // Interés fijo ("flat"): cada cuota paga el mismo interés sobre el monto original y el mismo capital
+  if (metodo === "flat") {
+    const interesFijo = r2(capitalTotal * i);
+    const cuota = redondearCuota(r2(capitalTotal / n + interesFijo), redondeo);
+    const cuotasFlat = [];
+    let saldoF = capitalTotal;
+    for (let k = 1; k <= n; k++) {
+      const capital = k === n ? saldoF : Math.min(saldoF, r2(cuota - interesFijo));
+      saldoF = r2(saldoF - capital);
+      cuotasFlat.push({ numero: k, fecha_vencimiento: sumarMeses(inicio, k), cuota: r2(capital + interesFijo), capital, interes: interesFijo, saldo: saldoF });
+    }
+    return cuotasFlat;
+  }
   const cuotaFija = redondearCuota(
     r2(i === 0 ? capitalTotal / n : (capitalTotal * i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1)),
     redondeo
@@ -123,6 +136,7 @@ const planDePrestamo = (p, hoy = hoyISO()) => {
     plazo: p.plazo_meses,
     fechaInicio: p.fecha_otorgado,
     redondeo: p.redondeo_cuota,
+    metodo: p.metodo_interes,
   });
   if (!cuotas.length) return null;
   return estadoDelPlan(cuotas, {
@@ -133,4 +147,13 @@ const planDePrestamo = (p, hoy = hoyISO()) => {
   });
 };
 
-module.exports = { generarPlan, estadoDelPlan, planDePrestamo, sumarMeses, redondearCuota };
+// Cuota pactada de un préstamo según su configuración (redondeo, interés sobre saldos o fijo)
+const cuotaDelPrestamo = (p) => {
+  const plan = generarPlan({
+    monto: p.monto, tasaAnual: p.tasa_interes, plazo: p.plazo_meses, fechaInicio: "2000-01-01",
+    redondeo: p.redondeo_cuota, metodo: p.metodo_interes,
+  });
+  return plan.length ? plan[0].cuota : calcularCuotaMensual(parseFloat(p.monto), parseFloat(p.tasa_interes), parseInt(p.plazo_meses));
+};
+
+module.exports = { generarPlan, estadoDelPlan, planDePrestamo, sumarMeses, redondearCuota, cuotaDelPrestamo };

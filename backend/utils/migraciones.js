@@ -1168,6 +1168,20 @@ const MIGRACIONES = [
       await agregar("prestamos", "numero_solicitud", "VARCHAR(30) NULL");
     },
   },
+  {
+    id: "2026_11_018_interes_flat",
+    descripcion: "Método de interés por producto: sobre saldos (como siempre) o fijo sobre el monto (flat)",
+    async up(conn) {
+      for (const t of ["productos_credito", "prestamos"]) {
+        const [[e]] = await conn.query(
+          `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'metodo_interes'`,
+          [t]
+        );
+        if (!e.n) await conn.query(`ALTER TABLE ${t} ADD COLUMN metodo_interes VARCHAR(10) NULL`);
+      }
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

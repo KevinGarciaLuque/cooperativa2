@@ -53,7 +53,7 @@ const datosDocumento = async (idPrestamo, usuario) => {
   const [[coop]] = await pool.query("SELECT valor FROM configuracion_sitio WHERE clave = 'site_name'");
   const [garantias] = await pool.query("SELECT * FROM garantias WHERE id_prestamo = ? AND estado = 'vigente' ORDER BY id_garantia", [idPrestamo]).catch(() => [[]]);
   const otorgado = soloFecha(p.fecha_otorgado) || hoyISO();
-  const plan = generarPlan({ monto: p.monto, tasaAnual: p.tasa_interes, plazo: p.plazo_meses, fechaInicio: otorgado, redondeo: p.redondeo_cuota });
+  const plan = generarPlan({ monto: p.monto, tasaAnual: p.tasa_interes, plazo: p.plazo_meses, fechaInicio: otorgado, redondeo: p.redondeo_cuota, metodo: p.metodo_interes });
   const tasaMensual = p.tipo_tasa === "nominal_mensual" && p.tasa_original != null ? parseFloat(p.tasa_original) : parseFloat(p.tasa_interes) / 12;
   const n = (v) => pais.numero(v);
   const textoGarantias = garantias.length

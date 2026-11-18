@@ -10,7 +10,7 @@ const {
   calcularDiasMora,
   calcularInteresMoratorio,
 } = require("./calculosPrestamo");
-const { planDePrestamo } = require("./planPagos");
+const { planDePrestamo, cuotaDelPrestamo } = require("./planPagos");
 
 const sumarMeses = (fecha, meses) => {
   const [y, m, d] = fecha.split("-").map(Number);
@@ -32,7 +32,7 @@ const clasificar = (diasMora, diasParaVencer) => {
 const obtenerCartera = async (filtro = { sql: "", params: [] }) => {
   const [prestamos] = await pool.query(
     `SELECT p.id_prestamo, p.id_usuario, p.monto, p.saldo_restante, p.tasa_interes, p.plazo_meses,
-            p.mora_tasa_anual, p.mora_dias_gracia, p.redondeo_cuota,
+            p.mora_tasa_anual, p.mora_dias_gracia, p.redondeo_cuota, p.metodo_interes,
             p.estado, p.fecha_otorgado,
             u.nombre_completo, u.dni, u.telefono, u.correo,
             (SELECT MAX(fecha_pago) FROM pagos_prestamo WHERE id_prestamo = p.id_prestamo) AS ultimo_pago,
@@ -58,11 +58,7 @@ const obtenerCartera = async (filtro = { sql: "", params: [] }) => {
     const diasMora = calcularDiasMora(p.fecha_otorgado, p.ultimo_pago, p.mora_dias_gracia);
     const diasAtraso = plan ? plan.resumen.dias_atraso : diasMora;
     const saldo = parseFloat(p.saldo_restante);
-    const cuota = calcularCuotaMensual(
-      parseFloat(p.monto),
-      parseFloat(p.tasa_interes),
-      parseInt(p.plazo_meses)
-    );
+    const cuota = cuotaDelPrestamo(p);
     return {
       id_prestamo: p.id_prestamo,
       id_usuario: p.id_usuario,

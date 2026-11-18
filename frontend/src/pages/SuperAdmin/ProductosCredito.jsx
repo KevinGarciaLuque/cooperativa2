@@ -33,6 +33,7 @@ const VACIO = {
   cargo_valor: "",
   cargo_concepto: "",
   redondeo_cuota: "",
+  metodo_interes: "",
 };
 
 export default function ProductosCredito() {
@@ -85,6 +86,7 @@ export default function ProductosCredito() {
             cargo_valor: p.cargo_valor ?? "",
             cargo_concepto: p.cargo_concepto || "",
             redondeo_cuota: p.redondeo_cuota ?? "",
+            metodo_interes: p.metodo_interes || "",
           }
         : VACIO
     );
@@ -277,6 +279,16 @@ export default function ProductosCredito() {
                           <div className="col-6 col-md-3">
                             <label className="form-label small mb-1">Días de gracia</label>
                             <input className="form-control form-control-sm" type="number" min="0" max="90" value={form.mora_dias_gracia} onChange={cambiar("mora_dias_gracia")} placeholder="General" />
+                          </div>
+                          <div className="col-12 col-md-6">
+                            <label className="form-label small mb-1">Cálculo del interés</label>
+                            <select className="form-select form-select-sm" value={form.metodo_interes} onChange={cambiar("metodo_interes")}>
+                              <option value="">Sobre saldos (cuota nivelada, como siempre)</option>
+                              <option value="flat">Fijo sobre el monto original (flat)</option>
+                            </select>
+                            {form.metodo_interes === "flat" && (
+                              <div className="form-text">Cada cuota paga el mismo interés (monto × tasa mensual) y el mismo capital.</div>
+                            )}
                           </div>
                           <div className="col-12 col-md-6">
                             <label className="form-label small mb-1">Redondeo de la cuota</label>

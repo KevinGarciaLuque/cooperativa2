@@ -58,6 +58,7 @@ const REGLAS = [
   ["POST", /^\/prestamos\/\d+\/liquidar$/, "pagos.registrar"],
   ["POST", /^\/grupos\/creditos\/\d+\/pagar$/, "pagos.registrar"],
   ["POST", /^\/pagos-ampliados\/rapido$/, "pagos.registrar"],
+  ["POST", /^\/planillas\/lotes\/\d+\/aplicar$/, "pagos.registrar"],
   ["POST", /^\/pagos-reportados\/\d+\/rechazar$/, "pagos.registrar"],
   ["PUT", /^\/pagos\/\d+$/, "pagos.editar"],
   ["DELETE", /^\/pagos\/\d+$/, "pagos.anular"],

@@ -365,3 +365,13 @@ Función nueva **"Calificación del socio y reglas de aprobación"** (*Control d
   - El Super Administrador puede aprobar casos especiales sin estas reglas.
   - Con la función encendida, un préstamo pendiente solo se aprueba con el botón **Aprobar** (no cambiando su estado a mano), para que siempre se revisen las reglas.
 - Al aprobarse, el préstamo guarda la calificación que tenía en ese momento.
+
+## Etapa 10: descuento por planilla
+
+Función nueva **"Descuento por planilla"** (*Control de Accesos → Funciones nuevas*). Menú: *Caja y pagos → Descuento por planilla*.
+
+1. **Empresas con convenio:** registra la empresa (contacto de RR. HH., día de corte) y agrega los préstamos de sus empleados buscando al socio. Cada préstamo muestra cuánto se descuenta al mes: su cuota llevada a un mes (semanal ×52/12, quincenal ×2), sin pasar de lo que debe.
+2. **Planilla del mes:** elige la empresa y el mes y pulsa *Generar*. Hay una sola planilla por empresa y mes; si te equivocaste, anúlala y genérala de nuevo.
+3. **Excel para la empresa:** lista de empleados con el monto a descontar y columnas para que anoten lo descontado.
+4. **Aplicar el pago:** cuando la empresa paga, revisa cuánto descontó a cada uno (0 si no se lo descontó, con una nota), elige cómo pagó (transferencia, depósito, cheque o efectivo) y la referencia, y pulsa *Aplicar*. Se registra un pago normal en cada préstamo (interés, mora, recibo y aviso al socio). Si uno falla, no se aplica ninguno. Los no descontados quedan marcados para cobrarlos por otra vía.
+- Aplicar es la acción "Registrar pagos" de los permisos por acción. Las planillas por aplicar aparecen en la campanita del personal.

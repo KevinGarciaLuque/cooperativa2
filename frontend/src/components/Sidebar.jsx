@@ -35,6 +35,7 @@ import {
   FaGavel,
   FaBolt,
   FaChartBar,
+  FaBuilding,
 } from "react-icons/fa";
 import LogoCoop from "./LogoCoop";
 import { useFunciones } from "../hooks/useFunciones";
@@ -67,6 +68,7 @@ const TODOS_MODULOS = [
   { key: "cobranza",      to: "/cobranza", grupo: "creditos",      icon: <FaPhoneAlt />,       label: "Cobranza" },
   { key: "caja",          to: "/caja", grupo: "caja",          icon: <FaCashRegister />,   label: "Caja" },
   { key: "pagos",         to: "/pagos-ampliados", grupo: "caja", icon: <FaBolt />,        label: "Pago rápido", funcion: "pagos_ampliados" },
+  { key: "pagos",         to: "/planillas", grupo: "caja", icon: <FaBuilding />, label: "Descuento por planilla", funcion: "descuento_planilla" },
   { key: "pagos",         to: "/pagos", grupo: "caja",         icon: <FaMoneyCheckAlt />,  label: "Pagos" },
   { key: "movimientos",   to: "/movimientos", grupo: "caja",   icon: <FaExchangeAlt />,    label: "Movimientos" },
   { key: "reportes",      to: "/reportes-cartera", grupo: "contabilidad", icon: <FaChartBar />,   label: "Reportes de cartera", funcion: "reportes_ampliados" },

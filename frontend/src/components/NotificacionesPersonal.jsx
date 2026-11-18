@@ -22,6 +22,7 @@ import {
   FaCashRegister,
   FaCheckCircle,
   FaChevronRight,
+  FaBuilding,
 } from "react-icons/fa";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -40,6 +41,7 @@ const ICONOS = {
   plazos_vencen: FaPiggyBank,
   alertas_cumplimiento: FaUserSecret,
   turno_abierto: FaCashRegister,
+  planillas_por_aplicar: FaBuilding,
 };
 const COLORES = {
   alta: ["#dc2626", "#fee2e2"],

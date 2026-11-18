@@ -45,6 +45,11 @@ const CATALOGO = [
     descripcion: "Historial crediticio, proyección de cobros, créditos vencidos, por cerrar y cerrados, por promotor y línea.",
   },
   {
+    clave: "descuento_planilla",
+    nombre: "Descuento por planilla",
+    descripcion: "Empresas con convenio, préstamos que se cobran por planilla, listado mensual de cuotas a descontar en Excel y aplicar en un paso el pago que manda la empresa.",
+  },
+  {
     clave: "calificacion_credito",
     nombre: "Calificación del socio y reglas de aprobación",
     descripcion: "Puntaje de 0 a 100 (A a E) con el detalle de cada factor en Solicitudes y Comité; no aprobar con cuotas atrasadas y mandar al comité los puntajes bajos.",

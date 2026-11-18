@@ -2761,6 +2761,96 @@ test("etapa 9: calificación del socio y reglas de aprobación (mora bloquea, pu
   assert.equal((await api("PUT", "/configuracion/funciones", { calificacion_credito: false }, ids.tSuper)).s, 200);
 });
 
+test("etapa 10: descuento por planilla — empresa, préstamos, planilla del mes y pago de la empresa", async () => {
+  assert.equal((await api("GET", "/planillas/empresas", null, ids.tAdmin)).s, 403, "apagada");
+  assert.equal((await api("PUT", "/configuracion/funciones", { descuento_planilla: true }, ids.tSuper)).s, 200);
+  assert.equal((await api("GET", "/planillas/empresas", null, ids.tSocio)).s, 403, "el socio no entra");
+
+  assert.equal((await api("POST", "/planillas/empresas", { nombre: "" }, ids.tAdmin)).s, 400);
+  const emp = await api("POST", "/planillas/empresas", { nombre: "Maquila El Progreso", contacto: "RR. HH.", dia_corte: 25 }, ids.tAdmin);
+  assert.equal(emp.s, 201, emp.b?.message);
+  const idEmp = emp.b.id_empresa;
+
+  const empleado = async (dni) =>
+    (await pool.query(
+      `INSERT INTO usuarios (nombre_completo, dni, telefono, correo, password, rol_id, estado, fecha_registro)
+       VALUES (?, ?, '98765432', ?, 'x', 2, 'activo', NOW())`,
+      [`Empleado ${dni}`, dni, `${dni}@prueba.hn`]
+    ))[0].insertId;
+  const prestamo = async (idU) =>
+    (await pool.query(
+      `INSERT INTO prestamos (id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado)
+       VALUES (?, 1200, 12, 12, 1200, 'activo', DATE_SUB(CURDATE(), INTERVAL 25 DAY))`,
+      [idU]
+    ))[0].insertId;
+  const e1 = await empleado("0801000000991");
+  const e2 = await empleado("0801000000992");
+  const p1 = await prestamo(e1);
+  const p2 = await prestamo(e2);
+
+  // Ligar préstamos a la empresa
+  const disp = await api("GET", "/planillas/prestamos-disponibles?buscar=0801000000991", null, ids.tAdmin);
+  assert.ok(disp.b.data.some((x) => x.id_prestamo === p1));
+  for (const id of [p1, p2]) assert.equal((await api("POST", `/planillas/empresas/${idEmp}/prestamos`, { id_prestamo: id }, ids.tAdmin)).s, 200);
+  assert.equal((await api("POST", `/planillas/empresas/${idEmp}/prestamos`, { id_prestamo: p1 }, ids.tAdmin)).s, 400, "ya está ligado");
+  const lista = (await api("GET", `/planillas/empresas/${idEmp}/prestamos`, null, ids.tAdmin)).b.data;
+  assert.equal(lista.length, 2);
+  cerca(lista[0].descuento_mensual, 106.62); // cuota de 1,200 a 12 meses al 12% anual
+
+  // Planilla del mes
+  assert.equal((await api("POST", "/planillas/lotes", { id_empresa: idEmp, periodo: "2026-13" }, ids.tAdmin)).s, 400);
+  const lote = await api("POST", "/planillas/lotes", { id_empresa: idEmp, periodo: "2026-11" }, ids.tAdmin);
+  assert.equal(lote.s, 201, lote.b?.message);
+  assert.equal((await api("POST", "/planillas/lotes", { id_empresa: idEmp, periodo: "2026-11" }, ids.tAdmin)).s, 409, "una por mes");
+  const idL = lote.b.id_lote;
+  const l = (await api("GET", `/planillas/lotes/${idL}`, null, ids.tAdmin)).b.data;
+  assert.equal(l.detalle.length, 2);
+  cerca(l.total_esperado, 213.24);
+  const xls = await fetch(`${base}/api/planillas/lotes/${idL}/excel`, { headers: { Authorization: `Bearer ${ids.tAdmin}` } });
+  assert.equal(xls.status, 200);
+
+  // La empresa pagó solo al primero
+  const d1 = l.detalle.find((d) => d.id_prestamo === p1);
+  const d2 = l.detalle.find((d) => d.id_prestamo === p2);
+  const ap = await api(
+    "POST",
+    `/planillas/lotes/${idL}/aplicar`,
+    { metodo: "transferencia", referencia: "TRF-889", detalle: [{ id_detalle: d1.id_detalle, monto_recibido: d1.monto_esperado }, { id_detalle: d2.id_detalle, monto_recibido: 0, nota: "Incapacidad" }] },
+    ids.tAdmin
+  );
+  assert.equal(ap.s, 200, ap.b?.message);
+  assert.equal(ap.b.aplicados, 1);
+  assert.equal(ap.b.sin_descontar, 1);
+  const [[pago]] = await pool.query("SELECT monto_pagado, metodo_pago FROM pagos_prestamo WHERE id_prestamo = ?", [p1]);
+  cerca(parseFloat(pago.monto_pagado), d1.monto_esperado);
+  assert.equal(pago.metodo_pago, "transferencia");
+  assert.equal((await pool.query("SELECT COUNT(*) AS n FROM pagos_prestamo WHERE id_prestamo = ?", [p2]))[0][0].n, 0);
+  const l2 = (await api("GET", `/planillas/lotes/${idL}`, null, ids.tAdmin)).b.data;
+  assert.equal(l2.estado, "aplicada");
+  assert.equal(l2.detalle.find((d) => d.id_prestamo === p2).estado, "no_descontado");
+  assert.equal((await api("POST", `/planillas/lotes/${idL}/aplicar`, {}, ids.tAdmin)).s, 400, "no se aplica dos veces");
+  const [[n]] = await pool.query("SELECT titulo FROM notificaciones WHERE id_usuario = ? ORDER BY id_notificacion DESC LIMIT 1", [e1]);
+  assert.equal(n.titulo, "Pago por planilla aplicado");
+
+  // Todo o nada: si un pago falla, no se aplica ninguno
+  const l3 = await api("POST", "/planillas/lotes", { id_empresa: idEmp, periodo: "2026-12" }, ids.tAdmin);
+  await pool.query("UPDATE prestamos SET estado = 'pagado' WHERE id_prestamo = ?", [p2]);
+  const det3 = (await api("GET", `/planillas/lotes/${l3.b.id_lote}`, null, ids.tAdmin)).b.data.detalle;
+  const malo = await api(
+    "POST",
+    `/planillas/lotes/${l3.b.id_lote}/aplicar`,
+    { metodo: "transferencia", detalle: [{ id_detalle: det3.find((d) => d.id_prestamo === p1).id_detalle, monto_recibido: 50 }] },
+    ids.tAdmin
+  );
+  assert.equal(malo.s, 400);
+  assert.match(malo.b.message, new RegExp(`#${p2}`));
+  assert.equal((await pool.query("SELECT COUNT(*) AS n FROM pagos_prestamo WHERE id_prestamo = ?", [p1]))[0][0].n, 1, "no quedó el pago del primero");
+  assert.equal((await api("DELETE", `/planillas/lotes/${l3.b.id_lote}`, null, ids.tAdmin)).s, 200);
+
+  await pool.query("UPDATE prestamos SET estado = 'rechazado', id_empresa_planilla = NULL WHERE id_prestamo IN (?)", [[p1, p2]]);
+  assert.equal((await api("PUT", "/configuracion/funciones", { descuento_planilla: false }, ids.tSuper)).s, 200);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

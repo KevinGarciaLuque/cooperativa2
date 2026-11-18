@@ -1255,6 +1255,60 @@ const MIGRACIONES = [
       await agregar("comite_motivo", "VARCHAR(200) NULL");
     },
   },
+  {
+    id: "2026_11_023_descuento_planilla",
+    descripcion: "Descuento por planilla: empresas con convenio, préstamos ligados y planillas mensuales",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS empresas_convenio (
+          id_empresa INT AUTO_INCREMENT PRIMARY KEY,
+          nombre VARCHAR(150) NOT NULL,
+          contacto VARCHAR(120) NULL,
+          telefono VARCHAR(30) NULL,
+          correo VARCHAR(120) NULL,
+          dia_corte TINYINT NULL,
+          activa TINYINT(1) NOT NULL DEFAULT 1,
+          creada_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      const [[e]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'prestamos' AND COLUMN_NAME = 'id_empresa_planilla'`
+      );
+      if (!e.n) await conn.query("ALTER TABLE prestamos ADD COLUMN id_empresa_planilla INT NULL, ADD INDEX idx_prestamo_planilla (id_empresa_planilla)");
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS planilla_lotes (
+          id_lote INT AUTO_INCREMENT PRIMARY KEY,
+          id_empresa INT NOT NULL,
+          periodo CHAR(7) NOT NULL,
+          estado ENUM('generada','aplicada','anulada') NOT NULL DEFAULT 'generada',
+          total_esperado DECIMAL(14,2) NOT NULL DEFAULT 0,
+          total_recibido DECIMAL(14,2) NULL,
+          metodo VARCHAR(20) NULL,
+          referencia VARCHAR(80) NULL,
+          creado_por INT NULL,
+          creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          aplicado_por INT NULL,
+          aplicado_en DATETIME NULL,
+          INDEX idx_lote_empresa (id_empresa, periodo)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS planilla_detalle (
+          id_detalle INT AUTO_INCREMENT PRIMARY KEY,
+          id_lote INT NOT NULL,
+          id_prestamo INT NOT NULL,
+          id_usuario INT NOT NULL,
+          monto_esperado DECIMAL(14,2) NOT NULL,
+          monto_recibido DECIMAL(14,2) NULL,
+          id_pago INT NULL,
+          estado ENUM('pendiente','aplicado','no_descontado') NOT NULL DEFAULT 'pendiente',
+          nota VARCHAR(200) NULL,
+          INDEX idx_detalle_lote (id_lote)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

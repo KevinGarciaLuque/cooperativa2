@@ -43,6 +43,7 @@ const MODULO_POR_PREFIJO = {
   "documentos-credito": "prestamos",
   "reportes-ampliados": "reportes",
   supervisor: "contabilidad",
+  planillas: "pagos",
   contabilidad: "contabilidad",
   recibos: "pagos",
   "pagos-reportados": "pagos",

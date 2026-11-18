@@ -251,6 +251,21 @@ const pendientesPersonal = async (req) => {
     });
   }
 
+  if (tiene("pagos") && (await require("./funciones").habilitada("descuento_planilla", u))) {
+    try {
+      const [[pl]] = await pool.query("SELECT COUNT(*) AS n FROM planilla_lotes WHERE estado = 'generada'");
+      agregar(pl.n, {
+        clave: "planillas_por_aplicar",
+        titulo: "Planillas por aplicar",
+        detalle: "Planillas de empresas con convenio que todavía no se han cobrado.",
+        ruta: "/planillas",
+        nivel: "media",
+      });
+    } catch {
+      // la tabla aún no existe
+    }
+  }
+
   if (tiene("caja")) {
     // Turno propio que quedó abierto desde un día anterior
     const [[t]] = await pool.query(

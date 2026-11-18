@@ -10,6 +10,15 @@ const DEFAULTS = {
   prov_31_60: 20,
   prov_61_90: 50,
   prov_90_mas: 100,
+  // Rangos de días de atraso de cada categoría (según la norma de la cooperativa)
+  prov_lim_1: 30, // mora de 1 a este número de días
+  prov_lim_2: 60,
+  prov_lim_3: 90, // más de este número: la última categoría
+  // Metas de los indicadores financieros (semáforo del informe al supervisor), en %
+  ind_meta_morosidad: 5, // cartera con atraso / cartera total: no más de
+  ind_meta_liquidez: 15, // disponibilidades / depósitos de socios: al menos
+  ind_meta_solvencia: 10, // patrimonio / activo: al menos
+  ind_meta_cobertura: 100, // provisión / cartera con más de 30 días: al menos
   // Solicitudes de préstamo hechas por el socio
   sol_tasa_mensual: 10, // tasa referencial mensual (%) para la cuota estimada
   sol_monto_max: 200000,

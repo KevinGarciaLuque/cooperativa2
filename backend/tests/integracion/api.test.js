@@ -2508,6 +2508,77 @@ test("el número rojo de Solicitudes no cuenta comprobantes de recibos anulados 
   await pool.query("DELETE FROM comprobantes_firmados WHERE id_recibo IN (?)", [[r.insertId, 99999999]]);
 });
 
+test("etapa 7: rangos de mora configurables, indicadores para el supervisor y reportes IVE", async () => {
+  // Apagada: nadie la usa
+  assert.equal((await api("GET", "/supervisor/indicadores", null, ids.tAdmin)).s, 403);
+  assert.equal((await api("GET", "/cumplimiento/ive/efectivo", null, ids.tAdmin)).s, 403);
+  assert.equal((await api("PUT", "/configuracion/funciones", { reportes_supervisor: true }, ids.tSuper)).s, 200);
+
+  // Rangos de mora: deben ir en orden y cambian los nombres de las categorías
+  const moraBase = { mora_tasa_anual: 24, mora_dias_gracia: 30 };
+  const malo = await api("PUT", "/configuracion/financiera", { ...moraBase, prov_lim_1: 60, prov_lim_2: 30, prov_lim_3: 90 }, ids.tSuper);
+  assert.equal(malo.s, 400);
+  assert.equal((await api("PUT", "/configuracion/financiera", { ...moraBase, prov_lim_1: 15, prov_lim_2: 45, prov_lim_3: 120 }, ids.tSuper)).s, 200);
+  const ant = await api("GET", "/contabilidad/antiguedad-cartera", null, ids.tAdmin);
+  assert.equal(ant.b.etiquetas.mora_1_30, "Mora 1-15 días");
+  assert.equal(ant.b.etiquetas.mora_90_mas, "Mora más de 120 días");
+  const { limites } = require("../../utils/cartera");
+  assert.deepEqual(limites(), [15, 45, 120]);
+  assert.equal((await api("PUT", "/configuracion/financiera", { ...moraBase, prov_lim_1: 30, prov_lim_2: 60, prov_lim_3: 90 }, ids.tSuper)).s, 200);
+
+  // Indicadores
+  const ind = await api("GET", "/supervisor/indicadores", null, ids.tAdmin);
+  assert.equal(ind.s, 200, ind.b?.message);
+  const claves = ind.b.indicadores.map((i) => i.clave);
+  for (const k of ["morosidad", "cobertura", "liquidez", "solvencia", "rentabilidad", "concentracion"]) assert.ok(claves.includes(k), k);
+  assert.ok(["contabilidad", "operacion"].includes(ind.b.fuente));
+  assert.equal(ind.b.cartera_por_categoria.length, 6);
+  const mor = ind.b.indicadores.find((i) => i.clave === "morosidad");
+  assert.ok(["bien", "atencion", "mal", "sin_dato"].includes(mor.estado));
+  const xls = await fetch(`${base}/api/supervisor/exportar`, { headers: { Authorization: `Bearer ${ids.tAdmin}` } });
+  assert.equal(xls.status, 200);
+  assert.match(xls.headers.get("content-type"), /spreadsheetml/);
+  // Un socio no lo ve
+  assert.equal((await api("GET", "/supervisor/indicadores", null, ids.tSocio)).s, 403);
+
+  // IVE: efectivo individual (sobre el umbral) y múltiple (dos menores el mismo día que lo superan)
+  const { umbral } = require("../../utils/cumplimiento");
+  const lim = umbral();
+  const dia = "2026-03-10";
+  const mov = (monto, hora) =>
+    pool.query(
+      `INSERT INTO caja_movimientos (fecha, tipo, categoria, monto, metodo, descripcion, id_socio, origen)
+       VALUES (?, 'ingreso', 'deposito', ?, 'efectivo', 'Prueba IVE', ?, 'prueba')`,
+      [`${dia} ${hora}`, monto, ids.socio2]
+    );
+  await mov(lim + 100, "09:00:00");
+  await mov(lim * 0.6, "10:00:00");
+  await mov(lim * 0.6, "15:30:00");
+  const ef = await api("GET", `/cumplimiento/ive/efectivo?desde=${dia}&hasta=${dia}`, null, ids.tAdmin);
+  assert.equal(ef.s, 200, ef.b?.message);
+  assert.equal(ef.b.individuales.filter((m) => m.id_socio === ids.socio2).length, 1);
+  const mult = ef.b.multiples.find((g) => g.socio.id_socio === ids.socio2);
+  assert.ok(mult, "aparece la transacción múltiple");
+  assert.equal(mult.movimientos.length, 2);
+  cerca(mult.total, lim * 1.2);
+  const efx = await fetch(`${base}/api/cumplimiento/ive/efectivo/exportar?desde=${dia}&hasta=${dia}`, { headers: { Authorization: `Bearer ${ids.tAdmin}` } });
+  assert.equal(efx.status, 200);
+
+  // Sospechosas: solo las alertas marcadas como reportadas
+  const [al] = await pool.query(
+    "INSERT INTO alertas_cumplimiento (id_socio, tipo, monto, detalle, estado, nota, revisado_por, revisado_en) VALUES (?, 'fraccionamiento', 5000, 'Prueba', 'reportada', 'Depósitos sin justificar', ?, NOW())",
+    [ids.socio2, ids.admin]
+  );
+  const sos = await api("GET", "/cumplimiento/ive/sospechosas", null, ids.tAdmin);
+  assert.equal(sos.s, 200);
+  assert.ok(sos.b.data.some((a) => a.id_alerta === al.insertId && a.nota === "Depósitos sin justificar"));
+  assert.equal((await fetch(`${base}/api/cumplimiento/ive/sospechosas/exportar`, { headers: { Authorization: `Bearer ${ids.tAdmin}` } })).status, 200);
+
+  await pool.query("DELETE FROM caja_movimientos WHERE origen = 'prueba' AND descripcion = 'Prueba IVE'");
+  await pool.query("DELETE FROM alertas_cumplimiento WHERE id_alerta = ?", [al.insertId]);
+  assert.equal((await api("PUT", "/configuracion/funciones", { reportes_supervisor: false }, ids.tSuper)).s, 200);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

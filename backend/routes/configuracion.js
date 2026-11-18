@@ -227,6 +227,13 @@ router.put("/financiera", verificarToken, soloSuperAdmin, async (req, res) => {
       aprob_votos_comite: [1, 15], // votos a favor del comité para aprobar
       caja_exigir_turno: [0, 1], // efectivo solo con turno de caja abierto
       seg_2fa_personal: [0, 1], // verificación en dos pasos por correo para el personal
+      prov_lim_1: [1, 3650], // días de cada categoría de mora
+      prov_lim_2: [2, 3650],
+      prov_lim_3: [3, 3650],
+      ind_meta_morosidad: [0, 100], // metas de los indicadores financieros (%)
+      ind_meta_liquidez: [0, 1000],
+      ind_meta_solvencia: [0, 100],
+      ind_meta_cobertura: [0, 1000],
     };
     for (const [k, [min, max]] of Object.entries(clavesSol)) {
       if (req.body[k] === undefined || req.body[k] === "") continue;
@@ -235,6 +242,11 @@ router.put("/financiera", verificarToken, soloSuperAdmin, async (req, res) => {
         return res.status(400).json({ message: `El valor de ${k} debe estar entre ${min} y ${max}.` });
       }
       guardar.push([`fin_${k}`, String(v)]);
+    }
+    // Los rangos de mora deben ir en orden (30 < 60 < 90)
+    const lim = (k) => (req.body[k] === undefined || req.body[k] === "" ? configFin.obtener()[k] : parseFloat(req.body[k]));
+    if (!(lim("prov_lim_1") < lim("prov_lim_2") && lim("prov_lim_2") < lim("prov_lim_3"))) {
+      return res.status(400).json({ message: "Los días de las categorías de mora deben ir de menor a mayor (por ejemplo 30, 60 y 90)." });
     }
     // Recordatorios de pago
     const clavesRec = { rec_activo: [0, 1], rec_dias_antes: [0, 15], rec_mora_cada: [0, 30] };

@@ -185,6 +185,7 @@ app.use("/api/grupos", ocultarInteresSocio, require("./routes/grupos"));
 app.use("/api/pagos-ampliados", ocultarInteresSocio, require("./routes/pagosAmpliados"));
 app.use("/api/documentos-credito", require("./routes/documentosCredito"));
 app.use("/api/reportes-ampliados", ocultarInteresSocio, require("./routes/reportesAmpliados"));
+app.use("/api/supervisor", ocultarInteresSocio, require("./routes/supervisor"));
 app.use("/api/aportaciones", require("./routes/aportaciones"));
 app.use("/api/pagos", ocultarInteresSocio, require("./routes/pagos"));
 app.use("/api/movimientos", require("./routes/movimientos"));

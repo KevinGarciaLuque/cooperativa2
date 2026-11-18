@@ -140,7 +140,7 @@ export default function Cobranza() {
 
   const resumen = cartera?.resumen || {};
   const colorDe = (cat) => CATEGORIAS.find((c) => c.key === cat)?.color || "#475569";
-  const etiquetaDe = (cat) => CATEGORIAS.find((c) => c.key === cat)?.label || cat;
+  const etiquetaDe = (cat) => cartera?.etiquetas?.[cat] || CATEGORIAS.find((c) => c.key === cat)?.label || cat;
 
   return (
     <div className="container-fluid py-3">
@@ -168,7 +168,7 @@ export default function Cobranza() {
                 fontWeight: 600,
               }}
             >
-              {c.label}
+              {cartera?.etiquetas?.[c.key] || c.label}
               {c.key === "todas"
                 ? ` (${cartera?.data.length ?? 0})`
                 : ` (${r ? r.cantidad : 0})`}

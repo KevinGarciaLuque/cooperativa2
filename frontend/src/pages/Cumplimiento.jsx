@@ -3,7 +3,10 @@
 // anota qué hizo y exporta el reporte. Información reservada: no se le muestra al socio.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { FaUserSecret, FaFileExcel, FaCheck, FaFlag, FaUndo } from "react-icons/fa";
+import { FaUserSecret, FaFileExcel, FaCheck, FaFlag, FaUndo, FaBell, FaMoneyBillWave, FaFileAlt } from "react-icons/fa";
+import Pestanas from "../components/Pestanas";
+import ReportesIve from "../components/ReportesIve";
+import { useFunciones } from "../hooks/useFunciones";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
 import { dinero } from "../utils/pais";
@@ -35,6 +38,8 @@ export default function Cumplimiento() {
   const [alertas, setAlertas] = useState([]);
   const [filtro, setFiltro] = useState({ estado: "pendiente", tipo: "", desde: "", hasta: "" });
   const [revisando, setRevisando] = useState(null); // { alerta, estado }
+  const { reportes_supervisor: conIve } = useFunciones();
+  const [vista, setVista] = useState("alertas");
   const [nota, setNota] = useState("");
   const error = (e, msg) => mostrarAlerta(e.response?.data?.message || msg, "error");
 
@@ -90,10 +95,29 @@ export default function Cumplimiento() {
           <h4 className="fw-bold mb-0" style={{ color: AZUL }}>Cumplimiento</h4>
           <div className="text-muted small">Prevención de lavado de dinero · información reservada</div>
         </div>
-        <button className="btn btn-outline-success btn-sm" onClick={exportar}>
-          <FaFileExcel className="me-1" /> Exportar a Excel
-        </button>
+        {vista === "alertas" && (
+          <button className="btn btn-outline-success btn-sm" onClick={exportar}>
+            <FaFileExcel className="me-1" /> Exportar a Excel
+          </button>
+        )}
       </div>
+
+      {conIve && (
+        <Pestanas
+          activa={vista}
+          onCambiar={setVista}
+          tabs={[
+            { clave: "alertas", titulo: "Alertas", icono: <FaBell />, cuenta: resumen?.alertas.pendiente, alerta: true },
+            { clave: "efectivo", titulo: "Efectivo para la IVE", icono: <FaMoneyBillWave /> },
+            { clave: "sospechosas", titulo: "Sospechosas para la IVE", icono: <FaFileAlt /> },
+          ]}
+        />
+      )}
+      {conIve && vista !== "alertas" && (
+        <ReportesIve modo={vista} token={token} onError={(m) => mostrarAlerta(m, "error")} />
+      )}
+      {(!conIve || vista === "alertas") && (
+      <>
 
       {resumen && (
         <div className="row g-3 mb-3">
@@ -208,6 +232,9 @@ export default function Cumplimiento() {
           )}
         </div>
       </div>
+
+      </>
+      )}
 
       {revisando && (
         <div className="modal d-block" style={{ background: "rgba(0,0,0,.4)" }} onClick={() => setRevisando(null)}>

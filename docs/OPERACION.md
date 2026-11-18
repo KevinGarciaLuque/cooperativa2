@@ -321,3 +321,14 @@ Se recomienda un ambiente de ensayo separado del de producción:
 - **Socio — recordatorios en la campanita:** 3 días antes de que venza una cuota llega "tu cuota vence el …"; si la cuota se atrasa, un aviso de mora; y 7 días antes de que venza un depósito a plazo, un aviso. Cada recordatorio llega una sola vez.
 - **Personal — campanita en la barra superior:** muestra lo que espera atención según los módulos del rol: socios y solicitudes por aprobar, pagos reportados, comprobantes firmados, préstamos por desembolsar, votos pendientes del comité, cuotas que vencen hoy o en 3 días, préstamos atrasados, promesas de pago incumplidas, plazos fijos por vencer, alertas de cumplimiento y turno de caja sin cerrar. Al tocar un aviso se abre su pantalla. El número rojo cuenta solo lo nuevo desde la última vez que se abrió.
 - **Celular:** las pestañas del portal del socio se desplazan solas como carrusel; se detienen al tocarlas (o con el mouse encima) y se pueden deslizar con el dedo.
+
+## Etapa 7: informe al supervisor y reportes para la IVE
+
+Función nueva **"Informe al supervisor y reportes IVE"**: la enciende el Super Administrador en *Control de Accesos → Funciones nuevas*.
+
+- **Rangos de mora configurables** (*Parámetros → Provisión de cartera*): los días de cada categoría (por defecto 30, 60 y 90) y su porcentaje de provisión se ajustan a la norma de la cooperativa. Cobranza, Contabilidad y el informe usan los nuevos rangos. Esto funciona aunque la función esté apagada.
+- **Informe al supervisor** (*Contabilidad → Informe al supervisor*): morosidad, morosidad mayor al primer rango, cobertura de provisiones, liquidez, solvencia, rentabilidad anualizada y concentración en los 10 mayores deudores, cada uno con su meta y semáforo (Cumple / En observación / No cumple). Se elige la fecha de corte y se baja en Excel con cuatro hojas: indicadores, cifras, cartera por categoría y mayores deudores. Con la contabilidad iniciada usa sus saldos; si no, calcula con caja, ahorro y préstamos y lo avisa.
+- **Metas de los indicadores** (*Parámetros → Metas de los indicadores*, visible con la función encendida).
+- **Efectivo para la IVE** (*Cumplimiento*): movimientos en efectivo iguales o mayores al umbral y las transacciones **múltiples** (varios movimientos menores del mismo socio en un día que juntos lo alcanzan). El Excel lleva los datos del socio: identidad, nacionalidad, fecha de nacimiento, profesión, actividad, lugar de trabajo, dirección, origen de los fondos y si es PEP.
+- **Sospechosas para la IVE** (*Cumplimiento*): las alertas marcadas como *reportadas*, con el análisis del oficial y los datos del socio.
+- Los formatos de Excel son estándar; cuando la cooperativa comparta su formulario oficial se ajustan las columnas.

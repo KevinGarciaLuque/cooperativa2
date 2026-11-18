@@ -44,6 +44,11 @@ const CATALOGO = [
     nombre: "Reportes ampliados",
     descripcion: "Historial crediticio, proyección de cobros, créditos vencidos, por cerrar y cerrados, por promotor y línea.",
   },
+  {
+    clave: "reportes_supervisor",
+    nombre: "Informe al supervisor y reportes IVE",
+    descripcion: "Indicadores financieros con semáforo (morosidad, cobertura, liquidez, solvencia, rentabilidad) en Excel; reporte de transacciones en efectivo y de transacciones sospechosas para la IVE.",
+  },
 ];
 
 let cache = null;

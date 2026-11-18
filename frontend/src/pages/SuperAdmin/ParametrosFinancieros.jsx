@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useAlerta } from "../../context/AlertaContext";
 import { FaBell, FaSlidersH } from "react-icons/fa";
 import { simboloMoneda } from "../../utils/pais";
+import { useFunciones } from "../../hooks/useFunciones";
 
 const ACCENT = "#a8cd3a";
 const AZUL = "#1a2035";
@@ -19,6 +20,10 @@ export default function ParametrosFinancieros() {
   const [prov, setProv] = useState({ prov_al_dia: "", prov_1_30: "", prov_31_60: "", prov_61_90: "", prov_90_mas: "" });
   const [sol, setSol] = useState({ sol_tasa_mensual: "", sol_monto_max: "", sol_plazo_max: "", sol_pct_ingreso_max: "", aho_retencion_pct: "0", aml_umbral: "0", aprob_monto_admin: "0", aprob_votos_comite: "2", caja_exigir_turno: "0", seg_2fa_personal: "0" });
   const [seguridad, setSeguridad] = useState(null);
+  // Días de cada categoría de mora y metas de los indicadores del informe al supervisor
+  const [lims, setLims] = useState({ prov_lim_1: "30", prov_lim_2: "60", prov_lim_3: "90" });
+  const [metas, setMetas] = useState({ ind_meta_morosidad: "5", ind_meta_liquidez: "15", ind_meta_solvencia: "10", ind_meta_cobertura: "100" });
+  const { reportes_supervisor: conSupervisor } = useFunciones();
   const [rec, setRec] = useState({ rec_activo: true, rec_dias_antes: "3", rec_mora_cada: "7" });
   const [enviando, setEnviando] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -48,6 +53,14 @@ export default function ParametrosFinancieros() {
           rec_dias_antes: String(res.data.data.rec_dias_antes ?? 3),
           rec_mora_cada: String(res.data.data.rec_mora_cada ?? 7),
         });
+        const dat = res.data.data;
+        setLims({ prov_lim_1: String(dat.prov_lim_1 ?? 30), prov_lim_2: String(dat.prov_lim_2 ?? 60), prov_lim_3: String(dat.prov_lim_3 ?? 90) });
+        setMetas({
+          ind_meta_morosidad: String(dat.ind_meta_morosidad ?? 5),
+          ind_meta_liquidez: String(dat.ind_meta_liquidez ?? 15),
+          ind_meta_solvencia: String(dat.ind_meta_solvencia ?? 10),
+          ind_meta_cobertura: String(dat.ind_meta_cobertura ?? 100),
+        });
         setProv({
           prov_al_dia: String(res.data.data.prov_al_dia),
           prov_1_30: String(res.data.data.prov_1_30),
@@ -71,6 +84,8 @@ export default function ParametrosFinancieros() {
           mora_tasa_anual: parseFloat(tasa),
           mora_dias_gracia: parseInt(gracia),
           ...prov,
+          ...lims,
+          ...(conSupervisor ? metas : {}),
           ...sol,
           rec_activo: rec.rec_activo ? 1 : 0,
           rec_dias_antes: rec.rec_dias_antes,
@@ -302,15 +317,33 @@ export default function ParametrosFinancieros() {
 
         <h5 className="fw-bold mt-4 mb-1" style={{ color: AZUL }}>Provisión de cartera</h5>
         <p className="text-muted small">
-          Porcentaje del saldo que se reserva según la antigüedad del atraso. Se usa en Contabilidad.
+          Porcentaje del saldo que se reserva según los días de atraso. Los rangos de días y los porcentajes se ajustan a la
+          norma de la cooperativa; se usan en Cobranza y Contabilidad.
         </p>
+        <div className="row g-3 mb-2">
+          {[
+            ["prov_lim_1", "Primer rango: hasta (días)"],
+            ["prov_lim_2", "Segundo rango: hasta (días)"],
+            ["prov_lim_3", "Tercer rango: hasta (días)"],
+          ].map(([k, etiqueta]) => (
+            <div className="col-4" key={k}>
+              <label className="form-label fw-semibold small">{etiqueta}</label>
+              <input
+                type="number" min="1" max="3650" step="1" className="form-control"
+                value={lims[k]}
+                onChange={(e) => setLims({ ...lims, [k]: e.target.value })}
+                disabled={cargando}
+              />
+            </div>
+          ))}
+        </div>
         <div className="row g-3">
           {[
             ["prov_al_dia", "Al día / por vencer"],
-            ["prov_1_30", "Mora 1-30 días"],
-            ["prov_31_60", "Mora 31-60 días"],
-            ["prov_61_90", "Mora 61-90 días"],
-            ["prov_90_mas", "Mora de más de 90 días"],
+            ["prov_1_30", `Mora 1-${lims.prov_lim_1 || "?"} días`],
+            ["prov_31_60", `Mora ${(parseInt(lims.prov_lim_1) || 0) + 1}-${lims.prov_lim_2 || "?"} días`],
+            ["prov_61_90", `Mora ${(parseInt(lims.prov_lim_2) || 0) + 1}-${lims.prov_lim_3 || "?"} días`],
+            ["prov_90_mas", `Mora de más de ${lims.prov_lim_3 || "?"} días`],
           ].map(([k, etiqueta]) => (
             <div className="col-6 col-md-4" key={k}>
               <label className="form-label fw-semibold small">{etiqueta} (%)</label>
@@ -327,6 +360,34 @@ export default function ParametrosFinancieros() {
             </div>
           ))}
         </div>
+
+        {conSupervisor && (
+          <>
+            <h5 className="fw-bold mt-4 mb-1" style={{ color: AZUL }}>Metas de los indicadores</h5>
+            <p className="text-muted small">
+              El informe al supervisor marca cada indicador en verde, amarillo o rojo comparándolo con estas metas. Pon las que
+              pide la norma de la cooperativa.
+            </p>
+            <div className="row g-3">
+              {[
+                ["ind_meta_morosidad", "Morosidad: no más de (%)"],
+                ["ind_meta_cobertura", "Cobertura de provisiones: al menos (%)"],
+                ["ind_meta_liquidez", "Liquidez: al menos (%)"],
+                ["ind_meta_solvencia", "Solvencia: al menos (%)"],
+              ].map(([k, etiqueta]) => (
+                <div className="col-12 col-sm-6" key={k}>
+                  <label className="form-label fw-semibold small">{etiqueta}</label>
+                  <input
+                    type="number" min="0" max="1000" step="0.1" className="form-control"
+                    value={metas[k]}
+                    onChange={(e) => setMetas({ ...metas, [k]: e.target.value })}
+                    disabled={cargando}
+                  />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="mt-4">
           <button type="submit" className="btn fw-semibold" style={{ background: ACCENT, color: "#1a2a00" }} disabled={guardando || cargando}>

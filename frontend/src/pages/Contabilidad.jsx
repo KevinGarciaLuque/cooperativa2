@@ -16,6 +16,9 @@ import {
   FaHourglassHalf,
 } from "react-icons/fa";
 import Pestanas from "../components/Pestanas";
+import InformeSupervisor from "../components/InformeSupervisor";
+import { useFunciones } from "../hooks/useFunciones";
+import { FaClipboardCheck } from "react-icons/fa";
 import { dinero, localeApp } from "../utils/pais";
 
 const AZUL = "#1a2035";
@@ -73,6 +76,7 @@ export default function Contabilidad() {
   const { mostrarAlerta } = useAlerta();
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
   const esSuper = user?.rol === "Super Administrador";
+  const { reportes_supervisor: conSupervisor } = useFunciones();
 
   const [tab, setTab] = useState("cierre");
   const [mes, setMes] = useState(moverMes(mesActualISO(), -1));
@@ -87,7 +91,9 @@ export default function Contabilidad() {
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      if (tab === "cierre") {
+      if (tab === "supervisor") {
+        // El informe al supervisor carga sus propios datos
+      } else if (tab === "cierre") {
         const r = await axios.get(`${API_URL}/contabilidad/cierre-mensual`, { headers, params: { anio, mes: mesNum } });
         setCierre(r.data);
       } else if (tab === "resultados") {
@@ -214,6 +220,9 @@ export default function Contabilidad() {
     </div>
   );
 
+  // Nombres de las categorías con los días configurados en Parámetros (vienen del servidor)
+  const etiquetasCartera = { ...ETIQUETAS_CARTERA, ...(cartera?.etiquetas || {}) };
+
   const bloqueCartera = (resumen, totales) => (
     <div className="table-responsive">
       <table className="table align-middle mb-0">
@@ -233,7 +242,7 @@ export default function Contabilidad() {
             if (!r) return null;
             return (
               <tr key={k}>
-                <td>{ETIQUETAS_CARTERA[k]}</td>
+                <td>{etiquetasCartera[k]}</td>
                 <td className="text-end">{r.cantidad}</td>
                 <td className="text-end">{fmt(r.saldo)}</td>
                 <td className="text-end">{fmt(r.mora)}</td>
@@ -285,7 +294,10 @@ export default function Contabilidad() {
         className="ct-no-print"
         activa={tab}
         onCambiar={setTab}
-        tabs={TABS.map((t) => ({ clave: t.key, titulo: t.label, icono: t.icono }))}
+        tabs={[
+          ...TABS.map((t) => ({ clave: t.key, titulo: t.label, icono: t.icono })),
+          ...(conSupervisor ? [{ clave: "supervisor", titulo: "Informe al supervisor", icono: <FaClipboardCheck /> }] : []),
+        ]}
       />
 
       <div className="ct-print" style={{ opacity: cargando ? 0.5 : 1, transition: "opacity .15s" }}>
@@ -294,6 +306,9 @@ export default function Contabilidad() {
           <img src="/smartcoop.png" alt="SmartCoop" style={{ height: 56 }} />
           <div className="fw-bold fs-5">SmartCoop · Contabilidad</div>
         </div>
+        {tab === "supervisor" && conSupervisor && (
+          <InformeSupervisor token={token} onError={(m) => mostrarAlerta(m, "error")} />
+        )}
         {/* ── CIERRE MENSUAL ── */}
         {tab === "cierre" && (
           <>
@@ -428,7 +443,7 @@ export default function Contabilidad() {
                       <tr key={f.id_prestamo}>
                         <td>{f.socio}</td>
                         <td>#{f.id_prestamo}</td>
-                        <td>{ETIQUETAS_CARTERA[f.categoria]}</td>
+                        <td>{etiquetasCartera[f.categoria]}</td>
                         <td className="text-end">{f.dias_atraso}</td>
                         <td className="text-end">{fmt(f.saldo)}</td>
                         <td className="text-end">{fmt(f.mora_generada)}</td>

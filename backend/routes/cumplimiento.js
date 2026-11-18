@@ -8,6 +8,8 @@ const ExcelJS = require("exceljs");
 const pool = require("../db");
 const { umbral } = require("../utils/cumplimiento");
 const { obtener: paisActual } = require("../utils/pais");
+const { habilitada } = require("../utils/funciones");
+const { hoyISO } = require("../utils/fechas");
 
 const TIPOS = {
   efectivo_umbral: "Efectivo sobre el umbral",
@@ -173,6 +175,184 @@ router.get("/exportar", async (req, res) => {
     res.end();
   } catch (error) {
     console.error("ERROR AL EXPORTAR ALERTAS:", error);
+    if (!res.headersSent) res.status(500).json({ message: "No se pudo exportar" });
+  }
+});
+
+// ============================================================================
+// Reportes para la IVE (función "reportes_supervisor")
+//  - Transacciones en efectivo: cada movimiento igual o mayor al umbral, y las "múltiples":
+//    varios movimientos menores del mismo socio en un mismo día que juntos lo alcanzan.
+//  - Transacciones sospechosas: las alertas que el oficial marcó como "reportada".
+// Formato estándar en Excel; se ajusta al formulario que use la cooperativa.
+// ============================================================================
+const conIve = async (req, res, next) => {
+  if (await habilitada("reportes_supervisor", req.usuario)) return next();
+  res.status(403).json({ message: "Los reportes para la IVE no están habilitados." });
+};
+
+const rangoIve = (q) => {
+  const hoy = hoyISO();
+  const hasta = esFecha(q.hasta) ? q.hasta : hoy;
+  const desde = esFecha(q.desde) ? q.desde : `${hasta.substring(0, 7)}-01`;
+  return { desde, hasta };
+};
+
+const DATOS_SOCIO = `u.numero_socio, u.nombre_completo, u.dni, u.nacionalidad, u.fecha_nacimiento, u.profesion,
+  u.actividad_economica, u.lugar_trabajo, u.direccion, u.municipio, u.departamento, u.origen_fondos, u.es_pep`;
+
+const transaccionesEfectivo = async (q) => {
+  const { desde, hasta } = rangoIve(q);
+  const limite = umbral();
+  const [movs] = await pool.query(
+    `SELECT m.id_movimiento, m.fecha, DATE_FORMAT(m.fecha, '%Y-%m-%d') AS dia, DATE_FORMAT(m.fecha, '%H:%i') AS hora, m.tipo, m.categoria, m.descripcion, m.monto, m.id_socio,
+            s.nombre AS agencia, c.nombre_completo AS cajero, ${DATOS_SOCIO}
+     FROM caja_movimientos m
+     JOIN usuarios u ON u.id_usuario = m.id_socio
+     LEFT JOIN sucursales s ON s.id_sucursal = m.id_sucursal
+     LEFT JOIN usuarios c ON c.id_usuario = m.id_registrado_por
+     WHERE m.metodo = 'efectivo' AND DATE(m.fecha) BETWEEN ? AND ?
+     ORDER BY m.fecha, m.id_movimiento`,
+    [desde, hasta]
+  );
+  const filas = movs.map((m) => ({ ...m, monto: parseFloat(m.monto) }));
+  const individuales = filas.filter((m) => m.monto >= limite);
+  // Múltiples: mismo socio, mismo día y sentido, cada uno menor al umbral pero juntos lo alcanzan
+  const grupos = {};
+  filas
+    .filter((m) => m.monto < limite)
+    .forEach((m) => {
+      const dia = m.dia;
+      const k = `${m.id_socio}|${dia}|${m.tipo}`;
+      (grupos[k] = grupos[k] || { dia, tipo: m.tipo, movimientos: [] }).movimientos.push(m);
+    });
+  const multiples = Object.values(grupos)
+    .filter((g) => g.movimientos.length > 1 && g.movimientos.reduce((t, m) => t + m.monto, 0) >= limite)
+    .map((g) => ({ ...g, total: Math.round(g.movimientos.reduce((t, m) => t + m.monto, 0) * 100) / 100, socio: g.movimientos[0] }));
+  return { desde, hasta, umbral: limite, individuales, multiples };
+};
+
+// GET /api/cumplimiento/ive/efectivo?desde=&hasta=  (por defecto, el mes en curso)
+router.get("/ive/efectivo", conIve, async (req, res) => {
+  try {
+    res.json({ success: true, ...(await transaccionesEfectivo(req.query)) });
+  } catch (error) {
+    console.error("ERROR EN REPORTE DE EFECTIVO:", error);
+    res.status(500).json({ message: "No se pudo generar el reporte" });
+  }
+});
+
+const sospechosas = async (q) => {
+  const { desde, hasta } = rangoIve(q);
+  const [filas] = await pool.query(
+    `SELECT a.id_alerta, a.fecha, a.tipo, a.monto, a.detalle, a.nota, a.revisado_en,
+            r.nombre_completo AS revisor, ${DATOS_SOCIO}
+     FROM alertas_cumplimiento a
+     JOIN usuarios u ON u.id_usuario = a.id_socio
+     LEFT JOIN usuarios r ON r.id_usuario = a.revisado_por
+     WHERE a.estado = 'reportada' AND DATE(COALESCE(a.revisado_en, a.fecha)) BETWEEN ? AND ?
+     ORDER BY a.revisado_en, a.id_alerta`,
+    [desde, hasta]
+  );
+  return { desde, hasta, data: filas.map((a) => ({ ...a, monto: parseFloat(a.monto), tipo_texto: TIPOS[a.tipo] || a.tipo })) };
+};
+
+// GET /api/cumplimiento/ive/sospechosas?desde=&hasta=  (alertas marcadas como reportadas)
+router.get("/ive/sospechosas", conIve, async (req, res) => {
+  try {
+    res.json({ success: true, ...(await sospechosas(req.query)) });
+  } catch (error) {
+    console.error("ERROR EN REPORTE DE SOSPECHOSAS:", error);
+    res.status(500).json({ message: "No se pudo generar el reporte" });
+  }
+});
+
+const COLS_SOCIO = ["N.º socio", "Nombre", "Identidad", "Nacionalidad", "Fecha de nacimiento", "Profesión u oficio", "Actividad económica", "Lugar de trabajo", "Dirección", "Municipio", "Departamento", "Origen de los fondos", "PEP"];
+const valoresSocio = (u) => [
+  u.numero_socio || "", u.nombre_completo, u.dni, u.nacionalidad || "", u.fecha_nacimiento ? new Date(u.fecha_nacimiento) : "",
+  u.profesion || "", u.actividad_economica || "", u.lugar_trabajo || "", u.direccion || "", u.municipio || "",
+  u.departamento || "", u.origen_fondos || "", u.es_pep ? "Sí" : "No",
+];
+
+const libroIve = async (titulo, subtitulo) => {
+  const [[sitio]] = await pool.query("SELECT valor FROM configuracion_sitio WHERE clave = 'site_name'");
+  const libro = new ExcelJS.Workbook();
+  const hoja = (nombre, columnas) => {
+    const ws = libro.addWorksheet(nombre);
+    ws.addRow([sitio?.valor || "Cooperativa"]).font = { size: 14, bold: true };
+    ws.addRow([titulo]).font = { size: 12, bold: true };
+    ws.addRow([subtitulo]).font = { size: 10, color: { argb: "FF666666" } };
+    ws.addRow([]);
+    const r = ws.addRow(columnas);
+    r.font = { bold: true };
+    r.eachCell((c) => (c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2E8F0" } }));
+    columnas.forEach((_, i) => (ws.getColumn(i + 1).width = 18));
+    return ws;
+  };
+  return { libro, hoja };
+};
+
+const enviarLibro = async (res, libro, nombre) => {
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="${nombre}"`);
+  await libro.xlsx.write(res);
+  res.end();
+};
+
+router.get("/ive/efectivo/exportar", conIve, async (req, res) => {
+  try {
+    const d = await transaccionesEfectivo(req.query);
+    const moneda = paisActual().moneda.iso;
+    const { libro, hoja } = await libroIve(
+      "Reporte de transacciones en efectivo (IVE)",
+      `Del ${d.desde} al ${d.hasta} · Umbral: ${d.umbral} ${moneda} · Moneda: ${moneda}`
+    );
+    const base = ["Fecha y hora", "Operación", "Concepto", "Monto", "Agencia", "Registró"];
+    const ws1 = hoja("Individuales", [...base, ...COLS_SOCIO]);
+    d.individuales.forEach((m) =>
+      ws1.addRow([new Date(m.fecha), m.tipo === "ingreso" ? "Ingreso de efectivo" : "Salida de efectivo", m.descripcion || m.categoria, m.monto, m.agencia || "", m.cajero || "", ...valoresSocio(m)])
+    );
+    const ws2 = hoja("Múltiples", ["Fecha", "Operación", "Movimientos", "Total del día", "Detalle", ...COLS_SOCIO]);
+    d.multiples.forEach((g) =>
+      ws2.addRow([
+        g.dia, g.tipo === "ingreso" ? "Ingresos de efectivo" : "Salidas de efectivo", g.movimientos.length, g.total,
+        g.movimientos.map((m) => `${m.hora} ${m.monto.toFixed(2)}`).join(" · "),
+        ...valoresSocio(g.socio),
+      ])
+    );
+    ws1.getColumn(1).numFmt = "yyyy-mm-dd hh:mm";
+    ws1.getColumn(4).numFmt = "#,##0.00";
+    ws1.getColumn(11).numFmt = "yyyy-mm-dd";
+    ws2.getColumn(4).numFmt = "#,##0.00";
+    ws2.getColumn(10).numFmt = "yyyy-mm-dd";
+    ws2.getColumn(5).width = 40;
+    await enviarLibro(res, libro, `ive_efectivo_${d.desde}_${d.hasta}.xlsx`);
+  } catch (error) {
+    console.error("ERROR AL EXPORTAR REPORTE DE EFECTIVO:", error);
+    if (!res.headersSent) res.status(500).json({ message: "No se pudo exportar" });
+  }
+});
+
+router.get("/ive/sospechosas/exportar", conIve, async (req, res) => {
+  try {
+    const d = await sospechosas(req.query);
+    const moneda = paisActual().moneda.iso;
+    const { libro, hoja } = await libroIve(
+      "Reporte de transacciones sospechosas (IVE) — reservado",
+      `Reportadas del ${d.desde} al ${d.hasta} · Moneda: ${moneda}`
+    );
+    const ws = hoja("Sospechosas", ["#", "Fecha de la operación", "Tipo de alerta", "Monto", "Descripción de la operación", "Análisis del oficial", "Revisó", "Fecha del reporte", ...COLS_SOCIO]);
+    d.data.forEach((a) =>
+      ws.addRow([a.id_alerta, new Date(a.fecha), a.tipo_texto, a.monto, a.detalle, a.nota || "", a.revisor || "", a.revisado_en ? new Date(a.revisado_en) : "", ...valoresSocio(a)])
+    );
+    ws.getColumn(2).numFmt = "yyyy-mm-dd hh:mm";
+    ws.getColumn(8).numFmt = "yyyy-mm-dd";
+    ws.getColumn(4).numFmt = "#,##0.00";
+    ws.getColumn(13).numFmt = "yyyy-mm-dd";
+    [5, 6].forEach((c) => (ws.getColumn(c).width = 45));
+    await enviarLibro(res, libro, `ive_sospechosas_${d.desde}_${d.hasta}.xlsx`);
+  } catch (error) {
+    console.error("ERROR AL EXPORTAR SOSPECHOSAS:", error);
     if (!res.headersSent) res.status(500).json({ message: "No se pudo exportar" });
   }
 });

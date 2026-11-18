@@ -3,7 +3,7 @@ const router = express.Router();
 const pool = require("../db");
 const { filtroSocio } = require("../utils/sucursal");
 const { DIAS_MES } = require("../utils/calculosPrestamo");
-const { obtenerCartera, resumirCartera } = require("../utils/cartera");
+const { obtenerCartera, resumirCartera, etiquetasCartera } = require("../utils/cartera");
 const { notificarSocio } = require("../utils/notificaciones");
 const {
   mensajeRecordatorio,
@@ -21,7 +21,7 @@ router.get("/cartera", async (req, res) => {
   try {
     const filas = await obtenerCartera(await filtroSocio(req));
     const { resumen } = resumirCartera(filas);
-    res.json({ success: true, dias_mes: DIAS_MES, resumen, data: filas });
+    res.json({ success: true, dias_mes: DIAS_MES, resumen, data: filas, etiquetas: etiquetasCartera() });
   } catch (error) {
     console.error("ERROR AL OBTENER CARTERA:", error);
     res.status(500).json({ message: "Error al obtener la cartera" });

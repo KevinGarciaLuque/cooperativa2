@@ -19,10 +19,33 @@ const sumarMeses = (fecha, meses) => {
 
 const CATEGORIAS = ["al_dia", "por_vencer", "mora_1_30", "mora_31_60", "mora_61_90", "mora_90_mas"];
 
+// Límites de días de cada categoría (configurables en Parámetros; por defecto 30, 60 y 90)
+const limites = () => {
+  const c = config.obtener();
+  const l1 = parseInt(c.prov_lim_1) || 30;
+  const l2 = Math.max(l1 + 1, parseInt(c.prov_lim_2) || 60);
+  const l3 = Math.max(l2 + 1, parseInt(c.prov_lim_3) || 90);
+  return [l1, l2, l3];
+};
+
+// Nombre de cada categoría con sus días ("Mora 1-30 días")
+const etiquetasCartera = () => {
+  const [l1, l2, l3] = limites();
+  return {
+    al_dia: "Al día",
+    por_vencer: "Por vencer (7 días)",
+    mora_1_30: `Mora 1-${l1} días`,
+    mora_31_60: `Mora ${l1 + 1}-${l2} días`,
+    mora_61_90: `Mora ${l2 + 1}-${l3} días`,
+    mora_90_mas: `Mora más de ${l3} días`,
+  };
+};
+
 const clasificar = (diasMora, diasParaVencer) => {
-  if (diasMora > 90) return "mora_90_mas";
-  if (diasMora > 60) return "mora_61_90";
-  if (diasMora > 30) return "mora_31_60";
+  const [l1, l2, l3] = limites();
+  if (diasMora > l3) return "mora_90_mas";
+  if (diasMora > l2) return "mora_61_90";
+  if (diasMora > l1) return "mora_31_60";
   if (diasMora > 0) return "mora_1_30";
   if (diasParaVencer <= 7) return "por_vencer";
   return "al_dia";
@@ -134,4 +157,4 @@ const resumirCartera = (filas) => {
   return { resumen, totales };
 };
 
-module.exports = { obtenerCartera, resumirCartera, CATEGORIAS };
+module.exports = { obtenerCartera, resumirCartera, CATEGORIAS, etiquetasCartera, limites };

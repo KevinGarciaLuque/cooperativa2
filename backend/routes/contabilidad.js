@@ -3,20 +3,12 @@ const { hoyISO, anioMesActual } = require("../utils/fechas");
 const router = express.Router();
 const ExcelJS = require("exceljs");
 const pool = require("../db");
-const { obtenerCartera, resumirCartera, CATEGORIAS } = require("../utils/cartera");
+const { obtenerCartera, resumirCartera, CATEGORIAS, etiquetasCartera } = require("../utils/cartera");
 const { dinero, locale } = require("../utils/pais");
 
 const num = (v) => parseFloat(v || 0);
 const redondear = (v) => parseFloat(num(v).toFixed(2));
 
-const ETIQUETAS_CARTERA = {
-  al_dia: "Al día",
-  por_vencer: "Por vencer (7 días)",
-  mora_1_30: "Mora 1-30 días",
-  mora_31_60: "Mora 31-60 días",
-  mora_61_90: "Mora 61-90 días",
-  mora_90_mas: "Mora más de 90 días",
-};
 
 const ETIQUETAS_GASTO = {
   gasto_servicios: "Servicios (agua, luz, internet)",
@@ -368,7 +360,7 @@ router.get("/antiguedad-cartera", async (req, res) => {
     res.json({
       success: true,
       fecha: hoyISO(),
-      etiquetas: ETIQUETAS_CARTERA,
+      etiquetas: etiquetasCartera(),
       resumen,
       totales,
       detalle: filas,
@@ -458,14 +450,14 @@ router.get("/exportar/antiguedad-cartera", async (req, res) => {
     estiloEncabezado(ws.addRow(["Categoría", "Préstamos", "Saldo", "Mora generada", "% provisión", "Provisión"]));
     CATEGORIAS.forEach((c) => {
       const r = resumen[c];
-      ws.addRow([ETIQUETAS_CARTERA[c], r.cantidad, r.saldo, r.mora, r.porcentaje_provision / 100, r.provision]);
+      ws.addRow([etiquetasCartera()[c], r.cantidad, r.saldo, r.mora, r.porcentaje_provision / 100, r.provision]);
     });
     const t = ws.addRow(["TOTAL", totales.cantidad, totales.saldo, totales.mora, "", totales.provision]);
     t.font = { bold: true };
 
     ws.addRow([]);
     estiloEncabezado(ws.addRow(["Socio", "Préstamo", "Categoría", "Días de atraso", "Saldo", "Mora generada"]));
-    filas.forEach((f) => ws.addRow([f.socio, `#${f.id_prestamo}`, ETIQUETAS_CARTERA[f.categoria], f.dias_atraso, f.saldo, f.mora_generada]));
+    filas.forEach((f) => ws.addRow([f.socio, `#${f.id_prestamo}`, etiquetasCartera()[f.categoria], f.dias_atraso, f.saldo, f.mora_generada]));
 
     ws.columns = [{ width: 34 }, { width: 12 }, { width: 24 }, { width: 16 }, { width: 16 }, { width: 16 }];
     ws.getColumn(3).numFmt = "#,##0.00";

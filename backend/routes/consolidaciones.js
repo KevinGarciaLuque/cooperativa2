@@ -62,6 +62,8 @@ const calcular = async (conn, { idUsuario, ids, tasaMensual, plazo, adicional, o
       tasaAnual: p.tasa_interes,
       fechaOtorgado: p.fecha_otorgado,
       fechaUltimoPago: p.ultimo_pago,
+      moraTasa: p.mora_tasa_anual,
+      moraGracia: p.mora_dias_gracia,
     });
     return {
       id_prestamo: p.id_prestamo,

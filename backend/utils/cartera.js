@@ -32,6 +32,7 @@ const clasificar = (diasMora, diasParaVencer) => {
 const obtenerCartera = async (filtro = { sql: "", params: [] }) => {
   const [prestamos] = await pool.query(
     `SELECT p.id_prestamo, p.id_usuario, p.monto, p.saldo_restante, p.tasa_interes, p.plazo_meses,
+            p.mora_tasa_anual, p.mora_dias_gracia, p.redondeo_cuota,
             p.estado, p.fecha_otorgado,
             u.nombre_completo, u.dni, u.telefono, u.correo,
             (SELECT MAX(fecha_pago) FROM pagos_prestamo WHERE id_prestamo = p.id_prestamo) AS ultimo_pago,
@@ -54,7 +55,7 @@ const obtenerCartera = async (filtro = { sql: "", params: [] }) => {
     const base = soloFecha(p.ultimo_pago) || soloFecha(p.fecha_otorgado) || hoy;
     const vencimiento = pendiente ? pendiente.fecha_vencimiento : sumarMeses(base, 1);
     const diasParaVencer = diasEntre(hoy, vencimiento);
-    const diasMora = calcularDiasMora(p.fecha_otorgado, p.ultimo_pago);
+    const diasMora = calcularDiasMora(p.fecha_otorgado, p.ultimo_pago, p.mora_dias_gracia);
     const diasAtraso = plan ? plan.resumen.dias_atraso : diasMora;
     const saldo = parseFloat(p.saldo_restante);
     const cuota = calcularCuotaMensual(
@@ -75,7 +76,7 @@ const obtenerCartera = async (filtro = { sql: "", params: [] }) => {
       vencimiento,
       dias_para_vencer: diasParaVencer,
       dias_mora: diasMora,
-      mora_generada: parseFloat(calcularInteresMoratorio(saldo, diasMora).toFixed(2)),
+      mora_generada: parseFloat(calcularInteresMoratorio(saldo, diasMora, p.mora_tasa_anual).toFixed(2)),
       // Atraso según el plan de pagos (los de plazo indefinido: igual que dias_mora)
       con_plan: Boolean(plan),
       dias_atraso: diasAtraso,

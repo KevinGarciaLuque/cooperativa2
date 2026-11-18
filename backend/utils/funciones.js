@@ -25,6 +25,11 @@ const CATALOGO = [
     descripcion: "Documentos del crédito generados desde plantillas que la cooperativa puede editar.",
   },
   {
+    clave: "configuracion_avanzada",
+    nombre: "Configuración avanzada de créditos",
+    descripcion: "Por producto: mora y días de gracia propios, cargos automáticos (seguro, gastos), redondeo de cuota; código del crédito con formato propio.",
+  },
+  {
     clave: "reportes_ampliados",
     nombre: "Reportes ampliados",
     descripcion: "Historial crediticio, proyección de cobros, créditos vencidos, por cerrar y cerrados, por promotor y línea.",

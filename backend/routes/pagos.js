@@ -6,6 +6,8 @@ const { notificarSocio, crearNotificacion } = require("../utils/notificaciones")
 const jwt = require("jsonwebtoken");
 const { registrarCaja } = require("../utils/caja");
 const { habilitada } = require("../utils/funciones");
+const { redondearCuota } = require("../utils/planPagos");
+const { cargoAutomatico } = require("../utils/configCredito");
 const { crearRecibo, emitirFiniquito } = require("../utils/recibos");
 const { dinero } = require("../utils/pais");
 const { registrarCambio, conSalvaguarda } = require("../utils/contabilidad");
@@ -266,10 +268,9 @@ const procesarPago = async (connection, body, usuario) => {
     }
 
     // Calcular cuota mensual esperada
-    const cuotaMensual = calcularCuotaMensual(
-      parseFloat(prestamoData.monto),
-      parseFloat(prestamoData.tasa_interes),
-      parseInt(prestamoData.plazo_meses)
+    const cuotaMensual = redondearCuota(
+      calcularCuotaMensual(parseFloat(prestamoData.monto), parseFloat(prestamoData.tasa_interes), parseInt(prestamoData.plazo_meses)),
+      prestamoData.redondeo_cuota
     );
 
     // Obtener último pago
@@ -284,13 +285,14 @@ const procesarPago = async (connection, body, usuario) => {
     // Calcular días de mora
     const diasMora = calcularDiasMora(
       prestamoData.fecha_otorgado,
-      ultimoPago.length > 0 ? ultimoPago[0].fecha_pago : null
+      ultimoPago.length > 0 ? ultimoPago[0].fecha_pago : null,
+      prestamoData.mora_dias_gracia
     );
 
     // ── Mora ───────────────────────────────────────────────────────────────
     // Se cobra siempre que haya días de atraso. Solo un Super Administrador
     // puede omitirla (condonar_mora): entonces se cobra como si no hubiera mora.
-    const moraGenerada = diasMora > 0 ? calcularInteresMoratorio(saldoActual, diasMora) : 0;
+    const moraGenerada = diasMora > 0 ? calcularInteresMoratorio(saldoActual, diasMora, prestamoData.mora_tasa_anual) : 0;
     let moraCondonada = false;
     if (condonar_mora && moraGenerada > 0) {
       const rolSolicitante = usuario?.rol || null;
@@ -458,11 +460,15 @@ const procesarPago = async (connection, body, usuario) => {
 
     // Pagos ampliados (función "pagos_ampliados"): boleta, lugar y otros cargos cobrados con el pago
     let otrosCargos = 0;
-    if (await habilitada("pagos_ampliados", usuario)) {
+    // Cargo automático del préstamo (configuración por producto: seguro, gastos...)
+    const cargoAuto = cargoAutomatico(prestamoData, montoPagadoNum);
+    const conAmpliados = await habilitada("pagos_ampliados", usuario);
+    if (conAmpliados || cargoAuto > 0) {
       const txt = (v, max) => (String(v ?? "").trim() ? String(v).trim().substring(0, max) : null);
-      otrosCargos = Math.round(parseFloat(body.otros_cargos || 0) * 100) / 100;
+      const indicado = conAmpliados && body.otros_cargos !== undefined && body.otros_cargos !== null && body.otros_cargos !== "";
+      otrosCargos = indicado ? Math.round(parseFloat(body.otros_cargos || 0) * 100) / 100 : cargoAuto;
       if (!(otrosCargos >= 0)) return fail(400, { message: "Los otros cargos no son válidos." });
-      const detalleCargos = txt(body.otros_cargos_detalle, 150);
+      const detalleCargos = txt(indicado ? body.otros_cargos_detalle : null, 150) || (otrosCargos > 0 && !indicado ? prestamoData.cargo_concepto : null) || txt(body.otros_cargos_detalle, 150);
       if (otrosCargos > 0 && !detalleCargos) return fail(400, { message: "Indica el concepto de los otros cargos (seguro, gastos administrativos...)." });
       await connection.query(
         "UPDATE pagos_prestamo SET numero_boleta = ?, lugar_pago = ?, otros_cargos = ?, otros_cargos_detalle = ? WHERE id_pago = ?",
@@ -591,10 +597,9 @@ router.get("/prestamo/:id_prestamo/proximo-pago", async (req, res) => {
     }
 
     // Calcular cuota mensual
-    const cuotaMensual = calcularCuotaMensual(
-      parseFloat(prestamoData.monto),
-      parseFloat(prestamoData.tasa_interes),
-      parseInt(prestamoData.plazo_meses)
+    const cuotaMensual = redondearCuota(
+      calcularCuotaMensual(parseFloat(prestamoData.monto), parseFloat(prestamoData.tasa_interes), parseInt(prestamoData.plazo_meses)),
+      prestamoData.redondeo_cuota
     );
 
     // Obtener último pago
@@ -619,7 +624,8 @@ router.get("/prestamo/:id_prestamo/proximo-pago", async (req, res) => {
     // Calcular días de mora
     const diasMora = calcularDiasMora(
       prestamoData.fecha_otorgado,
-      ultimoPago.length > 0 ? ultimoPago[0].fecha_pago : null
+      ultimoPago.length > 0 ? ultimoPago[0].fecha_pago : null,
+      prestamoData.mora_dias_gracia
     );
 
     // Calcular interés moratorio si aplica
@@ -627,7 +633,8 @@ router.get("/prestamo/:id_prestamo/proximo-pago", async (req, res) => {
     if (diasMora > 0) {
       interesMoratorio = calcularInteresMoratorio(
         parseFloat(prestamoData.saldo_restante),
-        diasMora
+        diasMora,
+        prestamoData.mora_tasa_anual
       );
     }
 
@@ -646,6 +653,8 @@ router.get("/prestamo/:id_prestamo/proximo-pago", async (req, res) => {
       tasaAnual: prestamoData.tasa_interes,
       fechaOtorgado: prestamoData.fecha_otorgado,
       fechaUltimoPago: ultimoPago.length > 0 ? ultimoPago[0].fecha_pago : null,
+      moraTasa: prestamoData.mora_tasa_anual,
+      moraGracia: prestamoData.mora_dias_gracia,
     });
 
     const cuotasPagadas = totalPagos[0].total;
@@ -659,8 +668,11 @@ router.get("/prestamo/:id_prestamo/proximo-pago", async (req, res) => {
         saldo_actual: parseFloat(prestamoData.saldo_restante),
         dias_mora: diasMora,
         interes_moratorio: parseFloat(interesMoratorio.toFixed(2)),
-        mora_por_dia: parseFloat(calcularInteresMoratorio(parseFloat(prestamoData.saldo_restante), 1).toFixed(2)),
+        mora_por_dia: parseFloat(calcularInteresMoratorio(parseFloat(prestamoData.saldo_restante), 1, prestamoData.mora_tasa_anual).toFixed(2)),
         total_a_pagar: parseFloat(totalAPagar.toFixed(2)),
+        // Cargo automático que se cobrará además (configuración por producto)
+        cargo_automatico: cargoAutomatico(prestamoData, totalAPagar),
+        cargo_concepto: prestamoData.cargo_concepto || null,
         cuotas_pagadas: cuotasPagadas,
         cuotas_faltantes: cuotasFaltantes,
         en_mora: diasMora > 0,
@@ -1230,7 +1242,8 @@ router.get("/reportes/morosidad", async (req, res) => {
       // Calcular días de mora
       const diasMora = calcularDiasMora(
         prestamo.fecha_otorgado,
-        prestamo.ultimo_pago
+        prestamo.ultimo_pago,
+        prestamo.mora_dias_gracia
       );
 
       if (diasMora > 0) {
@@ -1242,7 +1255,8 @@ router.get("/reportes/morosidad", async (req, res) => {
 
         const interesMoratorio = calcularInteresMoratorio(
           parseFloat(prestamo.saldo_restante),
-          diasMora
+          diasMora,
+          prestamo.mora_tasa_anual
         );
 
         prestamosConMora.push({

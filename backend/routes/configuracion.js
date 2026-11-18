@@ -118,6 +118,25 @@ router.get("/", async (req, res) => {
 // GET/PUT /api/configuracion/financiera  (requiere sesión; PUT solo Super Admin)
 // Parámetros de mora que usa todo el sistema
 // ============================================================
+// GET/PUT /api/configuracion/codigo-credito → formato del código de los préstamos (configuración avanzada)
+router.get("/codigo-credito", verificarToken, async (req, res) => {
+  const { formatoCodigo, armarCodigo } = require("../utils/configCredito");
+  const formato = await formatoCodigo();
+  res.json({ success: true, formato, ejemplo: formato ? armarCodigo(formato, { id_prestamo: 125, id_sucursal: 1, producto: "Agrícola", numero_socio: 48 }) : "" });
+});
+router.put("/codigo-credito", verificarToken, soloSuperAdmin, async (req, res) => {
+  const { armarCodigo } = require("../utils/configCredito");
+  const formato = String(req.body?.formato || "").trim().substring(0, 40);
+  if (formato && !formato.includes("{n}")) {
+    return res.status(400).json({ message: "El formato debe incluir {n} (el número del préstamo) para que el código no se repita." });
+  }
+  await pool.query(
+    "INSERT INTO configuracion_sitio (clave, valor) VALUES ('codigo_credito_formato', ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)",
+    [formato]
+  );
+  res.json({ success: true, formato, ejemplo: formato ? armarCodigo(formato, { id_prestamo: 125, id_sucursal: 1, producto: "Agrícola", numero_socio: 48 }) : "" });
+});
+
 // GET /api/configuracion/funciones → catálogo, estado guardado y lo que ve este usuario
 router.get("/funciones", verificarToken, async (req, res) => {
   try {

@@ -80,6 +80,8 @@ router.post("/", (req, res) => {
         tasaAnual: p.tasa_interes,
         fechaOtorgado: p.fecha_otorgado,
         fechaUltimoPago: ultimo?.f || null,
+        moraTasa: p.mora_tasa_anual,
+        moraGracia: p.mora_dias_gracia,
       });
       if (monto > total + 0.01) {
         return res.status(400).json({

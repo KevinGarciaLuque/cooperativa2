@@ -1142,6 +1142,32 @@ const MIGRACIONES = [
       }
     },
   },
+  {
+    id: "2026_11_017_configuracion_por_producto",
+    descripcion: "Mora, gracia, cargos automáticos y redondeo de cuota por producto; código del crédito",
+    async up(conn) {
+      const agregar = async (tabla, nombre, def) => {
+        const [[e]] = await conn.query(
+          `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+          [tabla, nombre]
+        );
+        if (!e.n) await conn.query(`ALTER TABLE ${tabla} ADD COLUMN ${nombre} ${def}`);
+      };
+      // Vacío (NULL) = se usa lo general de Parámetros, como siempre
+      for (const t of ["productos_credito", "prestamos"]) {
+        await agregar(t, "mora_tasa_anual", "DECIMAL(7,3) NULL");
+        await agregar(t, "mora_dias_gracia", "INT NULL");
+        await agregar(t, "cargo_tipo", "VARCHAR(12) NULL");
+        await agregar(t, "cargo_valor", "DECIMAL(12,2) NULL");
+        await agregar(t, "cargo_concepto", "VARCHAR(80) NULL");
+        await agregar(t, "redondeo_cuota", "DECIMAL(10,2) NULL");
+      }
+      await agregar("prestamos", "codigo", "VARCHAR(30) NULL");
+      await agregar("prestamos", "fecha_recepcion", "DATE NULL");
+      await agregar("prestamos", "numero_solicitud", "VARCHAR(30) NULL");
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

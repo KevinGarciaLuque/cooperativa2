@@ -284,6 +284,7 @@ export default function Prestamos() {
       nombreUsuario.toLowerCase().includes(texto) ||
       String(p.dni || usuario?.dni || "").includes(texto) ||
       String(p.id_prestamo) === texto.replace("#", "") ||
+      String(p.codigo || "").toLowerCase() === texto ||
       (p.grupo_nombre || "").toLowerCase().includes(texto);
 
     const coincideEstado =

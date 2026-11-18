@@ -18,7 +18,7 @@ const rutaPersonalizada = (tipo) => `plantillas/${tipo}.docx`; // en la tabla ar
 // Marcadores disponibles (para la ayuda en pantalla)
 const CAMPOS = [
   ["cooperativa", "Nombre de la cooperativa"], ["lugar", "Sucursal del socio"], ["fecha_hoy", "Fecha de hoy en letras"],
-  ["numero_prestamo", "Número del préstamo"], ["socio_nombre", "Nombre del socio"], ["socio_identidad", "Documento de identidad"],
+  ["numero_prestamo", "Número (o código) del préstamo"], ["socio_nombre", "Nombre del socio"], ["socio_identidad", "Documento de identidad"],
   ["socio_numero", "Número de socio"], ["socio_direccion", "Dirección"], ["socio_telefono", "Teléfono"],
   ["monto", "Monto (con separador de miles)"], ["monto_letras", "Monto en letras"], ["moneda_simbolo", "Símbolo de la moneda"],
   ["moneda_nombre", "Nombre de la moneda"], ["tasa_mensual", "Tasa mensual (%)"], ["tasa_anual", "Tasa anual (%)"],
@@ -53,7 +53,7 @@ const datosDocumento = async (idPrestamo, usuario) => {
   const [[coop]] = await pool.query("SELECT valor FROM configuracion_sitio WHERE clave = 'site_name'");
   const [garantias] = await pool.query("SELECT * FROM garantias WHERE id_prestamo = ? AND estado = 'vigente' ORDER BY id_garantia", [idPrestamo]).catch(() => [[]]);
   const otorgado = soloFecha(p.fecha_otorgado) || hoyISO();
-  const plan = generarPlan({ monto: p.monto, tasaAnual: p.tasa_interes, plazo: p.plazo_meses, fechaInicio: otorgado });
+  const plan = generarPlan({ monto: p.monto, tasaAnual: p.tasa_interes, plazo: p.plazo_meses, fechaInicio: otorgado, redondeo: p.redondeo_cuota });
   const tasaMensual = p.tipo_tasa === "nominal_mensual" && p.tasa_original != null ? parseFloat(p.tasa_original) : parseFloat(p.tasa_interes) / 12;
   const n = (v) => pais.numero(v);
   const textoGarantias = garantias.length
@@ -63,7 +63,8 @@ const datosDocumento = async (idPrestamo, usuario) => {
     cooperativa: coop?.valor || "la Cooperativa",
     lugar: [p.municipio, p.sucursal].filter(Boolean)[0] || p.sucursal || "",
     fecha_hoy: fechaLarga(hoyISO()),
-    numero_prestamo: String(p.id_prestamo),
+    numero_prestamo: p.codigo || String(p.id_prestamo),
+    codigo_credito: p.codigo || String(p.id_prestamo),
     socio_nombre: p.nombre_completo,
     socio_identidad: p.dni || "",
     socio_numero: p.numero_socio ? String(p.numero_socio) : "",

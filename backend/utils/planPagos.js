@@ -27,14 +27,24 @@ const sumarMeses = (iso, meses) => {
 
 // Cuotas del plan. tasaAnual = prestamos.tasa_interes (nominal anual; la mensual es /12).
 // La última cuota ajusta los centavos para que el capital sume exactamente el monto.
-const generarPlan = ({ monto, tasaAnual, plazo, fechaInicio }) => {
+// "redondeo" (configuración por producto): la cuota se sube al múltiplo indicado (1, 5, 10...)
+// y la última cuota ajusta la diferencia.
+const redondearCuota = (cuota, redondeo) => {
+  const r = parseFloat(redondeo);
+  return r > 0 ? r2(Math.ceil(r2(cuota) / r - 1e-9) * r) : cuota;
+};
+
+const generarPlan = ({ monto, tasaAnual, plazo, fechaInicio, redondeo = null }) => {
   const capitalTotal = r2(monto);
   const n = parseInt(plazo);
   const inicio = soloFecha(fechaInicio);
   if (!(capitalTotal > 0) || !(n > 0) || !inicio) return [];
 
   const i = parseFloat(tasaAnual) / 100 / 12;
-  const cuotaFija = r2(i === 0 ? capitalTotal / n : (capitalTotal * i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1));
+  const cuotaFija = redondearCuota(
+    r2(i === 0 ? capitalTotal / n : (capitalTotal * i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1)),
+    redondeo
+  );
 
   const cuotas = [];
   let saldo = capitalTotal;
@@ -112,6 +122,7 @@ const planDePrestamo = (p, hoy = hoyISO()) => {
     tasaAnual: p.tasa_interes,
     plazo: p.plazo_meses,
     fechaInicio: p.fecha_otorgado,
+    redondeo: p.redondeo_cuota,
   });
   if (!cuotas.length) return null;
   return estadoDelPlan(cuotas, {
@@ -122,4 +133,4 @@ const planDePrestamo = (p, hoy = hoyISO()) => {
   });
 };
 
-module.exports = { generarPlan, estadoDelPlan, planDePrestamo, sumarMeses };
+module.exports = { generarPlan, estadoDelPlan, planDePrestamo, sumarMeses, redondearCuota };

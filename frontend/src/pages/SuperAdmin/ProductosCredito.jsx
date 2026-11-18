@@ -8,6 +8,8 @@ import { useAlerta } from "../../context/AlertaContext";
 import InputMonto from "../../ui/InputMonto";
 import { dinero, simboloMoneda } from "../../utils/pais";
 import PlantillasDocumentos from "../../components/PlantillasDocumentos";
+import { useFunciones } from "../../hooks/useFunciones";
+import FormatoCodigoCredito from "../../components/FormatoCodigoCredito";
 
 const ACCENT = "#a8cd3a";
 const AZUL = "#1a2035";
@@ -25,9 +27,16 @@ const VACIO = {
   visible_socios: true,
   activo: true,
   orden: "0",
+  mora_tasa_anual: "",
+  mora_dias_gracia: "",
+  cargo_tipo: "",
+  cargo_valor: "",
+  cargo_concepto: "",
+  redondeo_cuota: "",
 };
 
 export default function ProductosCredito() {
+  const funciones = useFunciones();
   const { token } = useAuth();
   const { mostrarAlerta } = useAlerta();
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
@@ -70,6 +79,12 @@ export default function ProductosCredito() {
             plazo_min: String(p.plazo_min),
             plazo_max: String(p.plazo_max),
             orden: String(p.orden),
+            mora_tasa_anual: p.mora_tasa_anual ?? "",
+            mora_dias_gracia: p.mora_dias_gracia ?? "",
+            cargo_tipo: p.cargo_tipo || "",
+            cargo_valor: p.cargo_valor ?? "",
+            cargo_concepto: p.cargo_concepto || "",
+            redondeo_cuota: p.redondeo_cuota ?? "",
           }
         : VACIO
     );
@@ -249,6 +264,51 @@ export default function ProductosCredito() {
                     </select>
                     <div className="form-text">No se podrá desembolsar sin ella registrada.</div>
                   </div>
+                  {funciones.configuracion_avanzada && (
+                    <div className="col-12">
+                      <div className="border rounded-3 p-3" style={{ background: "#f8f9fb" }}>
+                        <div className="fw-semibold small mb-1">Configuración avanzada (préstamos nuevos de este producto)</div>
+                        <div className="form-text mb-2">Vacío = se usa lo general de Parámetros. Se copia a cada préstamo al desembolsarlo.</div>
+                        <div className="row g-2">
+                          <div className="col-6 col-md-3">
+                            <label className="form-label small mb-1">Mora (% anual)</label>
+                            <input className="form-control form-control-sm" type="number" step="0.01" min="0" max="120" value={form.mora_tasa_anual} onChange={cambiar("mora_tasa_anual")} placeholder="General" />
+                          </div>
+                          <div className="col-6 col-md-3">
+                            <label className="form-label small mb-1">Días de gracia</label>
+                            <input className="form-control form-control-sm" type="number" min="0" max="90" value={form.mora_dias_gracia} onChange={cambiar("mora_dias_gracia")} placeholder="General" />
+                          </div>
+                          <div className="col-12 col-md-6">
+                            <label className="form-label small mb-1">Redondeo de la cuota</label>
+                            <select className="form-select form-select-sm" value={form.redondeo_cuota} onChange={cambiar("redondeo_cuota")}>
+                              <option value="">Sin redondeo (cuota exacta)</option>
+                              {[1, 5, 10, 50, 100].map((r) => <option key={r} value={r}>Subir a múltiplos de {r} (la última ajusta)</option>)}
+                            </select>
+                          </div>
+                          <div className="col-12 col-md-4">
+                            <label className="form-label small mb-1">Cargo automático en cada pago</label>
+                            <select className="form-select form-select-sm" value={form.cargo_tipo} onChange={cambiar("cargo_tipo")}>
+                              <option value="">Ninguno</option>
+                              <option value="fijo">Monto fijo por pago</option>
+                              <option value="porcentaje">Porcentaje de cada pago</option>
+                            </select>
+                          </div>
+                          {form.cargo_tipo && (
+                            <>
+                              <div className="col-6 col-md-3">
+                                <label className="form-label small mb-1">{form.cargo_tipo === "porcentaje" ? "Porcentaje (%)" : `Monto (${simboloMoneda()})`}</label>
+                                <input className="form-control form-control-sm" type="number" step="0.01" min="0" value={form.cargo_valor} onChange={cambiar("cargo_valor")} />
+                              </div>
+                              <div className="col-6 col-md-5">
+                                <label className="form-label small mb-1">Concepto</label>
+                                <input className="form-control form-control-sm" maxLength={80} placeholder="Ej.: seguro de deuda" value={form.cargo_concepto} onChange={cambiar("cargo_concepto")} />
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="col-6 col-md-3">
                     <label className="form-label small fw-semibold">Orden en la lista</label>
                     <input className="form-control" type="number" value={form.orden} onChange={cambiar("orden")} />
@@ -277,6 +337,7 @@ export default function ProductosCredito() {
         </div>
       )}
 
+      <FormatoCodigoCredito token={token} mostrarAlerta={mostrarAlerta} />
       <PlantillasDocumentos token={token} mostrarAlerta={mostrarAlerta} />
     </div>
   );

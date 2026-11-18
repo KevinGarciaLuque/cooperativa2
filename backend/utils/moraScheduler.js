@@ -6,7 +6,7 @@ const { calcularDiasMora } = require("./calculosPrestamo");
 
 const actualizarEstadosMora = async () => {
   const [prestamos] = await pool.query(
-    `SELECT p.id_prestamo, p.id_usuario, p.estado, p.fecha_otorgado,
+    `SELECT p.id_prestamo, p.id_usuario, p.estado, p.fecha_otorgado, p.mora_dias_gracia,
             (SELECT MAX(fecha_pago) FROM pagos_prestamo WHERE id_prestamo = p.id_prestamo) AS ultimo_pago
      FROM prestamos p
      WHERE p.estado IN ('activo', 'mora')`
@@ -16,7 +16,7 @@ const actualizarEstadosMora = async () => {
   const salieron = [];
 
   for (const p of prestamos) {
-    const dias = calcularDiasMora(p.fecha_otorgado, p.ultimo_pago);
+    const dias = calcularDiasMora(p.fecha_otorgado, p.ultimo_pago, p.mora_dias_gracia);
     if (dias > 0 && p.estado === "activo") {
       await pool.query(`UPDATE prestamos SET estado = 'mora' WHERE id_prestamo = ?`, [p.id_prestamo]);
       await pool.query(

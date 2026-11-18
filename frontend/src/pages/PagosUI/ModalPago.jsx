@@ -52,10 +52,12 @@ export default function ModalPago({
   const { user: usuarioActual, token: tokenModal } = useAuth();
   const esSuperAdmin = usuarioActual?.rol === "Super Administrador";
   const [moraInfo, setMoraInfo] = useState(null); // { dias, mora, porDia }
+  const [cargoInfo, setCargoInfo] = useState(null); // cargo automático del producto { monto, concepto }
   const condonarMora = !!form.condonar_mora;
 
   useEffect(() => {
     setMoraInfo(null);
+    setCargoInfo(null);
     handleInput({ target: { name: "condonar_mora", value: false } });
     if (editPago || !prestamoSeleccionado) return;
     let activo = true;
@@ -65,6 +67,7 @@ export default function ModalPago({
       })
       .then((r) => {
         const pp = r.data.proximo_pago;
+        if (activo && pp && pp.cargo_automatico > 0) setCargoInfo({ monto: pp.cargo_automatico, concepto: pp.cargo_concepto });
         if (activo && pp && pp.dias_mora > 0) {
           setMoraInfo({
             dias: pp.dias_mora,
@@ -622,6 +625,12 @@ export default function ModalPago({
                       </div>
                     )}
                     {/* ── Mora ── */}
+                    {cargoInfo && (
+                      <div className="alert alert-info py-2 small mb-2">
+                        Este préstamo cobra además <strong>{cargoInfo.concepto}</strong> en cada pago (aprox. {simboloMoneda()} {fmt(cargoInfo.monto)} sobre la cuota del mes).
+                        Se registra aparte y no rebaja el préstamo.
+                      </div>
+                    )}
                     {moraInfo && (
                       <div className="small px-2 py-2"
                         style={{ background: "rgba(231,76,60,0.08)", borderRadius: 8, border: "1.5px solid #e74c3c", color: "#c0392b" }}>

@@ -557,18 +557,23 @@ export default function ModalDetallePrestamo({ show, prestamo, usuario, onClose,
             </div>
 
             {/* Datos ampliados del crédito (si se registraron) */}
-            {(prestamo.linea_credito || prestamo.destino || prestamo.promotor_nombre || prestamo.numero_pagare || prestamo.numero_acta || prestamo.numero_cheque) && (
+            {(prestamo.codigo || prestamo.linea_credito || prestamo.destino || prestamo.promotor_nombre || prestamo.numero_pagare || prestamo.numero_acta || prestamo.numero_cheque || prestamo.mora_tasa_anual != null || prestamo.cargo_tipo) && (
               <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: "12px" }}>
                 <div className="card-body">
                   <h6 className="fw-bold mb-2">Datos del crédito</h6>
                   <div className="row g-2 small">
                     {[
+                      ["Código", prestamo.codigo],
                       ["Línea", prestamo.linea_credito],
                       ["Destino", prestamo.destino],
                       ["Promotor", prestamo.promotor_nombre],
                       ["N.º pagaré", prestamo.numero_pagare],
                       ["N.º acta", prestamo.numero_acta],
                       ["N.º cheque", prestamo.numero_cheque],
+                      ["Recepción", prestamo.fecha_recepcion && String(prestamo.fecha_recepcion).substring(0, 10)],
+                      ["N.º solicitud", prestamo.numero_solicitud],
+                      ["Mora del producto", prestamo.mora_tasa_anual != null && `${parseFloat(prestamo.mora_tasa_anual)}% anual${prestamo.mora_dias_gracia != null ? `, ${prestamo.mora_dias_gracia} días de gracia` : ""}`],
+                      ["Cargo automático", prestamo.cargo_tipo && `${prestamo.cargo_concepto}: ${prestamo.cargo_tipo === "porcentaje" ? `${parseFloat(prestamo.cargo_valor)}% del pago` : parseFloat(prestamo.cargo_valor)}`],
                     ]
                       .filter(([, v]) => v)
                       .map(([k, v]) => (

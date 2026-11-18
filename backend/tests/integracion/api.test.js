@@ -2270,6 +2270,56 @@ test("etapa 4: nombres y apellidos, municipios sugeridos, ficha del socio en Wor
   assert.equal((await api("PUT", "/configuracion/funciones", { datos_ampliados: false, contratos_word: false, pagos_ampliados: false }, ids.tSuper)).s, 200);
 });
 
+test("configuración por producto: mora y gracia propias, cargo automático, redondeo de cuota y código del crédito", async () => {
+  const prod = await api("POST", "/productos", {
+    nombre: "Agrícola Config", tasa_mensual: 2, monto_min: 100, monto_max: 100000, plazo_min: 1, plazo_max: 24, garantia_requerida: "ninguna",
+    mora_tasa_anual: 36, mora_dias_gracia: 5, cargo_tipo: "fijo", cargo_valor: 15, cargo_concepto: "Seguro de deuda", redondeo_cuota: 10,
+  }, ids.tSuper);
+  assert.equal(prod.s, 201, prod.b?.message);
+  assert.equal(prod.b.data.mora_dias_gracia, 5);
+  assert.equal((await api("POST", "/productos", { nombre: "Malo Config", tasa_mensual: 2, monto_max: 100, plazo_max: 12, cargo_tipo: "fijo", cargo_valor: 5 }, ids.tSuper)).s, 400, "cargo sin concepto");
+  assert.equal((await api("PUT", "/configuracion/codigo-credito", { formato: "AG-{aa}" }, ids.tSuper)).s, 400, "sin {n}");
+  const fmt = await api("PUT", "/configuracion/codigo-credito", { formato: "{prod}-{aa}-{n}" }, ids.tSuper);
+  assert.equal(fmt.s, 200);
+
+  const nuevo = await api("POST", "/prestamos", { id_usuario: ids.socio2, monto: 5000, tasa_interes: 24, plazo_meses: 12, estado: "aprobado", id_producto: prod.b.data.id_producto }, ids.tSuper);
+  const id = nuevo.b.id_prestamo || nuevo.b.data?.id_prestamo || nuevo.b.prestamo?.id_prestamo;
+  assert.equal((await api("POST", `/prestamos/${id}/desembolsar`, { metodo: "efectivo" }, ids.tSuper)).s, 200);
+  const [[p]] = await pool.query("SELECT * FROM prestamos WHERE id_prestamo = ?", [id]);
+  assert.equal(parseFloat(p.mora_tasa_anual), 36);
+  assert.equal(p.mora_dias_gracia, 5);
+  assert.equal(p.cargo_tipo, "fijo");
+  assert.match(p.codigo, new RegExp(`^AGR-\\d{2}-${id}$`));
+
+  // Cuota redondeada a múltiplos de 10 (la última ajusta)
+  const plan = await api("GET", `/prestamos/${id}/plan`, null, ids.tAdmin);
+  assert.equal(plan.s, 200);
+  const cuotas = plan.b.plan;
+  assert.ok(cuotas.slice(0, -1).every((c) => Math.abs(c.cuota % 10) < 0.001), "cuotas redondeadas");
+
+  // Próximo pago: cargo automático y gracia del producto (5 días, no 30)
+  await pool.query("UPDATE prestamos SET fecha_otorgado = DATE_SUB(CURDATE(), INTERVAL 40 DAY) WHERE id_prestamo = ?", [id]);
+  const pp = await api("GET", `/pagos/prestamo/${id}/proximo-pago`, null, ids.tAdmin);
+  assert.equal(pp.b.proximo_pago.cargo_automatico, 15);
+  assert.equal(pp.b.proximo_pago.dias_mora, 35);
+  assert.equal(pp.b.proximo_pago.cuota_mensual % 10, 0);
+
+  // Al pagar, el cargo automático se cobra aparte
+  const pago = await api("POST", "/pagos", { id_prestamo: id, monto_pagado: 500, metodo_pago: "efectivo" }, ids.tAdmin);
+  assert.equal(pago.s, 201, pago.b?.message);
+  const [[pg]] = await pool.query("SELECT otros_cargos, otros_cargos_detalle FROM pagos_prestamo WHERE id_pago = ?", [pago.b.id_pago]);
+  assert.equal(parseFloat(pg.otros_cargos), 15);
+  assert.equal(pg.otros_cargos_detalle, "Seguro de deuda");
+
+  // Los préstamos sin producto siguen con lo general
+  const [[otro]] = await pool.query("SELECT mora_tasa_anual, codigo FROM prestamos WHERE id_producto IS NULL AND estado = 'activo' LIMIT 1");
+  if (otro) assert.equal(otro.mora_tasa_anual, null);
+
+  await pool.query("UPDATE prestamos SET estado = 'pagado', saldo_restante = 0 WHERE id_prestamo = ?", [id]);
+  await api("PUT", "/configuracion/codigo-credito", { formato: "" }, ids.tSuper);
+  await api("PUT", `/productos/${prod.b.data.id_producto}`, { activo: false }, ids.tSuper);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

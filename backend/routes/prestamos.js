@@ -13,6 +13,7 @@ const { obtenerProducto, fueraDeProducto } = require("../utils/productos");
 const { faltaGarantia } = require("../utils/garantias");
 const comite = require("../utils/comite");
 const { habilitada } = require("../utils/funciones");
+const { alDesembolsar } = require("../utils/configCredito");
 const { contabilizar, conSalvaguarda } = require("../utils/contabilidad");
 const {
   calcularCuotaMensual,
@@ -194,6 +195,8 @@ const datosCredito = async (b) => {
     numero_pagare: texto(b.numero_pagare, 30),
     numero_acta: texto(b.numero_acta, 30),
     numero_cheque: texto(b.numero_cheque, 30),
+    fecha_recepcion: /^\d{4}-\d{2}-\d{2}$/.test(String(b.fecha_recepcion || "")) ? b.fecha_recepcion : null,
+    numero_solicitud: texto(b.numero_solicitud, 30),
   };
 };
 
@@ -205,9 +208,10 @@ router.put("/:id/datos-credito", async (req, res) => {
     }
     const d = await datosCredito(req.body || {});
     const [r] = await pool.query(
-      `UPDATE prestamos SET linea_credito = ?, destino = ?, id_promotor = ?, numero_pagare = ?, numero_acta = ?, numero_cheque = ?
+      `UPDATE prestamos SET linea_credito = ?, destino = ?, id_promotor = ?, numero_pagare = ?, numero_acta = ?, numero_cheque = ?,
+              fecha_recepcion = ?, numero_solicitud = ?
        WHERE id_prestamo = ?`,
-      [d.linea_credito, d.destino, d.id_promotor, d.numero_pagare, d.numero_acta, d.numero_cheque, parseInt(req.params.id)]
+      [d.linea_credito, d.destino, d.id_promotor, d.numero_pagare, d.numero_acta, d.numero_cheque, d.fecha_recepcion, d.numero_solicitud, parseInt(req.params.id)]
     );
     if (!r.affectedRows) return res.status(404).json({ message: "Préstamo no encontrado" });
     res.json({ success: true, message: "Datos del crédito guardados.", data: d });
@@ -226,7 +230,7 @@ router.put("/:id/datos-credito", async (req, res) => {
 router.get("/:id/plan", async (req, res) => {
   try {
     const [[p]] = await pool.query(
-      `SELECT id_prestamo, id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado
+      `SELECT id_prestamo, id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado, redondeo_cuota
        FROM prestamos WHERE id_prestamo = ?`,
       [req.params.id]
     );
@@ -593,6 +597,8 @@ router.post("/:id/desembolsar", async (req, res) => {
       `UPDATE prestamos SET estado = 'activo', fecha_otorgado = NOW(), saldo_restante = monto WHERE id_prestamo = ?`,
       [req.params.id]
     );
+    // Copia la configuración de su producto (mora, gracia, cargos, redondeo) y le da su código
+    await alDesembolsar(connection, req.params.id);
 
     // El efectivo o la transferencia sale de caja; el depósito a cuenta no mueve caja
     if (metodo !== "cuenta") {
@@ -777,8 +783,8 @@ const cotizarLiquidacion = async (conn, idPrestamo) => {
   const dias = Math.max(DIAS_MES, diasEntre(fechaBase, hoy));
   const saldo = parseFloat(p.saldo_restante);
   const interes = calcularInteresPeriodo(saldo, p.tasa_interes, dias);
-  const diasMora = calcularDiasMora(p.fecha_otorgado, ultimo.length > 0 ? ultimo[0].fecha_pago : null);
-  const mora = parseFloat(calcularInteresMoratorio(saldo, diasMora).toFixed(2));
+  const diasMora = calcularDiasMora(p.fecha_otorgado, ultimo.length > 0 ? ultimo[0].fecha_pago : null, p.mora_dias_gracia);
+  const mora = parseFloat(calcularInteresMoratorio(saldo, diasMora, p.mora_tasa_anual).toFixed(2));
   return {
     prestamo: p,
     saldo,
@@ -1034,9 +1040,10 @@ router.post("/", async (req, res) => {
     );
     if (ampliados && Object.values(ampliados).some((v) => v != null)) {
       await connection.query(
-        `UPDATE prestamos SET linea_credito = ?, destino = ?, id_promotor = ?, numero_pagare = ?, numero_acta = ?, numero_cheque = ?
+        `UPDATE prestamos SET linea_credito = ?, destino = ?, id_promotor = ?, numero_pagare = ?, numero_acta = ?, numero_cheque = ?,
+                fecha_recepcion = ?, numero_solicitud = ?
          WHERE id_prestamo = ?`,
-        [ampliados.linea_credito, ampliados.destino, ampliados.id_promotor, ampliados.numero_pagare, ampliados.numero_acta, ampliados.numero_cheque, result.insertId]
+        [ampliados.linea_credito, ampliados.destino, ampliados.id_promotor, ampliados.numero_pagare, ampliados.numero_acta, ampliados.numero_cheque, ampliados.fecha_recepcion, ampliados.numero_solicitud, result.insertId]
       );
     }
 

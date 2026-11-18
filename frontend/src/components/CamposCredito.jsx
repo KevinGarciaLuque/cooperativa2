@@ -6,7 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { useFunciones } from "../hooks/useFunciones";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-export const CAMPOS_CREDITO = ["linea_credito", "destino", "id_promotor", "numero_pagare", "numero_acta", "numero_cheque"];
+export const CAMPOS_CREDITO = ["linea_credito", "destino", "id_promotor", "numero_pagare", "numero_acta", "numero_cheque", "fecha_recepcion", "numero_solicitud"];
 
 export default function CamposCredito({ form, handleInput }) {
   const { token } = useAuth();
@@ -60,6 +60,14 @@ export default function CamposCredito({ form, handleInput }) {
         <div className="col-4 col-md-2">
           <label className="form-label small mb-1">N.º cheque</label>
           <input className="form-control form-control-sm" name="numero_cheque" maxLength={30} value={v("numero_cheque")} onChange={handleInput} />
+        </div>
+        <div className="col-6 col-md-4">
+          <label className="form-label small mb-1">Fecha de recepción</label>
+          <input type="date" className="form-control form-control-sm" name="fecha_recepcion" value={String(v("fecha_recepcion")).substring(0, 10)} onChange={handleInput} />
+        </div>
+        <div className="col-6 col-md-4">
+          <label className="form-label small mb-1">N.º de solicitud</label>
+          <input className="form-control form-control-sm" name="numero_solicitud" maxLength={30} value={v("numero_solicitud")} onChange={handleInput} />
         </div>
       </div>
     </div>

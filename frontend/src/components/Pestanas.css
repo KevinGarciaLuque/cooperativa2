@@ -1,0 +1,83 @@
+/* Pestañas estándar del sistema (personal). Una sola apariencia en todas las pantallas. */
+.pst {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid #e3e8ef;
+  padding: 0 6px;
+  -webkit-overflow-scrolling: touch;
+}
+.pst::-webkit-scrollbar { display: none; }
+.pst.pst-suelta {
+  background: #fff;
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  margin-bottom: 1rem;
+}
+.pst.pst-con-sombra-izq { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 24px); mask-image: linear-gradient(90deg, transparent 0, #000 24px); }
+.pst.pst-con-sombra-der { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent 100%); mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent 100%); }
+.pst.pst-con-sombra-izq.pst-con-sombra-der { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%); }
+
+.pst-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  border: 0;
+  background: none;
+  margin: 6px 0 0;
+  padding: 0.7rem 1rem 0.85rem;
+  border-radius: 10px 10px 0 0;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.93rem;
+  transition: color 0.15s, background 0.15s;
+}
+.pst-tab svg { font-size: 1rem; color: #94a3b8; transition: color 0.15s, transform 0.15s; }
+.pst-tab:hover:not(:disabled) { color: #1e293b; background: #f6f9ee; }
+.pst-tab:hover:not(:disabled) svg { color: #7da42a; }
+.pst-tab:focus-visible { outline: 2px solid #a8cd3a; outline-offset: -2px; }
+.pst-tab:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Barra verde de la pestaña activa */
+.pst-tab::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: #a8cd3a;
+  transform: scaleX(0);
+  transition: transform 0.2s ease;
+}
+.pst-tab.activa { color: #1e293b; }
+.pst-tab.activa svg { color: #7da42a; }
+.pst-tab.activa::after { transform: scaleX(1); }
+
+/* Contador */
+.pst-cuenta {
+  min-width: 22px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef2f6;
+  color: #475569;
+}
+.pst-tab.activa .pst-cuenta { background: #a8cd3a; color: #1a2a00; }
+.pst-cuenta.alerta { background: #ef4444; color: #fff; }
+
+@media (max-width: 575.98px) {
+  .pst-tab { padding: 0.6rem 0.8rem 0.75rem; font-size: 0.86rem; }
+}
+@media print { .pst { display: none !important; } }

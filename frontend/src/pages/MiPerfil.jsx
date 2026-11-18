@@ -8,6 +8,7 @@ import {
   FaSave, FaTimes, FaLock, FaEye, FaEyeSlash,
   FaCheckCircle, FaExclamationTriangle, FaIdBadge, FaSignature,
 } from "react-icons/fa";
+import Pestanas from "../components/Pestanas";
 import { useAuth } from "../context/AuthContext";
 import FirmaDigital from "../components/FirmaDigital";
 import { formatearNombre } from "../utils/nombres";
@@ -240,16 +241,6 @@ export default function MiPerfil() {
           font-size: .75rem;
         }
         .mp-camera-btn:hover { background: #c0e040; transform: scale(1.12); }
-        .mp-tab-btn {
-          background: none; border: none;
-          padding: .5rem 1.2rem; border-radius: 2rem;
-          font-weight: 500; color: ${MUTED};
-          transition: all .2s; display:flex; align-items:center; gap:.45rem;
-          font-size: .9rem; cursor: pointer; white-space: nowrap;
-        }
-        .mp-tab-btn:hover { background: rgba(168,205,58,.1); color: #3a5a00; }
-        .mp-tab-btn.active { background: ${ACCENT}; color: ${DARK}; font-weight: 700;
-          box-shadow: 0 2px 10px ${ACCENT}55; }
         .mp-card {
           background: #fff;
           border-radius: 1.2rem;
@@ -388,17 +379,12 @@ export default function MiPerfil() {
           </div>
 
           {/* ── Tabs ── */}
-          <div className="d-flex gap-2 mb-4 flex-wrap">
-            {tabs.map((t) => (
-              <button
-                key={t.key}
-                className={`mp-tab-btn${tab === t.key ? " active" : ""}`}
-                onClick={() => setTab(t.key)}
-              >
-                {t.icon} {t.label}
-              </button>
-            ))}
-          </div>
+          <Pestanas
+            className="mb-4"
+            activa={tab}
+            onCambiar={setTab}
+            tabs={tabs.map((t) => ({ clave: t.key, titulo: t.label, icono: t.icon }))}
+          />
 
           {loading && (
             <div className="text-center py-5" style={{ color: MUTED }}>

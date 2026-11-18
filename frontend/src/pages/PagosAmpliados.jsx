@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { FaBolt, FaCheckDouble, FaReceipt, FaSearch, FaUndo } from "react-icons/fa";
+import Pestanas from "../components/Pestanas";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
 import InputMonto from "../ui/InputMonto";
@@ -31,13 +32,14 @@ export default function PagosAmpliados() {
           <div className="text-muted small">Cobrar todos los préstamos de un socio de una vez y conciliar boletas</div>
         </div>
       </div>
-      <ul className="nav nav-tabs mb-3">
-        {[["rapido", "Pago rápido"], ["conciliacion", "Conciliación de boletas"]].map(([k, t]) => (
-          <li className="nav-item" key={k}>
-            <button className={`nav-link ${tab === k ? "active fw-semibold" : ""}`} onClick={() => setTab(k)}>{t}</button>
-          </li>
-        ))}
-      </ul>
+      <Pestanas
+        activa={tab}
+        onCambiar={setTab}
+        tabs={[
+          { clave: "rapido", titulo: "Pago rápido", icono: <FaBolt /> },
+          { clave: "conciliacion", titulo: "Conciliación de boletas", icono: <FaCheckDouble /> },
+        ]}
+      />
       {tab === "rapido" ? <PagoRapido headers={headers} mostrarAlerta={mostrarAlerta} /> : <Conciliacion headers={headers} mostrarAlerta={mostrarAlerta} />}
     </div>
   );

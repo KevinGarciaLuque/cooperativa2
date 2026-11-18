@@ -3,6 +3,7 @@ import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import { useAlerta } from "../../context/AlertaContext";
 import { FaCog, FaSave, FaHome, FaSignInAlt, FaPlus, FaTrash, FaUpload, FaImage, FaGlobeAmericas } from "react-icons/fa";
+import Pestanas from "../../components/Pestanas";
 import { establecerPais, dinero } from "../../utils/pais";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -784,34 +785,14 @@ export default function Configuracion() {
         {/* Panel editor */}
         <div className="col-12 col-xl-8">
           {/* Pestañas */}
-          <ul className="nav nav-tabs mb-4" style={{ borderBottom: "2px solid #e5e7eb" }}>
-            {[
-              { key: "inicio", label: "Inicio", Icon: FaHome },
-              { key: "login",  label: "Login",  Icon: FaSignInAlt },
-            ].map(({ key, label, Icon }) => (
-              <li key={key} className="nav-item">
-                <button
-                  type="button"
-                  className="nav-link d-flex align-items-center gap-2"
-                  style={{
-                    border: "none",
-                    borderBottom: tabActivo === key ? `2px solid ${ACCENT}` : "2px solid transparent",
-                    color: tabActivo === key ? DARK : "#6b7280",
-                    fontWeight: tabActivo === key ? 700 : 500,
-                    background: "none",
-                    paddingBottom: 10,
-                    fontSize: 14,
-                    marginBottom: -2,
-                    transition: "color 0.2s",
-                  }}
-                  onClick={() => setTabActivo(key)}
-                >
-                  <Icon style={{ fontSize: 13 }} />
-                  {label}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <Pestanas
+            activa={tabActivo}
+            onCambiar={setTabActivo}
+            tabs={[
+              { clave: "inicio", titulo: "Inicio", icono: <FaHome /> },
+              { clave: "login", titulo: "Login", icono: <FaSignInAlt /> },
+            ]}
+          />
 
           {tabActivo === "inicio" ? (
             <TabInicio datos={datosHome} setDatos={setDatosHome} />

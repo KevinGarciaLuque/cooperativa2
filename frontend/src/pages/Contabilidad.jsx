@@ -12,7 +12,10 @@ import {
   FaPrint,
   FaUnlock,
   FaExclamationTriangle,
+  FaChartLine,
+  FaHourglassHalf,
 } from "react-icons/fa";
+import Pestanas from "../components/Pestanas";
 import { dinero, localeApp } from "../utils/pais";
 
 const AZUL = "#1a2035";
@@ -49,10 +52,10 @@ const ETIQUETAS_CARTERA = {
 };
 
 const TABS = [
-  { key: "cierre", label: "Cierre mensual" },
-  { key: "resultados", label: "Estado de resultados" },
-  { key: "cartera", label: "Antigüedad de cartera" },
-  { key: "situacion", label: "Situación financiera" },
+  { key: "cierre", label: "Cierre mensual", icono: <FaCalendarCheck /> },
+  { key: "resultados", label: "Estado de resultados", icono: <FaChartLine /> },
+  { key: "cartera", label: "Antigüedad de cartera", icono: <FaHourglassHalf /> },
+  { key: "situacion", label: "Situación financiera", icono: <FaBalanceScale /> },
 ];
 
 const Fila = ({ etiqueta, valor, negrita, sangria, color }) => (
@@ -278,18 +281,12 @@ export default function Contabilidad() {
         </button>
       </div>
 
-      <ul className="nav nav-tabs mb-3 ct-no-print">
-        {TABS.map((t) => (
-          <li className="nav-item" key={t.key}>
-            <button
-              className={`nav-link ${tab === t.key ? "active fw-semibold" : ""}`}
-              onClick={() => setTab(t.key)}
-            >
-              {t.label}
-            </button>
-          </li>
-        ))}
-      </ul>
+      <Pestanas
+        className="ct-no-print"
+        activa={tab}
+        onCambiar={setTab}
+        tabs={TABS.map((t) => ({ clave: t.key, titulo: t.label, icono: t.icono }))}
+      />
 
       <div className="ct-print" style={{ opacity: cargando ? 0.5 : 1, transition: "opacity .15s" }}>
         {/* Encabezado solo al imprimir */}

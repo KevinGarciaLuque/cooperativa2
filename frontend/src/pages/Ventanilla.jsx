@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import Pestanas from "../components/Pestanas";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
 import DetallePrestamoVentanilla from "./DetallePrestamoVentanilla";
@@ -324,11 +325,6 @@ export default function Ventanilla() {
         .vt-action:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 18px #0000001a; border-color: ${ACCENT}; }
         .vt-action:disabled { opacity: .5; cursor: not-allowed; }
         .vt-kpi { border-radius: .9rem; padding: .85rem 1rem; background: #f6f8fb; }
-        .vt-tabs { overflow-x: auto; scrollbar-width: none; }
-        .vt-tab { display: flex; align-items: center; gap: .45rem; white-space: nowrap; border: 0; background: none;
-          padding: .95rem 1rem; color: #64748b; font-weight: 600; border-bottom: 3px solid transparent; margin-bottom: -1px; }
-        .vt-tab:hover { color: ${AZUL}; }
-        .vt-tab.activa { color: ${AZUL}; border-bottom-color: ${ACCENT}; }
       `}</style>
 
       <div className="mb-3">
@@ -587,20 +583,7 @@ export default function Ventanilla() {
 
           {/* Pestañas con la información del socio */}
           <div id="ventanilla-pestanas" className="vt-card mb-4 overflow-hidden">
-            <div className="vt-tabs d-flex border-bottom px-2">
-              {pestanas.map((t) => (
-                <button
-                  key={t.clave}
-                  type="button"
-                  className={`vt-tab ${pestana === t.clave ? "activa" : ""}`}
-                  onClick={() => setPestana(t.clave)}
-                >
-                  {t.icono}
-                  <span>{t.titulo}</span>
-                  {t.cuenta > 0 && <span className="badge rounded-pill bg-light text-dark border ms-1">{t.cuenta}</span>}
-                </button>
-              ))}
-            </div>
+            <Pestanas variante="tarjeta" activa={pestana} onCambiar={setPestana} tabs={pestanas} />
             <div className="p-4">
               {pestana === "expediente" && (
                 <ExpedienteSocio key={socio.id_usuario} idSocio={socio.id_usuario} headers={headers} />

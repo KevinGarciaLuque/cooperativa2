@@ -2,7 +2,8 @@
 // partidas manuales y catálogo de cuentas. Las partidas de las operaciones se registran solas.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { FaBook, FaFileExcel, FaPlus, FaTrash, FaCheckCircle, FaExclamationTriangle } from "react-icons/fa";
+import { FaBook, FaFileExcel, FaPlus, FaTrash, FaCheckCircle, FaExclamationTriangle, FaHome, FaBookOpen, FaBalanceScale, FaFileInvoiceDollar, FaPlusCircle, FaListOl, FaCoins } from "react-icons/fa";
+import Pestanas from "../components/Pestanas";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
 import { cifra, dinero } from "../utils/pais";
@@ -21,6 +22,16 @@ const TABS = [
   ["catalogo", "Catálogo"],
   ["excedentes", "Excedentes"],
 ];
+const ICONOS_TABS = {
+  inicio: <FaHome />,
+  diario: <FaBook />,
+  mayor: <FaBookOpen />,
+  balanza: <FaBalanceScale />,
+  estados: <FaFileInvoiceDollar />,
+  partida: <FaPlusCircle />,
+  catalogo: <FaListOl />,
+  excedentes: <FaCoins />,
+};
 const fecha = (v) => (v ? String(v).substring(0, 10) : "");
 const primerDiaDelAnio = () => `${hoyLocal().substring(0, 4)}-01-01`;
 
@@ -69,15 +80,17 @@ export default function LibrosContables() {
         </div>
       </div>
 
-      <ul className="nav nav-tabs mb-3 flex-nowrap overflow-auto">
-        {TABS.map(([k, t]) => (
-          <li className="nav-item" key={k}>
-            <button className={`nav-link ${tab === k ? "active fw-semibold" : ""}`} onClick={() => setTab(k)} disabled={!["inicio", "catalogo", "excedentes"].includes(k) && !estado?.iniciada}>
-              {t}
-            </button>
-          </li>
-        ))}
-      </ul>
+      <Pestanas
+        activa={tab}
+        onCambiar={setTab}
+        tabs={TABS.map(([k, t]) => ({
+          clave: k,
+          titulo: t,
+          icono: ICONOS_TABS[k],
+          deshabilitada: !["inicio", "catalogo", "excedentes"].includes(k) && !estado?.iniciada,
+          ayuda: !["inicio", "catalogo", "excedentes"].includes(k) && !estado?.iniciada ? "Primero inicia la contabilidad" : undefined,
+        }))}
+      />
 
       {tab === "inicio" && <Inicio estado={estado} headers={headers} esSuper={esSuper} recargar={cargarEstado} error={error} mostrarAlerta={mostrarAlerta} />}
       {tab === "diario" && <Diario headers={headers} error={error} exportar={exportar} mostrarAlerta={mostrarAlerta} />}

@@ -2,7 +2,8 @@
 // promedio diario y depósitos a plazo fijo.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { FaPiggyBank, FaPlus, FaEdit } from "react-icons/fa";
+import { FaPiggyBank, FaPlus, FaEdit, FaLayerGroup, FaPercent, FaLock } from "react-icons/fa";
+import Pestanas from "../components/Pestanas";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
 import InputMonto from "../ui/InputMonto";
@@ -51,13 +52,15 @@ export default function Ahorro() {
           <div className="text-muted small">Productos de ahorro, intereses del mes y depósitos a plazo fijo</div>
         </div>
       </div>
-      <ul className="nav nav-tabs mb-3">
-        {[["productos", "Productos"], ["intereses", "Intereses del mes"], ["plazos", "Plazo fijo"]].map(([k, t]) => (
-          <li className="nav-item" key={k}>
-            <button className={`nav-link ${tab === k ? "active fw-semibold" : ""}`} onClick={() => setTab(k)}>{t}</button>
-          </li>
-        ))}
-      </ul>
+      <Pestanas
+        activa={tab}
+        onCambiar={setTab}
+        tabs={[
+          { clave: "productos", titulo: "Productos", icono: <FaLayerGroup /> },
+          { clave: "intereses", titulo: "Intereses del mes", icono: <FaPercent /> },
+          { clave: "plazos", titulo: "Plazo fijo", icono: <FaLock /> },
+        ]}
+      />
       {tab === "productos" && <Productos productos={productos} esSuper={esSuper} headers={headers} recargar={cargarProductos} error={error} mostrarAlerta={mostrarAlerta} />}
       {tab === "intereses" && <Intereses esSuper={esSuper} headers={headers} error={error} mostrarAlerta={mostrarAlerta} />}
       {tab === "plazos" && <Plazos productos={productos.filter((p) => p.clase === "plazo_fijo" && p.activo)} headers={headers} error={error} mostrarAlerta={mostrarAlerta} />}

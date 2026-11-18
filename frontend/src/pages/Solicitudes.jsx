@@ -3,7 +3,8 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
-import { FaInbox, FaLink, FaCopy, FaWhatsapp, FaSyncAlt, FaFilePdf, FaEnvelope } from "react-icons/fa";
+import { FaInbox, FaLink, FaCopy, FaWhatsapp, FaSyncAlt, FaFilePdf, FaEnvelope, FaHandHoldingUsd, FaUserPlus, FaMoneyCheckAlt, FaFileSignature } from "react-icons/fa";
+import Pestanas from "../components/Pestanas";
 import { EmptyState, PageHeader } from "../ui/Componentes";
 import InputMonto from "../ui/InputMonto";
 import DesembolsoModal from "../components/DesembolsoModal";
@@ -240,21 +241,17 @@ export default function Solicitudes() {
         subtitulo="Nuevos socios y solicitudes de préstamo que esperan tu revisión."
       />
 
-      <ul className="nav nav-tabs mb-3">
-        {[
-          ["prestamos", `Solicitudes de préstamo${nPrestamos ? ` (${nPrestamos})` : ""}`],
-          ["socios", `Nuevos socios${nSocios ? ` (${nSocios})` : ""}`],
-          ["pagos", `Pagos reportados${pagosRep.length ? ` (${pagosRep.length})` : ""}`],
-          ["firmas", `Comprobantes firmados${recibidos.length ? ` (${recibidos.length} nuevos)` : ""}`],
-          ["enlace", "Enlace de registro"],
-        ].map(([k, t]) => (
-          <li className="nav-item" key={k}>
-            <button className={`nav-link ${tab === k ? "active fw-semibold" : ""}`} onClick={() => setTab(k)}>
-              {t}
-            </button>
-          </li>
-        ))}
-      </ul>
+      <Pestanas
+        activa={tab}
+        onCambiar={setTab}
+        tabs={[
+          { clave: "prestamos", titulo: "Solicitudes de préstamo", icono: <FaHandHoldingUsd />, cuenta: nPrestamos, alerta: true },
+          { clave: "socios", titulo: "Nuevos socios", icono: <FaUserPlus />, cuenta: nSocios, alerta: true },
+          { clave: "pagos", titulo: "Pagos reportados", icono: <FaMoneyCheckAlt />, cuenta: pagosRep.length, alerta: true },
+          { clave: "firmas", titulo: "Comprobantes firmados", icono: <FaFileSignature />, cuenta: recibidos.length, ayuda: "Comprobantes nuevos por revisar" },
+          { clave: "enlace", titulo: "Enlace de registro", icono: <FaLink /> },
+        ]}
+      />
 
       {cargando && !data && (
         <div className="text-center py-5">

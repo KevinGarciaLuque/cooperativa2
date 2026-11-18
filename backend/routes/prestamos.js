@@ -13,6 +13,7 @@ const { obtenerProducto, fueraDeProducto } = require("../utils/productos");
 const { faltaGarantia } = require("../utils/garantias");
 const comite = require("../utils/comite");
 const { habilitada } = require("../utils/funciones");
+const { calificarSocio, reglasDeAprobacion, guardarCalificacion, solicitudDe } = require("../utils/calificacion");
 const { alDesembolsar } = require("../utils/configCredito");
 const { contabilizar, conSalvaguarda } = require("../utils/contabilidad");
 const {
@@ -248,6 +249,28 @@ router.get("/:id/plan", async (req, res) => {
   } catch (error) {
     console.error("ERROR AL OBTENER PLAN DE PAGOS:", error);
     res.status(500).json({ message: "Error al obtener el plan de pagos" });
+  }
+});
+
+// GET /api/prestamos/:id/calificacion → calificación del socio para este préstamo
+// (función "calificacion_credito"; no se le muestra al socio)
+router.get("/:id/calificacion", async (req, res) => {
+  try {
+    if (req.usuario?.rol === "Socio" || !(await habilitada("calificacion_credito", req.usuario))) {
+      return res.status(403).json({ message: "La calificación del socio no está habilitada." });
+    }
+    const [[p]] = await pool.query("SELECT * FROM prestamos WHERE id_prestamo = ?", [req.params.id]);
+    if (!p) return res.status(404).json({ message: "Préstamo no encontrado" });
+    const cal = await calificarSocio(p.id_usuario, solicitudDe(p));
+    res.json({
+      success: true,
+      data: cal,
+      guardada: p.calificacion_letra ? { puntaje: p.calificacion_puntaje, letra: p.calificacion_letra } : null,
+      comite_motivo: p.comite_motivo || null,
+    });
+  } catch (error) {
+    console.error("ERROR AL CALIFICAR AL SOCIO:", error);
+    res.status(500).json({ message: "No se pudo calcular la calificación" });
   }
 });
 
@@ -491,9 +514,26 @@ router.patch("/:id/aprobar", async (req, res) => {
       });
     }
 
+    // Calificación del socio: puede impedir la aprobación o mandarla al comité
+    const reglas = await reglasDeAprobacion(connection, p, req.usuario, { habilitada, comite });
+    if (reglas.bloqueo) {
+      await connection.rollback();
+      return res.status(409).json({ message: reglas.bloqueo, calificacion: reglas.cal });
+    }
+
     // Por encima del límite del personal decide el comité de crédito: esta aprobación es un voto
-    if (comite.requiere(p.monto)) {
-      const r = await comite.votar(connection, p, req.usuario.id_usuario, "aprobar", req.body?.comentario);
+    if (reglas.porComite) {
+      let r;
+      try {
+        r = await comite.votar(connection, p, req.usuario.id_usuario, "aprobar", req.body?.comentario, { motivo: reglas.motivo });
+      } catch (e) {
+        // Pasó al comité por la calificación y quien aprueba no es miembro: queda anotado para el comité
+        if (e.noMiembro && reglas.motivo) {
+          await connection.commit();
+          return res.status(202).json({ success: true, en_comite: true, message: e.message });
+        }
+        throw e;
+      }
       if (!r.aprobado) {
         await connection.commit();
         return res.status(202).json({
@@ -509,6 +549,7 @@ router.patch("/:id/aprobar", async (req, res) => {
       `UPDATE prestamos SET estado = 'aprobado', aprobado_por = ?, fecha_aprobacion = NOW() WHERE id_prestamo = ?`,
       [req.usuario?.id_usuario || null, req.params.id]
     );
+    await guardarCalificacion(connection, p.id_prestamo, reglas.cal);
     await connection.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
       [p.id_usuario, "Préstamo aprobado", `Préstamo #${req.params.id} por ${dinero(parseFloat(p.monto))} aprobado. Pendiente de desembolso.`]
@@ -718,8 +759,12 @@ router.patch("/:id/estado", async (req, res) => {
       return res.status(404).json({ message: "Préstamo no encontrado" });
     }
 
-    if (comite.bloqueaCambioDirecto(req.usuario, prestamo[0].monto, prestamo[0].estado, estado)) {
-      return res.status(409).json({ message: `${comite.mensajeBloqueo()} Usa "Aprobar" para votar.` });
+    if (comite.bloqueaCambioDirecto(req.usuario, prestamo[0].monto, prestamo[0].estado, estado, await habilitada("calificacion_credito", req.usuario))) {
+      return res.status(409).json({
+        message: comite.requiere(prestamo[0].monto)
+          ? `${comite.mensajeBloqueo()} Usa "Aprobar" para votar.`
+          : "Con la calificación del socio encendida, los préstamos se aprueban con el botón Aprobar (así se revisan sus reglas). Regístralo como pendiente.",
+      });
     }
 
     // Solo se marca como pagado un préstamo sin saldo (el saldo se salda registrando el pago)
@@ -1017,8 +1062,12 @@ router.post("/", async (req, res) => {
     const cuotaMensual = calcularCuotaMensual(montoNum, tasaNum, plazoNum);
     const estadosPermitidos = ['pendiente', 'aprobado', 'activo', 'mora', 'pagado', 'rechazado'];
     const estadoPrestamo = (estado && estadosPermitidos.includes(estado)) ? estado : 'pendiente';
-    if (comite.bloqueaCambioDirecto(req.usuario, montoNum, null, estadoPrestamo)) {
-      return res.status(409).json({ message: `${comite.mensajeBloqueo()} Regístralo como pendiente.` });
+    if (comite.bloqueaCambioDirecto(req.usuario, montoNum, null, estadoPrestamo, await habilitada("calificacion_credito", req.usuario))) {
+      return res.status(409).json({
+        message: comite.requiere(montoNum)
+          ? `${comite.mensajeBloqueo()} Regístralo como pendiente.`
+          : "Con la calificación del socio encendida, los préstamos se aprueban con el botón Aprobar (así se revisan sus reglas). Regístralo como pendiente.",
+      });
     }
     // Datos ampliados del crédito (si la función está habilitada para quien registra)
     let ampliados = null;
@@ -1143,9 +1192,13 @@ router.put("/:id", async (req, res) => {
     const nuevoEstado = (estado && estadosPermitidosPut.includes(estado))
       ? estado
       : actual.estado;
-    if (comite.bloqueaCambioDirecto(req.usuario, montoNum, actual.estado, nuevoEstado)) {
+    if (comite.bloqueaCambioDirecto(req.usuario, montoNum, actual.estado, nuevoEstado, await habilitada("calificacion_credito", req.usuario))) {
       await connection.rollback();
-      return res.status(409).json({ message: `${comite.mensajeBloqueo()} Usa "Aprobar" para votar.` });
+      return res.status(409).json({
+        message: comite.requiere(montoNum)
+          ? `${comite.mensajeBloqueo()} Usa "Aprobar" para votar.`
+          : "Con la calificación del socio encendida, los préstamos se aprueban con el botón Aprobar (así se revisan sus reglas). Regístralo como pendiente.",
+      });
     }
 
     // Un préstamo solo pasa a "pagado" cuando su saldo ya es cero (se salda registrando el pago)

@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
 import { FaInbox, FaLink, FaCopy, FaWhatsapp, FaSyncAlt, FaFilePdf, FaEnvelope, FaHandHoldingUsd, FaUserPlus, FaMoneyCheckAlt, FaFileSignature } from "react-icons/fa";
 import Pestanas from "../components/Pestanas";
+import CalificacionSocio from "../components/CalificacionSocio";
 import { EmptyState, PageHeader } from "../ui/Componentes";
 import InputMonto from "../ui/InputMonto";
 import DesembolsoModal from "../components/DesembolsoModal";
@@ -734,6 +735,9 @@ export default function Solicitudes() {
                 <button type="button" className="btn-close" onClick={() => setRevisando(null)} />
               </div>
               <div className="modal-body">
+                <div className="mb-3">
+                  <CalificacionSocio idPrestamo={revisando.id_prestamo} token={token} />
+                </div>
                 <p className="small text-muted">
                   Puedes ajustar las condiciones antes de aprobar. Al aprobar, el socio recibe por correo la carta de
                   aprobación en PDF. El dinero se entrega después, al registrar el desembolso.

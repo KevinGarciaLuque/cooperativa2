@@ -2673,6 +2673,94 @@ test("etapa 8: app del socio — pagar desde su ahorro, transferir, estado de cu
   assert.equal((await api("PUT", "/configuracion/funciones", { app_socio: false, reportes_supervisor: false }, ids.tSuper)).s, 200);
 });
 
+test("etapa 9: calificación del socio y reglas de aprobación (mora bloquea, puntaje bajo va al comité)", async () => {
+  const parametros = (extra) => api("PUT", "/configuracion/financiera", { mora_tasa_anual: 24, mora_dias_gracia: 30, ...extra }, ids.tSuper);
+  const socio = async (dni, extra = "") => {
+    const [u] = await pool.query(
+      `INSERT INTO usuarios (nombre_completo, dni, telefono, correo, password, rol_id, estado, fecha_registro, ingreso_mensual, fecha_ingreso)
+       VALUES (?, ?, '98765432', ?, 'x', 2, 'activo', NOW(), 10000, DATE_SUB(CURDATE(), INTERVAL 4 YEAR))`,
+      [`Socio Cal ${dni}`, dni, `${dni}@prueba.hn`]
+    );
+    if (extra) await pool.query(extra, [u.insertId]);
+    return u.insertId;
+  };
+  const prestamo = async (idU, estado, monto, dias = 0) =>
+    (await pool.query(
+      `INSERT INTO prestamos (id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado)
+       VALUES (?, ?, 24, 12, ?, ?, ${estado === "pendiente" ? "NULL" : "DATE_SUB(CURDATE(), INTERVAL ? DAY)"})`,
+      estado === "pendiente" ? [idU, monto, monto, estado] : [idU, monto, estado === "pagado" ? 0 : monto, estado, dias]
+    ))[0].insertId;
+
+  // Buen socio: ingreso alto, 4 años, ahorro y un préstamo pagado
+  const bueno = await socio("0801000000881", "INSERT INTO cuentas (id_usuario, tipo_cuenta, saldo_actual, estado, fecha_apertura) VALUES (?, 'Vivienda', 3000, 'activa', NOW())");
+  await prestamo(bueno, "pagado", 2000, 400);
+  const pb = await prestamo(bueno, "pendiente", 5000);
+
+  // Apagada: no se calcula ni cambia la aprobación
+  assert.equal((await api("GET", `/prestamos/${pb}/calificacion`, null, ids.tAdmin)).s, 403);
+  assert.equal((await api("PUT", "/configuracion/funciones", { calificacion_credito: true }, ids.tSuper)).s, 200);
+
+  const c = await api("GET", `/prestamos/${pb}/calificacion`, null, ids.tAdmin);
+  assert.equal(c.s, 200, c.b?.message);
+  const cal = c.b.data;
+  assert.equal(cal.factores.length, 5);
+  assert.equal(cal.puntaje, cal.factores.reduce((t, f) => t + f.puntos, 0));
+  assert.equal(cal.factores.reduce((t, f) => t + f.max, 0), 100);
+  assert.ok(cal.puntaje >= 80, `buen socio con puntaje ${cal.puntaje}`);
+  assert.equal(cal.letra, "A");
+  assert.equal(cal.datos.prestamos_pagados, 1);
+  assert.ok(cal.datos.porcentaje_cuota_ingreso > 0 && cal.datos.porcentaje_cuota_ingreso < 10);
+  // El socio no ve su calificación
+  assert.equal((await api("GET", `/prestamos/${pb}/calificacion`, null, tokenDe(bueno, "Socio", 2))).s, 403);
+
+  // Socio con cuotas atrasadas: puntaje bajo y, con la regla, no se aprueba
+  const moroso = await socio("0801000000882");
+  await prestamo(moroso, "activo", 3000, 100);
+  const pm = await prestamo(moroso, "pendiente", 2000);
+  const cm = (await api("GET", `/prestamos/${pm}/calificacion`, null, ids.tAdmin)).b.data;
+  assert.ok(cm.datos.dias_atraso > 0);
+  assert.ok(cm.puntaje < cal.puntaje);
+  assert.ok(cm.alertas.some((a) => /atrasadas/.test(a)));
+  assert.equal((await parametros({ cred_bloquear_mora: 1 })).s, 200);
+  const bloq = await api("PATCH", `/prestamos/${pm}/aprobar`, {}, ids.tAdmin);
+  assert.equal(bloq.s, 409);
+  assert.match(bloq.b.message, /cuotas atrasadas/);
+  // Cambiar el estado a mano tampoco lo salta
+  assert.equal((await api("PATCH", `/prestamos/${pm}/estado`, { estado: "aprobado" }, ids.tAdmin)).s, 409);
+  // El Super Administrador sí puede (casos especiales)
+  assert.equal((await api("PATCH", `/prestamos/${pm}/aprobar`, {}, ids.tSuper)).s, 200);
+  const [[gm]] = await pool.query("SELECT calificacion_letra, calificacion_puntaje FROM prestamos WHERE id_prestamo = ?", [pm]);
+  assert.equal(gm.calificacion_puntaje, cm.puntaje, "se guarda la calificación con la que se aprobó");
+
+  // Puntaje bajo el mínimo: pasa al comité aunque el monto no lo pida
+  // Sin su ahorro, el buen socio baja a 80 puntos (sigue en A) y queda bajo el mínimo de 90
+  await pool.query("UPDATE cuentas SET saldo_actual = 0 WHERE id_usuario = ?", [bueno]);
+  assert.equal((await api("GET", `/prestamos/${pb}/calificacion`, null, ids.tAdmin)).b.data.puntaje, 80);
+  assert.equal((await parametros({ cred_bloquear_mora: 0, cred_puntaje_comite: 90, aprob_votos_comite: 1 })).s, 200);
+  const alComite = await api("PATCH", `/prestamos/${pb}/aprobar`, {}, ids.tAdmin);
+  assert.equal(alComite.s, 202, alComite.b?.message);
+  assert.equal(alComite.b.en_comite, true);
+  assert.match(alComite.b.message, /comité/);
+  const [[pp]] = await pool.query("SELECT estado, comite_motivo FROM prestamos WHERE id_prestamo = ?", [pb]);
+  assert.equal(pp.estado, "pendiente");
+  assert.match(pp.comite_motivo, /menor a 90/);
+  const pend = await api("GET", "/comite/pendientes", null, ids.tAdmin);
+  assert.ok(pend.b.data.some((x) => x.id_prestamo === pb), "aparece en el comité");
+  // Un miembro del comité vota y queda aprobado con su calificación
+  assert.equal((await api("PUT", "/comite/miembros", { miembros: [{ id_usuario: ids.admin }] }, ids.tSuper)).s, 200);
+  const voto = await api("POST", `/comite/prestamos/${pb}/votar`, { voto: "aprobar" }, ids.tAdmin);
+  assert.equal(voto.b.resultado, "aprobado", voto.b?.message);
+  const [[gb]] = await pool.query("SELECT estado, calificacion_letra FROM prestamos WHERE id_prestamo = ?", [pb]);
+  assert.equal(gb.estado, "aprobado");
+  assert.equal(gb.calificacion_letra, "A");
+
+  // Limpieza
+  assert.equal((await parametros({ cred_puntaje_comite: 0, aprob_votos_comite: 2 })).s, 200);
+  assert.equal((await api("PUT", "/comite/miembros", { miembros: [] }, ids.tSuper)).s, 200);
+  await pool.query("UPDATE prestamos SET estado = 'rechazado' WHERE id_usuario IN (?)", [[bueno, moroso]]);
+  assert.equal((await api("PUT", "/configuracion/funciones", { calificacion_credito: false }, ids.tSuper)).s, 200);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

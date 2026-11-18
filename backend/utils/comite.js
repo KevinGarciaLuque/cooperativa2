@@ -12,6 +12,8 @@ const num = (v) => parseFloat(v || 0);
 const limite = () => num(config.obtener().aprob_monto_admin);
 const votosRequeridos = () => Math.max(1, parseInt(config.obtener().aprob_votos_comite) || 1);
 const requiere = (monto) => limite() > 0 && num(monto) > limite() + 0.001;
+// Un préstamo va al comité por su monto o porque la calificación del socio lo mandó (comite_motivo)
+const requierePrestamo = (p) => requiere(p.monto) || !!p.comite_motivo;
 
 const esMiembro = async (conn, idUsuario) => {
   const [[m]] = await conn.query("SELECT 1 AS si FROM comite_credito WHERE id_usuario = ?", [idUsuario]);
@@ -41,12 +43,16 @@ const conteo = async (conn, idPrestamo, monto) => {
 };
 
 // Registra (o cambia) el voto del usuario. Lanza un error con .codigo si no puede votar.
-const votar = async (conn, prestamo, idUsuario, voto, comentario) => {
+const votar = async (conn, prestamo, idUsuario, voto, comentario, { motivo } = {}) => {
   if (!["aprobar", "rechazar"].includes(voto)) throw Object.assign(new Error("Voto inválido."), { codigo: 400 });
   if (!(await esMiembro(conn, idUsuario))) {
     throw Object.assign(
-      new Error(`Los préstamos de más de ${dinero(limite())} los aprueba el comité de crédito, y no eres miembro.`),
-      { codigo: 409 }
+      new Error(
+        motivo
+          ? `${motivo} No eres miembro del comité: los miembros votan en Comité de crédito.`
+          : `Los préstamos de más de ${dinero(limite())} los aprueba el comité de crédito, y no eres miembro.`
+      ),
+      { codigo: 409, noMiembro: true }
     );
   }
   if (voto === "rechazar" && !String(comentario || "").trim()) {
@@ -63,12 +69,14 @@ const votar = async (conn, prestamo, idUsuario, voto, comentario) => {
 // Para las rutas que cambian el estado a mano (crear, editar): un préstamo que requiere comité
 // no pasa de pendiente a aprobado/activo por fuera de la votación (salvo el Super Administrador,
 // que registra préstamos históricos).
-const bloqueaCambioDirecto = (usuario, monto, estadoAntes, estadoNuevo) =>
+// conCalificacion: con la calificación del socio encendida, todo préstamo pendiente se aprueba con
+// "Aprobar" (así se aplican sus reglas), no cambiando el estado a mano.
+const bloqueaCambioDirecto = (usuario, monto, estadoAntes, estadoNuevo, conCalificacion = false) =>
   usuario?.rol !== "Super Administrador" &&
-  requiere(monto) &&
+  (requiere(monto) || conCalificacion) &&
   (estadoAntes === "pendiente" || estadoAntes == null) &&
   ["aprobado", "activo", "mora", "pagado"].includes(estadoNuevo);
 
 const mensajeBloqueo = () => `Los préstamos de más de ${dinero(limite())} se aprueban por votación del comité de crédito.`;
 
-module.exports = { limite, votosRequeridos, requiere, esMiembro, conteo, votar, bloqueaCambioDirecto, mensajeBloqueo };
+module.exports = { limite, votosRequeridos, requiere, requierePrestamo, esMiembro, conteo, votar, bloqueaCambioDirecto, mensajeBloqueo };

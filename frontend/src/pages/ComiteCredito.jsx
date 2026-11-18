@@ -1,5 +1,6 @@
 // Comité de crédito: las solicitudes por encima del monto que aprueba el personal se deciden por
 // votos de los miembros. El Super Administrador define el límite (Parámetros) y los miembros.
+import CalificacionSocio from "../components/CalificacionSocio";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { FaGavel, FaThumbsUp, FaThumbsDown, FaUsers } from "react-icons/fa";
@@ -83,7 +84,7 @@ export default function ComiteCredito() {
         </div>
       </div>
 
-      {info && !info.activo && (
+      {info && !info.activo && pendientes.length === 0 && (
         <div className="alert alert-info small">
           El comité no está activo: el personal aprueba los préstamos de cualquier monto. Para activarlo, el Super
           Administrador indica en <em>Parámetros</em> el monto máximo que aprueba el personal.
@@ -122,6 +123,14 @@ export default function ComiteCredito() {
                       <td>
                         <div className="fw-semibold">{p.nombre_completo}</div>
                         {p.numero_socio && <div className="small text-muted">N.º {p.numero_socio}</div>}
+                        {p.comite_motivo && (
+                          <span className="badge rounded-pill mt-1" style={{ background: "#eef2ff", color: "#3730a3" }} title={p.comite_motivo}>
+                            Por calificación del socio
+                          </span>
+                        )}
+                        <div className="mt-2" style={{ minWidth: 240 }}>
+                          <CalificacionSocio idPrestamo={p.id_prestamo} token={token} compacta />
+                        </div>
                       </td>
                       <td className="text-end text-nowrap">{dinero(p.monto)}</td>
                       <td className="small">{p.plazo_meses} meses · {tasa(p)}</td>

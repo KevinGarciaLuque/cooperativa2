@@ -346,3 +346,22 @@ Función nueva **"App del socio"** (*Control de Accesos → Funciones nuevas*). 
   - Cada operación pide confirmación; tocar dos veces "Pagar" no cobra dos veces.
 - **Aportaciones:** por defecto no se usan para pagar ni transferir (son capital). Se puede permitir en *Parámetros → App del socio*.
 - **Claves de las notificaciones:** se crean solas la primera vez. Para fijarlas, define `VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY` en el servidor; si las cambias, los socios deben volver a activar las notificaciones.
+
+## Etapa 9: calificación del socio y reglas de aprobación
+
+Función nueva **"Calificación del socio y reglas de aprobación"** (*Control de Accesos → Funciones nuevas*). El socio nunca ve su calificación.
+
+- **Calificación** de 0 a 100 con letra: A (80 o más, excelente), B (65, bueno), C (50, aceptable), D (35, riesgoso), E (alto riesgo). Suma cinco factores, cada uno con su explicación:
+  - Historial de pagos (30): préstamos pagados, atraso actual, promesas incumplidas y gestiones de cobro del último año.
+  - Capacidad de pago (25): las cuotas de sus préstamos vigentes más la nueva, frente a su ingreso mensual (del expediente o de su solicitud).
+  - Ahorro y aportaciones (20): lo ahorrado frente al monto que pide.
+  - Antigüedad como socio (15).
+  - Endeudamiento actual (10): préstamos vigentes.
+  - Alertas: cuotas atrasadas, cuotas que superan el % de ingreso permitido, falta el ingreso, persona expuesta políticamente.
+- **Dónde se ve:** al revisar una solicitud (*Solicitudes → Revisar*) y en cada préstamo del *Comité de crédito*.
+- **Reglas** (*Parámetros → Calificación del socio*):
+  - *No aprobar préstamos a socios con cuotas atrasadas.*
+  - *Con menos de este puntaje, decide el comité:* el préstamo pasa al Comité de crédito aunque su monto sea pequeño (aparece marcado "Por calificación del socio"). Necesita miembros en el comité.
+  - El Super Administrador puede aprobar casos especiales sin estas reglas.
+  - Con la función encendida, un préstamo pendiente solo se aprueba con el botón **Aprobar** (no cambiando su estado a mano), para que siempre se revisen las reglas.
+- Al aprobarse, el préstamo guarda la calificación que tenía en ese momento.

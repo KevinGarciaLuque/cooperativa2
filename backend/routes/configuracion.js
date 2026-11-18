@@ -229,7 +229,9 @@ router.put("/financiera", verificarToken, soloSuperAdmin, async (req, res) => {
       aprob_votos_comite: [1, 15], // votos a favor del comité para aprobar
       caja_exigir_turno: [0, 1], // efectivo solo con turno de caja abierto
       seg_2fa_personal: [0, 1], // verificación en dos pasos por correo para el personal
-      app_debito_aportaciones: [0, 1], // app del socio: usar aportaciones para pagar o transferir
+      app_debito_aportaciones: [0, 1],
+      cred_bloquear_mora: [0, 1], // calificación: no aprobar con cuotas atrasadas
+      cred_puntaje_comite: [0, 100], // calificación: con menos puntaje lo decide el comité // app del socio: usar aportaciones para pagar o transferir
       prov_lim_1: [1, 3650], // días de cada categoría de mora
       prov_lim_2: [2, 3650],
       prov_lim_3: [3, 3650],

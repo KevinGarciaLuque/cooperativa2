@@ -15,6 +15,8 @@ const { asignarNumeroSocio } = require("../utils/numeroSocio");
 const { abrirCuentasAutomaticas } = require("../utils/ahorro");
 const { dinero } = require("../utils/pais");
 const comite = require("../utils/comite");
+const { reglasDeAprobacion, guardarCalificacion } = require("../utils/calificacion");
+const { habilitada } = require("../utils/funciones");
 
 const num = (v) => parseFloat(v || 0);
 const esSocio = (req) => req.usuario?.rol === "Socio";
@@ -350,16 +352,35 @@ router.post("/prestamos/:id/aprobar", soloPersonal, async (req, res) => {
       return res.status(400).json({ message: "Tasa mensual inválida." });
     }
 
+    // Calificación del socio con las condiciones propuestas: puede impedir la aprobación o
+    // mandarla al comité
+    const propuesto = { ...p, monto, plazo_meses: plazo, tasa_interes: parseFloat((tasaMensual * 12).toFixed(4)) };
+    const reglas = await reglasDeAprobacion(connection, propuesto, req.usuario, { habilitada, comite });
+    if (reglas.bloqueo) {
+      await connection.rollback();
+      return res.status(409).json({ message: reglas.bloqueo, calificacion: reglas.cal });
+    }
+
     // Por encima del límite del personal decide el comité de crédito: esta aprobación es un voto
     // sobre las condiciones propuestas (si cambian, los votos anteriores dejan de contar)
-    if (comite.requiere(monto)) {
+    if (reglas.porComite) {
       await connection.query(
         `UPDATE prestamos
          SET monto = ?, saldo_restante = ?, plazo_meses = ?, tasa_interes = ?, tasa_original = ?, tipo_tasa = 'nominal_mensual'
          WHERE id_prestamo = ?`,
         [monto, monto, plazo, parseFloat((tasaMensual * 12).toFixed(4)), tasaMensual, req.params.id]
       );
-      const r = await comite.votar(connection, { id_prestamo: p.id_prestamo, monto }, req.usuario.id_usuario, "aprobar", req.body.comentario);
+      let r;
+      try {
+        r = await comite.votar(connection, { id_prestamo: p.id_prestamo, monto }, req.usuario.id_usuario, "aprobar", req.body.comentario, { motivo: reglas.motivo });
+      } catch (e) {
+        // Pasó al comité por la calificación y quien aprueba no es miembro: queda anotado para el comité
+        if (e.noMiembro && reglas.motivo) {
+          await connection.commit();
+          return res.status(202).json({ success: true, en_comite: true, message: e.message });
+        }
+        throw e;
+      }
       if (!r.aprobado) {
         await connection.commit();
         return res.status(202).json({
@@ -378,6 +399,7 @@ router.post("/prestamos/:id/aprobar", soloPersonal, async (req, res) => {
        WHERE id_prestamo = ?`,
       [monto, monto, plazo, parseFloat((tasaMensual * 12).toFixed(4)), tasaMensual, req.usuario.id_usuario, req.params.id]
     );
+    await guardarCalificacion(connection, p.id_prestamo, reglas.cal);
     await connection.query(
       `INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())`,
       [p.id_usuario, "Préstamo aprobado", `Solicitud #${req.params.id} aprobada: ${dinero(monto)} a ${plazo} meses, ${tasaMensual}% mensual. Pendiente de desembolso.`]

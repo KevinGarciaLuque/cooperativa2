@@ -3,6 +3,8 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const comite = require("../utils/comite");
+const { habilitada } = require("../utils/funciones");
+const { calificarSocio, guardarCalificacion, solicitudDe } = require("../utils/calificacion");
 const { avisarAprobacion } = require("../utils/cartaAprobacion");
 const { notificarSocio } = require("../utils/notificaciones");
 const { dinero } = require("../utils/pais");
@@ -95,14 +97,15 @@ router.put("/miembros", async (req, res) => {
 // GET /api/comite/pendientes → solicitudes pendientes que necesitan al comité, con sus votos
 router.get("/pendientes", async (req, res) => {
   try {
-    if (!(comite.limite() > 0)) return res.json({ success: true, data: [] });
+    // Por monto (si hay límite) o porque la calificación del socio lo mandó al comité
+    const limite = comite.limite() > 0 ? comite.limite() : null;
     const [filas] = await pool.query(
-      `SELECT p.id_prestamo, p.id_usuario, p.monto, p.plazo_meses, p.tasa_original, p.tipo_tasa, p.tasa_interes,
+      `SELECT p.id_prestamo, p.id_usuario, p.monto, p.plazo_meses, p.tasa_original, p.tipo_tasa, p.tasa_interes, p.comite_motivo,
               u.nombre_completo, u.numero_socio
        FROM prestamos p JOIN usuarios u ON u.id_usuario = p.id_usuario
-       WHERE p.estado = 'pendiente' AND p.monto > ?
+       WHERE p.estado = 'pendiente' AND (${limite !== null ? "p.monto > ? OR " : ""}p.comite_motivo IS NOT NULL)
        ORDER BY p.id_prestamo`,
-      [comite.limite()]
+      limite !== null ? [limite] : []
     );
     for (const f of filas) {
       const c = await comite.conteo(pool, f.id_prestamo, f.monto);
@@ -119,9 +122,9 @@ router.get("/pendientes", async (req, res) => {
 // GET /api/comite/prestamos/:id → votos de un préstamo
 router.get("/prestamos/:id", async (req, res) => {
   try {
-    const [[p]] = await pool.query("SELECT id_prestamo, monto, estado FROM prestamos WHERE id_prestamo = ?", [parseInt(req.params.id)]);
+    const [[p]] = await pool.query("SELECT id_prestamo, monto, estado, comite_motivo FROM prestamos WHERE id_prestamo = ?", [parseInt(req.params.id)]);
     if (!p) return res.status(404).json({ message: "Préstamo no encontrado" });
-    res.json({ success: true, data: { requiere: comite.requiere(p.monto), ...(await comite.conteo(pool, p.id_prestamo, p.monto)) } });
+    res.json({ success: true, data: { requiere: comite.requierePrestamo(p), ...(await comite.conteo(pool, p.id_prestamo, p.monto)) } });
   } catch (error) {
     console.error("ERROR AL LEER VOTOS:", error);
     res.status(500).json({ message: "No se pudieron leer los votos" });
@@ -142,12 +145,12 @@ router.post("/prestamos/:id/votar", async (req, res) => {
       await conn.rollback();
       return res.status(400).json({ message: `El préstamo ya está en estado "${p.estado}".` });
     }
-    if (!comite.requiere(p.monto)) {
+    if (!comite.requierePrestamo(p)) {
       await conn.rollback();
       return res.status(400).json({ message: "Este préstamo no necesita al comité: apruébalo directamente." });
     }
     const { voto, comentario } = req.body || {};
-    const r = await comite.votar(conn, p, req.usuario.id_usuario, voto, comentario);
+    const r = await comite.votar(conn, p, req.usuario.id_usuario, voto, comentario, { motivo: p.comite_motivo });
     let resultado = "pendiente";
     if (r.aprobado) {
       await conn.query(
@@ -155,6 +158,9 @@ router.post("/prestamos/:id/votar", async (req, res) => {
         [req.usuario.id_usuario, p.id_prestamo]
       );
       await bitacora(conn, p.id_usuario, "Préstamo aprobado", `Préstamo #${p.id_prestamo} por ${dinero(p.monto)} aprobado por el comité (${r.a_favor} votos a favor). Pendiente de desembolso.`);
+      if (await habilitada("calificacion_credito", req.usuario)) {
+        await guardarCalificacion(conn, p.id_prestamo, await calificarSocio(p.id_usuario, solicitudDe(p), conn));
+      }
       resultado = "aprobado";
     } else if (r.rechazado) {
       const motivos = r.votos.filter((v) => v.voto === "rechazar" && v.comentario).map((v) => v.comentario).join("; ");

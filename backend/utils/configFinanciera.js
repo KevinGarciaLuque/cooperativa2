@@ -42,6 +42,9 @@ const DEFAULTS = {
   seg_2fa_personal: 0,
   // App del socio: 1 = también puede pagar o transferir desde su cuenta de aportaciones
   app_debito_aportaciones: 0,
+  // Calificación del socio (función "calificacion_credito"):
+  cred_bloquear_mora: 0, // 1 = no se aprueba un préstamo si el socio tiene cuotas atrasadas
+  cred_puntaje_comite: 0, // con menos de este puntaje, el préstamo lo decide el comité (0 = no aplica)
 };
 
 let cache = { ...DEFAULTS };

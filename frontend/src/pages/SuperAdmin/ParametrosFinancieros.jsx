@@ -18,12 +18,12 @@ export default function ParametrosFinancieros() {
   const [tasa, setTasa] = useState("");
   const [gracia, setGracia] = useState("");
   const [prov, setProv] = useState({ prov_al_dia: "", prov_1_30: "", prov_31_60: "", prov_61_90: "", prov_90_mas: "" });
-  const [sol, setSol] = useState({ sol_tasa_mensual: "", sol_monto_max: "", sol_plazo_max: "", sol_pct_ingreso_max: "", aho_retencion_pct: "0", aml_umbral: "0", aprob_monto_admin: "0", aprob_votos_comite: "2", caja_exigir_turno: "0", seg_2fa_personal: "0", app_debito_aportaciones: "0" });
+  const [sol, setSol] = useState({ sol_tasa_mensual: "", sol_monto_max: "", sol_plazo_max: "", sol_pct_ingreso_max: "", aho_retencion_pct: "0", aml_umbral: "0", aprob_monto_admin: "0", aprob_votos_comite: "2", caja_exigir_turno: "0", seg_2fa_personal: "0", app_debito_aportaciones: "0", cred_bloquear_mora: "0", cred_puntaje_comite: "0" });
   const [seguridad, setSeguridad] = useState(null);
   // Días de cada categoría de mora y metas de los indicadores del informe al supervisor
   const [lims, setLims] = useState({ prov_lim_1: "30", prov_lim_2: "60", prov_lim_3: "90" });
   const [metas, setMetas] = useState({ ind_meta_morosidad: "5", ind_meta_liquidez: "15", ind_meta_solvencia: "10", ind_meta_cobertura: "100" });
-  const { reportes_supervisor: conSupervisor, app_socio: conApp } = useFunciones();
+  const { reportes_supervisor: conSupervisor, app_socio: conApp, calificacion_credito: conCalificacion } = useFunciones();
   const [rec, setRec] = useState({ rec_activo: true, rec_dias_antes: "3", rec_mora_cada: "7" });
   const [enviando, setEnviando] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -46,6 +46,8 @@ export default function ParametrosFinancieros() {
           aprob_votos_comite: String(res.data.data.aprob_votos_comite ?? 2),
           caja_exigir_turno: String(res.data.data.caja_exigir_turno ?? 0),
           app_debito_aportaciones: String(res.data.data.app_debito_aportaciones ?? 0),
+          cred_bloquear_mora: String(res.data.data.cred_bloquear_mora ?? 0),
+          cred_puntaje_comite: String(res.data.data.cred_puntaje_comite ?? 0),
           seg_2fa_personal: String(res.data.data.seg_2fa_personal ?? 0),
         });
         setSeguridad(res.data.seguridad || null);
@@ -255,6 +257,34 @@ export default function ParametrosFinancieros() {
             Exigir turno abierto para operar en efectivo
           </label>
         </div>
+
+        {conCalificacion && (
+          <>
+            <h5 className="fw-bold mt-4 mb-1" style={{ color: AZUL }}>Calificación del socio</h5>
+            <p className="text-muted small">
+              Cada solicitud muestra un puntaje de 0 a 100 (A a E) por historial de pagos, capacidad de pago, ahorro, antigüedad y
+              deudas actuales. Estas reglas se aplican al aprobar; el Super Administrador puede aprobar casos especiales.
+            </p>
+            <div className="form-check form-switch mb-3">
+              <input id="bloquear-mora" type="checkbox" className="form-check-input" checked={sol.cred_bloquear_mora === "1"}
+                onChange={(e) => setSol({ ...sol, cred_bloquear_mora: e.target.checked ? "1" : "0" })} disabled={cargando} />
+              <label htmlFor="bloquear-mora" className="form-check-label">
+                No aprobar préstamos a socios con cuotas atrasadas
+              </label>
+            </div>
+            <div className="row g-3">
+              <div className="col-12 col-md-6">
+                <label className="form-label fw-semibold small">Con menos de este puntaje, decide el comité</label>
+                <input type="number" min="0" max="100" step="1" className="form-control"
+                  value={sol.cred_puntaje_comite} onChange={(e) => setSol({ ...sol, cred_puntaje_comite: e.target.value })} disabled={cargando} />
+                <div className="form-text">
+                  0 = no aplica. Por ejemplo 50: las calificaciones D y E van al comité aunque el monto sea pequeño. Necesita miembros
+                  en Comité de crédito.
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         {conApp && (
           <>

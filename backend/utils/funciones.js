@@ -45,6 +45,11 @@ const CATALOGO = [
     descripcion: "Historial crediticio, proyección de cobros, créditos vencidos, por cerrar y cerrados, por promotor y línea.",
   },
   {
+    clave: "calificacion_credito",
+    nombre: "Calificación del socio y reglas de aprobación",
+    descripcion: "Puntaje de 0 a 100 (A a E) con el detalle de cada factor en Solicitudes y Comité; no aprobar con cuotas atrasadas y mandar al comité los puntajes bajos.",
+  },
+  {
     clave: "app_socio",
     socio: true, // la usan los socios (las demás funciones son solo para el personal)
     nombre: "App del socio",

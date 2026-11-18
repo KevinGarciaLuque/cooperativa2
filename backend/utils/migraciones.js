@@ -1238,6 +1238,23 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_11_022_calificacion_credito",
+    descripcion: "Calificación del socio guardada al aprobar y préstamos que pasan al comité por la calificación",
+    async up(conn) {
+      const agregar = async (nombre, def) => {
+        const [[e]] = await conn.query(
+          `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'prestamos' AND COLUMN_NAME = ?`,
+          [nombre]
+        );
+        if (!e.n) await conn.query(`ALTER TABLE prestamos ADD COLUMN ${nombre} ${def}`);
+      };
+      await agregar("calificacion_puntaje", "INT NULL");
+      await agregar("calificacion_letra", "CHAR(1) NULL");
+      await agregar("comite_motivo", "VARCHAR(200) NULL");
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

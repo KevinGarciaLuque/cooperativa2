@@ -9,6 +9,36 @@ const { filtroSocio } = require("../utils/sucursal");
 const { procesarPago, FalloPago } = require("./pagos");
 const { crearNotificacion } = require("../utils/notificaciones");
 const { dinero } = require("../utils/pais");
+const { registrarCaja, normalizarMetodo } = require("../utils/caja");
+
+// Depósito a una cuenta de ahorro dentro de la transacción del pago (igual que un abono normal)
+const depositar = async (conn, { id_cuenta, monto, metodo, boleta, usuario }) => {
+  const [[c]] = await conn.query("SELECT id_cuenta, id_usuario, tipo_cuenta, saldo_actual, estado FROM cuentas WHERE id_cuenta = ? FOR UPDATE", [id_cuenta]);
+  if (!c) throw error(404, `La cuenta #${id_cuenta} no existe.`);
+  if (c.estado && c.estado !== "activa") throw error(400, `La cuenta ${c.tipo_cuenta} no está activa.`);
+  const anterior = num(c.saldo_actual);
+  const nuevo = Math.round((anterior + monto) * 100) / 100;
+  const descripcion = `Depósito con el pago${boleta ? ` (boleta ${boleta})` : ""}`;
+  const [r] = await conn.query(
+    `INSERT INTO movimientos_cuenta (id_cuenta, tipo_movimiento, monto, saldo_anterior, saldo_nuevo, descripcion, fecha)
+     VALUES (?, 'abono', ?, ?, ?, ?, NOW())`,
+    [id_cuenta, monto, anterior, nuevo, descripcion]
+  );
+  await registrarCaja(conn, {
+    tipo: "ingreso",
+    categoria: "deposito_ahorro",
+    monto,
+    metodo: normalizarMetodo(metodo),
+    descripcion: `Depósito en cuenta ${c.tipo_cuenta}: ${descripcion}`,
+    referencia_tipo: "movimiento_cuenta",
+    referencia_id: r.insertId,
+    id_socio: c.id_usuario,
+    id_registrado_por: usuario?.id_usuario,
+    contable: { tipo_cuenta: c.tipo_cuenta },
+  });
+  await conn.query("UPDATE cuentas SET saldo_actual = ? WHERE id_cuenta = ?", [nuevo, id_cuenta]);
+  return { id_cuenta, id_usuario: c.id_usuario, tipo_cuenta: c.tipo_cuenta, monto, saldo_nuevo: nuevo };
+};
 
 const num = (v) => parseFloat(v || 0);
 const esFecha = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ""));
@@ -29,14 +59,23 @@ router.post("/rapido", async (req, res) => {
     const detalles = (Array.isArray(b.detalles) ? b.detalles : [])
       .map((d) => ({ ...d, id_prestamo: parseInt(d.id_prestamo), monto_pagado: Math.round(num(d.monto_pagado) * 100) / 100 }))
       .filter((d) => d.monto_pagado > 0);
-    if (!detalles.length) throw error(400, "Indica cuánto se paga en al menos un préstamo.");
+    // Depósitos a cuentas de ahorro del socio en la misma operación
+    const depositos = (Array.isArray(b.depositos) ? b.depositos : [])
+      .map((d) => ({ id_cuenta: parseInt(d.id_cuenta), monto: Math.round(num(d.monto) * 100) / 100 }))
+      .filter((d) => d.id_cuenta && d.monto > 0);
+    if (!detalles.length && !depositos.length) throw error(400, "Indica cuánto se paga en al menos un préstamo o cuenta.");
     if (new Set(detalles.map((d) => d.id_prestamo)).size !== detalles.length) throw error(400, "Un préstamo aparece dos veces.");
-    const [prestamos] = await conn.query(
-      "SELECT id_prestamo, id_usuario FROM prestamos WHERE id_prestamo IN (?)",
-      [detalles.map((d) => d.id_prestamo)]
-    );
+    const [prestamos] = detalles.length
+      ? await conn.query("SELECT id_prestamo, id_usuario FROM prestamos WHERE id_prestamo IN (?)", [detalles.map((d) => d.id_prestamo)])
+      : [[]];
     if (prestamos.length !== detalles.length) throw error(404, "Uno de los préstamos no existe.");
-    if (new Set(prestamos.map((p) => p.id_usuario)).size > 1) throw error(400, "El pago rápido es para los préstamos de un mismo socio.");
+    const [cuentas] = depositos.length
+      ? await conn.query("SELECT id_cuenta, id_usuario FROM cuentas WHERE id_cuenta IN (?)", [depositos.map((d) => d.id_cuenta)])
+      : [[]];
+    if (cuentas.length !== new Set(depositos.map((d) => d.id_cuenta)).size) throw error(404, "Una de las cuentas no existe.");
+    const duenos = new Set([...prestamos.map((p) => p.id_usuario), ...cuentas.map((c) => c.id_usuario)]);
+    if (duenos.size > 1) throw error(400, "El pago rápido es para los préstamos y cuentas de un mismo socio.");
+    const idSocio = [...duenos][0];
 
     await conn.beginTransaction();
     const resultados = [];
@@ -63,11 +102,16 @@ router.post("/rapido", async (req, res) => {
         throw e;
       }
     }
-    const total = resultados.reduce((t, r) => t + r.montoPagadoNum + (r.otrosCargos || 0), 0);
+    const depositados = [];
+    for (const d of depositos) {
+      depositados.push(await depositar(conn, { ...d, metodo: b.metodo_pago, boleta: b.numero_boleta, usuario: req.usuario }));
+    }
+    const total =
+      resultados.reduce((t, r) => t + r.montoPagadoNum + (r.otrosCargos || 0), 0) + depositados.reduce((t, d) => t + d.monto, 0);
     await conn.query("INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())", [
       req.usuario.id_usuario,
       "Pago rápido",
-      `${dinero(total)} en ${resultados.length} préstamo(s) del socio #${prestamos[0].id_usuario}${b.numero_boleta ? ` · boleta ${b.numero_boleta}` : ""}`,
+      `${dinero(total)} en ${resultados.length} préstamo(s) y ${depositados.length} cuenta(s) del socio #${idSocio}${b.numero_boleta ? ` · boleta ${b.numero_boleta}` : ""}`,
     ]);
     await conn.commit();
     for (const r of resultados) {
@@ -81,7 +125,8 @@ router.post("/rapido", async (req, res) => {
     }
     res.status(201).json({
       success: true,
-      message: `Pago registrado: ${dinero(total)} en ${resultados.length} préstamo(s).`,
+      message: `Pago registrado: ${dinero(total)}${resultados.length ? ` en ${resultados.length} préstamo(s)` : ""}${depositados.length ? `${resultados.length ? " y" : " en"} ${depositados.length} cuenta(s) de ahorro` : ""}.`,
+      depositos: depositados,
       total,
       detalles: resultados.map((r) => ({
         id_prestamo: Number(r.id_prestamo),

@@ -48,6 +48,7 @@ function PagoRapido({ headers, mostrarAlerta }) {
   const [socios, setSocios] = useState([]);
   const [socio, setSocio] = useState(null);
   const [filas, setFilas] = useState([]);
+  const [cuentas, setCuentas] = useState([]);
   const [datos, setDatos] = useState({ metodo_pago: "efectivo", fecha_pago: hoyLocal(), numero_boleta: "", lugar_pago: "" });
   const [resultado, setResultado] = useState(null);
   const [trabajando, setTrabajando] = useState(false);
@@ -83,12 +84,17 @@ function PagoRapido({ headers, mostrarAlerta }) {
         })
       );
       setFilas(conCuota);
+      // Sus cuentas de ahorro (para ver saldos y depositar en la misma operación)
+      const c = await axios.get(`${API_URL}/cuentas`, { headers, params: { id_usuario: s.id_usuario } }).catch(() => ({ data: { data: [] } }));
+      setCuentas((c.data.data || []).filter((x) => (x.estado || "activa") === "activa").map((x) => ({ ...x, monto: "" })));
     } catch (e) {
       mostrarAlerta(e.response?.data?.message || "No se pudieron cargar los préstamos.", "error");
     }
   };
 
-  const total = filas.reduce((t, f) => t + (parseFloat(f.monto) || 0) + (parseFloat(f.otros_cargos) || 0), 0);
+  const total =
+    filas.reduce((t, f) => t + (parseFloat(f.monto) || 0) + (parseFloat(f.otros_cargos) || 0), 0) +
+    cuentas.reduce((t, c) => t + (parseFloat(c.monto) || 0), 0);
   const registrar = async () => {
     setTrabajando(true);
     try {
@@ -97,6 +103,7 @@ function PagoRapido({ headers, mostrarAlerta }) {
         {
           ...datos,
           detalles: filas.map((f) => ({ id_prestamo: f.id_prestamo, monto_pagado: f.monto, otros_cargos: f.otros_cargos, otros_cargos_detalle: f.otros_cargos_detalle })),
+          depositos: cuentas.map((c) => ({ id_cuenta: c.id_cuenta, monto: c.monto })),
         },
         { headers }
       );
@@ -130,8 +137,8 @@ function PagoRapido({ headers, mostrarAlerta }) {
         {socio && !resultado && (
           <>
             <h6 className="fw-bold" style={{ color: AZUL }}>{socio.nombre_completo}</h6>
-            {!filas.length ? (
-              <div className="text-muted small">No tiene préstamos vigentes.</div>
+            {!filas.length && !cuentas.length ? (
+              <div className="text-muted small">No tiene préstamos vigentes ni cuentas activas.</div>
             ) : (
               <>
                 <div className="row g-2 mb-3">
@@ -179,6 +186,23 @@ function PagoRapido({ headers, mostrarAlerta }) {
                     </tbody>
                   </table>
                 </div>
+                {cuentas.length > 0 && (
+                  <div className="table-responsive">
+                    <div className="small fw-semibold mb-1">Ahorro (depósito con el mismo pago)</div>
+                    <table className="table table-sm align-middle">
+                      <thead className="table-light"><tr><th>Cuenta</th><th className="text-end">Saldo actual</th><th style={{ width: 140 }}>Deposita</th></tr></thead>
+                      <tbody>
+                        {cuentas.map((c, k) => (
+                          <tr key={c.id_cuenta}>
+                            <td>{c.tipo_cuenta} <span className="text-muted small">#{c.id_cuenta}</span></td>
+                            <td className="text-end">{dinero(c.saldo_actual)}</td>
+                            <td><InputMonto className="form-control form-control-sm" value={c.monto} onChange={(v) => setCuentas(cuentas.map((x, j) => (j === k ? { ...x, monto: v } : x)))} /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
                 <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
                   <div className="small text-muted">Se registra todo junto: si un pago no es válido, no se registra ninguno.</div>
                   <button className="btn btn-success" disabled={trabajando || total <= 0} onClick={registrar}>
@@ -207,7 +231,21 @@ function PagoRapido({ headers, mostrarAlerta }) {
                 ))}
               </tbody>
             </table>
-            <button className="btn btn-outline-primary btn-sm" onClick={() => { setSocio(null); setFilas([]); setResultado(null); setBuscar(""); }}>
+            {(resultado.depositos || []).length > 0 && (
+              <table className="table table-sm align-middle">
+                <thead className="table-light"><tr><th>Cuenta</th><th className="text-end">Depositó</th><th className="text-end">Nuevo saldo</th></tr></thead>
+                <tbody>
+                  {resultado.depositos.map((d) => (
+                    <tr key={d.id_cuenta}>
+                      <td>{d.tipo_cuenta}</td>
+                      <td className="text-end">{dinero(d.monto)}</td>
+                      <td className="text-end fw-semibold">{dinero(d.saldo_nuevo)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <button className="btn btn-outline-primary btn-sm" onClick={() => { setSocio(null); setFilas([]); setCuentas([]); setResultado(null); setBuscar(""); }}>
               Atender a otro socio
             </button>
           </>

@@ -2234,6 +2234,42 @@ test("reportes ampliados: historial, proyección, vencidos, por cerrar, cerrados
   assert.equal((await api("PUT", "/configuracion/funciones", { reportes_ampliados: false }, ids.tSuper)).s, 200);
 });
 
+test("etapa 4: nombres y apellidos, municipios sugeridos, ficha del socio en Word y pago con depósito a ahorro", async () => {
+  const PizZip = require("pizzip");
+  assert.equal((await api("PUT", "/configuracion/funciones", { datos_ampliados: true, contratos_word: true, pagos_ampliados: true }, ids.tSuper)).s, 200);
+
+  // Nombres y apellidos por separado arman el nombre completo
+  const exp = await api("PUT", `/socios/${ids.socio2}/expediente`, {
+    actividad_economica: "Comerciante", ingreso_mensual: 9000, origen_fondos: "Ventas",
+    nombres: "socio dos", apellidos: "prueba", departamento: "Chimaltenango", municipio: "Tecpán",
+  }, ids.tAdmin);
+  assert.equal(exp.s, 200, exp.b?.message);
+  const [[u]] = await pool.query("SELECT nombre_completo, nombres FROM usuarios WHERE id_usuario = ?", [ids.socio2]);
+  assert.equal(u.nombre_completo, "Socio Dos Prueba");
+  const muni = await api("GET", "/socios/municipios?departamento=Chimaltenango", null, ids.tAdmin);
+  assert.ok(muni.b.data.includes("Tecpán"));
+
+  // Ficha de inscripción en Word
+  const f = await fetch(`${base}/api/documentos-credito/socios/${ids.socio2}/ficha`, { headers: { Authorization: `Bearer ${ids.tAdmin}` } });
+  assert.equal(f.status, 200);
+  const xml = new PizZip(Buffer.from(await f.arrayBuffer())).file("word/document.xml").asText();
+  assert.match(xml, /FICHA DE INSCRIPCIÓN DE SOCIO/);
+  assert.match(xml, /Tecpán/);
+
+  // Pago rápido solo con depósito a ahorro (y no a cuentas de otro socio)
+  const [[c2]] = await pool.query("SELECT id_cuenta, saldo_actual FROM cuentas WHERE id_usuario = ? AND estado = 'activa' LIMIT 1", [ids.socio2]);
+  const [[c1]] = await pool.query("SELECT id_cuenta FROM cuentas WHERE id_usuario = ? LIMIT 1", [ids.socio]);
+  assert.equal((await api("POST", "/pagos-ampliados/rapido", { metodo_pago: "efectivo", depositos: [{ id_cuenta: c2.id_cuenta, monto: 10 }, { id_cuenta: c1.id_cuenta, monto: 10 }] }, ids.tAdmin)).s, 400);
+  const dep = await api("POST", "/pagos-ampliados/rapido", { metodo_pago: "efectivo", numero_boleta: "AH-1", depositos: [{ id_cuenta: c2.id_cuenta, monto: 75 }] }, ids.tAdmin);
+  assert.equal(dep.s, 201, dep.b?.message);
+  assert.equal(dep.b.depositos[0].saldo_nuevo, Math.round((parseFloat(c2.saldo_actual) + 75) * 100) / 100);
+  const [[mov]] = await pool.query("SELECT categoria FROM caja_movimientos WHERE referencia_tipo = 'movimiento_cuenta' ORDER BY id_movimiento DESC LIMIT 1");
+  assert.equal(mov.categoria, "deposito_ahorro");
+
+  await pool.query("UPDATE usuarios SET nombres = NULL, apellidos = NULL WHERE id_usuario = ?", [ids.socio2]);
+  assert.equal((await api("PUT", "/configuracion/funciones", { datos_ampliados: false, contratos_word: false, pagos_ampliados: false }, ids.tSuper)).s, 200);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

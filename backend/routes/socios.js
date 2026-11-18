@@ -11,6 +11,7 @@ const {
 } = require("../utils/identidad");
 const { notificarAdministradores, escaparHtml } = require("../utils/notificaciones");
 const { habilitada } = require("../utils/funciones");
+const { formatearNombre } = require("../utils/nombres");
 
 const num = (v) => parseFloat(v || 0);
 
@@ -169,7 +170,7 @@ const CAMPOS_PERFIL = [
 // Datos ampliados (función "datos_ampliados"): se guardan solo si el usuario la tiene
 const CAMPOS_AMPLIADOS = [
   "escolaridad", "conyuge_nombre", "conyuge_identidad", "conyuge_telefono",
-  "departamento", "municipio", "comunidad", "fecha_ingreso",
+  "departamento", "municipio", "comunidad", "fecha_ingreso", "nombres", "apellidos",
 ];
 
 const expediente = async (id) => {
@@ -195,6 +196,20 @@ const expediente = async (id) => {
   if (!beneficiarios.length) faltantes.push("beneficiarios");
   return { ...perfil, es_pep: !!perfil.es_pep, beneficiarios, alertas_pendientes: alertas.pendientes, faltantes };
 };
+
+// GET /api/socios/municipios?departamento= → municipios ya registrados (para sugerirlos al escribir)
+router.get("/municipios", async (req, res) => {
+  try {
+    const [filas] = await pool.query(
+      `SELECT DISTINCT municipio FROM usuarios WHERE municipio IS NOT NULL AND municipio <> ''
+       ${req.query.departamento ? "AND departamento = ?" : ""} ORDER BY municipio LIMIT 400`,
+      req.query.departamento ? [String(req.query.departamento)] : []
+    );
+    res.json({ success: true, data: filas.map((f) => f.municipio) });
+  } catch (e) {
+    res.json({ success: true, data: [] });
+  }
+});
 
 // GET /api/socios/:id/expediente
 router.get("/:id/expediente", async (req, res) => {
@@ -237,6 +252,8 @@ router.put("/:id/expediente", async (req, res) => {
     municipio: texto(b.municipio, 80),
     comunidad: texto(b.comunidad, 120),
     fecha_ingreso: /^\d{4}-\d{2}-\d{2}$/.test(String(b.fecha_ingreso || "")) ? b.fecha_ingreso : null,
+    nombres: b.nombres ? formatearNombre(texto(b.nombres, 80)) : null,
+    apellidos: b.apellidos ? formatearNombre(texto(b.apellidos, 80)) : null,
   };
   const conAmpliados = await habilitada("datos_ampliados", req.usuario);
   if (perfil.ingreso_mensual != null && !(perfil.ingreso_mensual >= 0)) {
@@ -278,6 +295,13 @@ router.put("/:id/expediente", async (req, res) => {
         `UPDATE usuarios SET ${CAMPOS_AMPLIADOS.map((c) => `${c} = ?`).join(", ")} WHERE id_usuario = ?`,
         [...CAMPOS_AMPLIADOS.map((c) => ampliados[c]), id]
       );
+    }
+    // Con nombres y apellidos por separado, el nombre completo se arma con ellos
+    if (conAmpliados && ampliados.nombres && ampliados.apellidos) {
+      await conn.query("UPDATE usuarios SET nombre_completo = ? WHERE id_usuario = ?", [
+        `${ampliados.nombres} ${ampliados.apellidos}`.substring(0, 100),
+        id,
+      ]);
     }
     await conn.query("DELETE FROM beneficiarios WHERE id_usuario = ?", [id]);
     if (beneficiarios.length) {

@@ -204,6 +204,11 @@ El catálogo base está en `backend/utils/contabilidad.js`; el contador puede ag
 - **Contrato y pagaré en Word**: botones en el detalle del préstamo. Las plantillas están en Productos de
   crédito (Super Administrador): se bajan, se editan en Word con marcadores como {socio_nombre} o
   {monto_letras} y se suben; el sistema las prueba antes de guardarlas.
+- **Etapa 4** (dentro de las mismas funciones): nombres y apellidos por separado y municipios sugeridos
+  (datos ampliados); filtros en la lista de préstamos por tipo, línea y promotor, búsqueda por n.º de
+  préstamo y sucursal del socio; ficha de inscripción del socio en Word (contrato y pagaré en Word); en el
+  pago rápido, saldos de ahorro y depósito a las cuentas del socio en la misma operación (pagos ampliados);
+  garantías de cada integrante desde el crédito grupal.
 - **Reportes ampliados** (menú "Reportes de cartera"): proyección de cobros, créditos vencidos, pendientes de
   cerrar, cerrados, cartera agrupada (promotor, línea, municipio, sucursal, producto, individual/grupal) e
   historial crediticio de un socio; en pantalla y en Excel, por sucursal.

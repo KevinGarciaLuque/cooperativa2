@@ -12,7 +12,7 @@ const { generarPlan } = require("./planPagos");
 const { describir } = require("./garantias");
 const { hoyISO } = require("./fechas");
 
-const TIPOS = { contrato: "Contrato de préstamo", pagare: "Pagaré" };
+const TIPOS = { contrato: "Contrato de préstamo", pagare: "Pagaré", ficha_socio: "Ficha de inscripción del socio" };
 const rutaPersonalizada = (tipo) => `plantillas/${tipo}.docx`; // en la tabla archivos (no se sirve en /uploads)
 
 // Marcadores disponibles (para la ayuda en pantalla)
@@ -100,6 +100,63 @@ const datosDocumento = async (idPrestamo, usuario) => {
   };
 };
 
+// Datos de la ficha de inscripción del socio
+const CAMPOS_FICHA = [
+  ["nombres", "Nombres"], ["apellidos", "Apellidos"], ["fecha_nacimiento", "Fecha de nacimiento"], ["genero", "Género"],
+  ["estado_civil", "Estado civil"], ["escolaridad", "Escolaridad"], ["nacionalidad", "Nacionalidad"], ["socio_correo", "Correo"],
+  ["region_nombre", "Departamento / provincia (palabra)"], ["departamento", "Departamento"], ["municipio", "Municipio"],
+  ["comunidad", "Comunidad"], ["fecha_ingreso", "Fecha de ingreso"], ["estado", "Estado del socio"], ["sucursal", "Sucursal"],
+  ["profesion", "Profesión"], ["actividad_economica", "Actividad económica"], ["lugar_trabajo", "Lugar de trabajo"],
+  ["ingreso_mensual", "Ingreso mensual"], ["origen_fondos", "Origen de fondos"], ["es_pep", "PEP (Sí/No)"],
+  ["conyuge_nombre", "Cónyuge"], ["conyuge_identidad", "Identidad del cónyuge"],
+  ["#beneficiarios … /beneficiarios", "Beneficiarios: nombre, parentesco, identidad, porcentaje"],
+];
+const datosFicha = async (idUsuario) => {
+  const [[u]] = await pool.query(
+    `SELECT u.*, s.nombre AS sucursal FROM usuarios u LEFT JOIN sucursales s ON s.id_sucursal = u.id_sucursal WHERE u.id_usuario = ?`,
+    [idUsuario]
+  );
+  if (!u) return null;
+  const [[coop]] = await pool.query("SELECT valor FROM configuracion_sitio WHERE clave = 'site_name'");
+  const [benef] = await pool.query("SELECT * FROM beneficiarios WHERE id_usuario = ? ORDER BY id_beneficiario", [idUsuario]).catch(() => [[]]);
+  const partes = String(u.nombre_completo || "").split(" ");
+  const v = (x) => (x == null || x === "" ? "" : String(x));
+  return {
+    cooperativa: coop?.valor || "Cooperativa",
+    fecha_hoy: fechaLarga(hoyISO()),
+    lugar: v(u.municipio) || v(u.sucursal),
+    socio_numero: v(u.numero_socio),
+    socio_nombre: v(u.nombre_completo),
+    nombres: v(u.nombres) || partes.slice(0, Math.ceil(partes.length / 2)).join(" "),
+    apellidos: v(u.apellidos) || partes.slice(Math.ceil(partes.length / 2)).join(" "),
+    socio_identidad: v(u.dni),
+    fecha_nacimiento: fechaLarga(soloFecha(u.fecha_nacimiento)),
+    genero: v(u.genero),
+    estado_civil: v(u.estado_civil),
+    escolaridad: v(u.escolaridad),
+    nacionalidad: v(u.nacionalidad),
+    socio_telefono: v(u.telefono),
+    socio_correo: v(u.correo),
+    region_nombre: pais.obtener().regiones?.nombre || "Departamento",
+    departamento: v(u.departamento),
+    municipio: v(u.municipio),
+    comunidad: v(u.comunidad),
+    socio_direccion: v(u.direccion),
+    fecha_ingreso: fechaLarga(soloFecha(u.fecha_ingreso || u.fecha_registro)),
+    estado: v(u.estado),
+    sucursal: v(u.sucursal),
+    profesion: v(u.profesion),
+    actividad_economica: v(u.actividad_economica),
+    lugar_trabajo: v(u.lugar_trabajo),
+    ingreso_mensual: u.ingreso_mensual != null ? pais.dinero(u.ingreso_mensual) : "",
+    origen_fondos: v(u.origen_fondos),
+    es_pep: u.es_pep ? `Sí (${v(u.pep_detalle)})` : "No",
+    conyuge_nombre: v(u.conyuge_nombre),
+    conyuge_identidad: v(u.conyuge_identidad),
+    beneficiarios: benef.map((b) => ({ nombre: b.nombre, parentesco: v(b.parentesco), identidad: v(b.identidad), porcentaje: pais.numero(b.porcentaje) })),
+  };
+};
+
 const plantilla = async (tipo) => {
   try {
     const [[f]] = await pool.query("SELECT contenido FROM archivos WHERE ruta = ?", [rutaPersonalizada(tipo)]);
@@ -120,4 +177,4 @@ const llenar = (buffer, datos) => {
   }
 };
 
-module.exports = { TIPOS, CAMPOS, rutaPersonalizada, datosDocumento, plantilla, llenar };
+module.exports = { TIPOS, CAMPOS, CAMPOS_FICHA, rutaPersonalizada, datosDocumento, datosFicha, plantilla, llenar };

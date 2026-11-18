@@ -41,7 +41,7 @@ export default function PlantillasDocumentos({ token, mostrarAlerta }) {
   return (
     <div className="card border-0 shadow-sm mt-4" style={{ borderRadius: 14 }}>
       <div className="card-body">
-        <h5 className="fw-bold mb-1" style={{ color: "#1a2035" }}><FaFileWord className="me-2" />Plantillas del contrato y del pagaré</h5>
+        <h5 className="fw-bold mb-1" style={{ color: "#1a2035" }}><FaFileWord className="me-2" />Plantillas de documentos en Word</h5>
         <p className="text-muted small">
           Baja la plantilla, edítala en Word con el formato de la cooperativa dejando los marcadores entre llaves, y súbela.
           El sistema la prueba antes de guardarla.
@@ -66,8 +66,15 @@ export default function PlantillasDocumentos({ token, mostrarAlerta }) {
         ))}
         <details className="mt-3">
           <summary className="small fw-semibold" style={{ cursor: "pointer" }}>Marcadores disponibles</summary>
-          <div className="row small mt-2">
+          <div className="small fw-semibold mt-2">Contrato y pagaré</div>
+          <div className="row small mt-1">
             {info.campos.map(([k, d]) => (
+              <div className="col-12 col-md-6" key={k}><code>{`{${k}}`}</code> — {d}</div>
+            ))}
+          </div>
+          <div className="small fw-semibold mt-3">Ficha de inscripción (además de cooperativa, socio_nombre, socio_identidad, socio_numero, socio_telefono, socio_direccion, lugar y fecha_hoy)</div>
+          <div className="row small mt-1">
+            {(info.campos_ficha || []).map(([k, d]) => (
               <div className="col-12 col-md-6" key={k}><code>{`{${k}}`}</code> — {d}</div>
             ))}
           </div>

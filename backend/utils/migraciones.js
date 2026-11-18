@@ -1128,6 +1128,20 @@ const MIGRACIONES = [
       }
     },
   },
+  {
+    id: "2026_11_016_nombres_apellidos",
+    descripcion: "Nombres y apellidos del socio por separado (opcional)",
+    async up(conn) {
+      for (const [nombre, def] of [["nombres", "VARCHAR(80) NULL"], ["apellidos", "VARCHAR(80) NULL"]]) {
+        const [[e]] = await conn.query(
+          `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND COLUMN_NAME = ?`,
+          [nombre]
+        );
+        if (!e.n) await conn.query(`ALTER TABLE usuarios ADD COLUMN ${nombre} ${def}`);
+      }
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

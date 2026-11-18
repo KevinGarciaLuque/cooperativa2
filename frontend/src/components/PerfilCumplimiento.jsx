@@ -2,10 +2,11 @@
 // origen de los fondos, si es persona expuesta políticamente (PEP) y sus beneficiarios.
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { FaShieldAlt, FaEdit, FaPlus, FaTrash, FaExclamationTriangle } from "react-icons/fa";
+import { FaShieldAlt, FaEdit, FaPlus, FaTrash, FaExclamationTriangle, FaFileWord } from "react-icons/fa";
 import InputMonto from "../ui/InputMonto";
 import { dinero, pais } from "../utils/pais";
 import { useFunciones } from "../hooks/useFunciones";
+import { bajarArchivo, mensajeBlob } from "./DocumentosCredito";
 
 const ESCOLARIDADES = ["Ninguna", "Primaria incompleta", "Primaria", "Básico", "Secundaria / Diversificado", "Técnico", "Universitaria", "Posgrado"];
 const fechaCorta = (v) => (v ? String(v).substring(0, 10) : "");
@@ -22,13 +23,23 @@ const Dato = ({ etiqueta, valor }) => (
 );
 
 export default function PerfilCumplimiento({ idSocio, headers }) {
-  const { datos_ampliados: ampliados } = useFunciones();
+  const { datos_ampliados: ampliados, contratos_word: fichaWord } = useFunciones();
   const regiones = pais()?.regiones || { nombre: "Departamento", lista: [] };
   const [datos, setDatos] = useState(undefined);
   const [editando, setEditando] = useState(false);
   const [form, setForm] = useState(null);
   const [mensaje, setMensaje] = useState(null);
   const [guardando, setGuardando] = useState(false);
+  const [municipios, setMunicipios] = useState([]);
+  // Municipios ya registrados en ese departamento, para sugerirlos (y escribirlos igual)
+  useEffect(() => {
+    if (!editando || !ampliados) return;
+    axios
+      .get(`${API_URL}/socios/municipios`, { headers, params: form?.departamento ? { departamento: form.departamento } : {} })
+      .then((r) => setMunicipios(r.data.data || []))
+      .catch(() => setMunicipios([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editando, ampliados, form?.departamento]);
 
   const cargar = () =>
     axios
@@ -96,6 +107,7 @@ export default function PerfilCumplimiento({ idSocio, headers }) {
         </div>
         {ampliados && (
           <div className="row g-3 mb-3">
+            {(datos.nombres || datos.apellidos) && <Dato etiqueta="Nombres / apellidos" valor={`${datos.nombres || ""} / ${datos.apellidos || ""}`} />}
             <Dato etiqueta="Escolaridad" valor={datos.escolaridad} />
             <Dato etiqueta="Cónyuge" valor={[datos.conyuge_nombre, datos.conyuge_identidad, datos.conyuge_telefono].filter(Boolean).join(" · ")} />
             <Dato etiqueta="Fecha de ingreso" valor={fechaCorta(datos.fecha_ingreso) || fechaCorta(datos.fecha_registro)} />
@@ -121,6 +133,19 @@ export default function PerfilCumplimiento({ idSocio, headers }) {
         <button className="btn btn-sm btn-outline-primary" onClick={editar}>
           <FaEdit className="me-1" /> Actualizar expediente
         </button>
+        {fichaWord && (
+          <button
+            className="btn btn-sm btn-outline-secondary ms-2"
+            onClick={() =>
+              bajarArchivo(`${API_URL}/documentos-credito/socios/${idSocio}/ficha`, String(headers?.Authorization || "").replace("Bearer ", ""), `ficha_socio_${idSocio}.docx`).catch(
+                async (e) => setMensaje(await mensajeBlob(e, "No se pudo generar la ficha."))
+              )
+            }
+          >
+            <FaFileWord className="me-1" /> Ficha de inscripción (Word)
+          </button>
+        )}
+        {mensaje && !editando && <div className="text-danger small mt-2">{mensaje}</div>}
         {datos.perfil_actualizado_en && (
           <span className="small text-muted ms-2">Actualizado el {String(datos.perfil_actualizado_en).substring(0, 10)}</span>
         )}
@@ -195,6 +220,15 @@ export default function PerfilCumplimiento({ idSocio, headers }) {
       {ampliados && (
         <div className="row g-2 mt-2">
           <div className="col-12 small fw-semibold mt-2">Datos generales</div>
+          <div className="col-12 col-md-6">
+            <label className="form-label small">Nombres</label>
+            <input className="form-control form-control-sm" maxLength={80} {...campo("nombres")} />
+          </div>
+          <div className="col-12 col-md-6">
+            <label className="form-label small">Apellidos</label>
+            <input className="form-control form-control-sm" maxLength={80} {...campo("apellidos")} />
+            <div className="form-text">Con los dos llenos, el nombre completo del socio se actualiza.</div>
+          </div>
           <div className="col-6 col-md-4">
             <label className="form-label small">Escolaridad</label>
             <select className="form-select form-select-sm" {...campo("escolaridad")}>
@@ -223,7 +257,12 @@ export default function PerfilCumplimiento({ idSocio, headers }) {
           </div>
           <div className="col-6 col-md-4">
             <label className="form-label small">Municipio</label>
-            <input className="form-control form-control-sm" maxLength={80} {...campo("municipio")} />
+            <input className="form-control form-control-sm" maxLength={80} list="municipios-sugeridos" {...campo("municipio")} />
+            <datalist id="municipios-sugeridos">
+              {municipios.map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
           </div>
           <div className="col-6 col-md-8">
             <label className="form-label small">Comunidad / aldea / caserío</label>

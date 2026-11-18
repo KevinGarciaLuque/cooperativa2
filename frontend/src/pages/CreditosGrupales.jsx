@@ -8,6 +8,7 @@ import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
 import InputMonto from "../ui/InputMonto";
 import ReciboModal from "../components/ReciboModal";
+import GarantiasPrestamo from "../components/GarantiasPrestamo";
 import { dinero } from "../utils/pais";
 import { hoyLocal } from "../utils/fechas";
 import { useFunciones } from "../hooks/useFunciones";
@@ -57,6 +58,7 @@ export default function CreditosGrupales() {
   const [pago, setPago] = useState(null); // formulario de pago grupal
   const [catalogos, setCatalogos] = useState({ lineas: [], promotores: [] });
   const [recibo, setRecibo] = useState(null);
+  const [garantiasDe, setGarantiasDe] = useState(null); // préstamo del integrante
   const [trabajando, setTrabajando] = useState(false);
 
   const cargarGrupos = useCallback(() => {
@@ -373,7 +375,7 @@ export default function CreditosGrupales() {
             <div className="table-responsive">
               <table className="table table-sm align-middle mb-0">
                 <thead className="table-light">
-                  <tr><th>Integrante</th><th>Cargo</th><th>Préstamo</th><th className="text-end">Monto</th><th className="text-end">Pagado</th><th className="text-end">Saldo</th><th>Estado</th></tr>
+                  <tr><th>Integrante</th><th>Cargo</th><th>Préstamo</th><th className="text-end">Monto</th><th className="text-end">Pagado</th><th className="text-end">Saldo</th><th>Estado</th><th></th></tr>
                 </thead>
                 <tbody>
                   {credito.prestamos.map((p) => (
@@ -385,6 +387,11 @@ export default function CreditosGrupales() {
                       <td className="text-end">{dinero(p.total_pagado)}</td>
                       <td className="text-end fw-semibold">{dinero(p.saldo_restante)}</td>
                       <td><Estado e={p.estado} /></td>
+                      <td>
+                        {p.estado !== "rechazado" && (
+                          <button className="btn btn-sm btn-outline-secondary" onClick={() => setGarantiasDe(p)}>Garantías</button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -548,6 +555,12 @@ export default function CreditosGrupales() {
       )}
 
       {recibo && <ReciboModal idRecibo={recibo} onClose={() => setRecibo(null)} />}
+
+      {garantiasDe && (
+        <Modal titulo={`Garantías · ${garantiasDe.nombre_completo} (préstamo #${garantiasDe.id_prestamo})`} onCerrar={() => setGarantiasDe(null)} ancho="modal-lg">
+          <GarantiasPrestamo idPrestamo={garantiasDe.id_prestamo} headers={headers} estadoPrestamo={garantiasDe.estado} />
+        </Modal>
+      )}
     </div>
   );
 }

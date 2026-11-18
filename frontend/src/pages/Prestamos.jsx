@@ -24,6 +24,7 @@ export default function Prestamos() {
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState("");
+  const [filtrosExtra, setFiltrosExtra] = useState({ linea: "", promotor: "", tipo: "" });
   const [estadoFiltro, setEstadoFiltro] = useState("todos");
   const [showModal, setShowModal] = useState(false);
   const [showDetalleModal, setShowDetalleModal] = useState(false);
@@ -276,15 +277,28 @@ export default function Prestamos() {
   const prestamosFiltrados = prestamos.filter((p) => {
     const usuario = usuarios.find((u) => u.id_usuario === p.id_usuario);
     const nombreUsuario = usuario?.nombre_completo || "";
-    const coincideBusqueda = nombreUsuario
-      .toLowerCase()
-      .includes(filtro.toLowerCase());
+    const texto = filtro.trim().toLowerCase();
+    // También por número de préstamo ("15" o "#15") o identidad
+    const coincideBusqueda =
+      !texto ||
+      nombreUsuario.toLowerCase().includes(texto) ||
+      String(p.dni || usuario?.dni || "").includes(texto) ||
+      String(p.id_prestamo) === texto.replace("#", "") ||
+      (p.grupo_nombre || "").toLowerCase().includes(texto);
 
     const coincideEstado =
       estadoFiltro === "todos" || p.estado === estadoFiltro;
 
-    return coincideBusqueda && coincideEstado;
+    // Filtros de los datos ampliados
+    const coincideExtra =
+      (!filtrosExtra.linea || p.linea_credito === filtrosExtra.linea) &&
+      (!filtrosExtra.promotor || String(p.id_promotor) === filtrosExtra.promotor) &&
+      (!filtrosExtra.tipo || (filtrosExtra.tipo === "grupal" ? !!p.id_credito_grupal : !p.id_credito_grupal));
+
+    return coincideBusqueda && coincideEstado && coincideExtra;
   });
+  const lineasUsadas = [...new Set(prestamos.map((p) => p.linea_credito).filter(Boolean))].sort();
+  const promotoresUsados = [...new Map(prestamos.filter((p) => p.id_promotor).map((p) => [String(p.id_promotor), p.promotor_nombre])).entries()];
 
   // Estadísticas
   const totalPrestamos = prestamos.length;
@@ -544,7 +558,7 @@ export default function Prestamos() {
                 <input
                   type="text"
                   className="form-control border-start-0"
-                  placeholder="Buscar por nombre del socio..."
+                  placeholder="Buscar por socio, identidad o n.º de préstamo..."
                   value={filtro}
                   onChange={(e) => setFiltro(e.target.value)}
                   style={{ borderRadius: "0 10px 10px 0", boxShadow: "none" }}
@@ -610,6 +624,29 @@ export default function Prestamos() {
                 </button>
               </div>
             </div>
+            {(funciones.datos_ampliados || funciones.creditos_grupales) && (
+              <>
+                <div className="col-12 col-md-4">
+                  <select className="form-select form-select-sm" value={filtrosExtra.tipo} onChange={(e) => setFiltrosExtra({ ...filtrosExtra, tipo: e.target.value })}>
+                    <option value="">Individuales y grupales</option>
+                    <option value="individual">Solo individuales</option>
+                    <option value="grupal">Solo grupales</option>
+                  </select>
+                </div>
+                <div className="col-6 col-md-4">
+                  <select className="form-select form-select-sm" value={filtrosExtra.linea} onChange={(e) => setFiltrosExtra({ ...filtrosExtra, linea: e.target.value })}>
+                    <option value="">Todas las líneas</option>
+                    {lineasUsadas.map((l) => <option key={l}>{l}</option>)}
+                  </select>
+                </div>
+                <div className="col-6 col-md-4">
+                  <select className="form-select form-select-sm" value={filtrosExtra.promotor} onChange={(e) => setFiltrosExtra({ ...filtrosExtra, promotor: e.target.value })}>
+                    <option value="">Todos los promotores</option>
+                    {promotoresUsados.map(([id, n]) => <option key={id} value={id}>{n}</option>)}
+                  </select>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

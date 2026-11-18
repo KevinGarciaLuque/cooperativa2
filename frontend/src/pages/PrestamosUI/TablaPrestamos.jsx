@@ -41,12 +41,15 @@ export default function TablaPrestamos({ prestamos, usuarios, onEdit, onDelete, 
         key,
         nombre: p.nombre_completo || usuario?.nombre_completo || "Desconocido",
         dni: p.dni || usuario?.dni || "N/A",
+        sucursal: usuario?.sucursal || null,
         prestamos: [],
       };
     }
     gruposMap[key].prestamos.push(p);
   });
   const grupos = Object.values(gruposMap).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  // La sucursal ("sede") solo se muestra si la cooperativa tiene más de una
+  const hayVariasSucursales = new Set(usuarios.map((u) => u.sucursal).filter(Boolean)).size > 1;
 
   const montoTotal = prestamos.reduce((s, p) => s + parseFloat(p.monto || 0), 0);
   const saldoTotal = prestamos.reduce((s, p) => s + parseFloat(p.saldo_restante || p.monto || 0), 0);
@@ -118,7 +121,7 @@ export default function TablaPrestamos({ prestamos, usuarios, onEdit, onDelete, 
                           <div className="fw-semibold text-truncate" style={{ color: "#2c3e50", fontSize: 14 }}>
                             {grupo.nombre}
                           </div>
-                          <div className="text-muted" style={{ fontSize: "0.72rem" }}>{docIdentidad().nombre}: {grupo.dni}</div>
+                          <div className="text-muted" style={{ fontSize: "0.72rem" }}>{docIdentidad().nombre}: {grupo.dni}{grupo.sucursal && hayVariasSucursales ? ` · ${grupo.sucursal}` : ""}</div>
                           <div className="d-flex gap-1 flex-wrap mt-1">
                             {activos > 0 && (
                               <span style={{ fontSize: "0.65rem", fontWeight: 700, background: "rgba(39,174,96,0.1)", color: "#27ae60", border: "1px solid #27ae60", borderRadius: 4, padding: "1px 5px" }}>
@@ -193,7 +196,7 @@ export default function TablaPrestamos({ prestamos, usuarios, onEdit, onDelete, 
                         </div>
                         <div style={{ minWidth: 0 }}>
                           <div className="fw-semibold text-truncate" style={{ color: "#2c3e50", fontSize: 14 }}>{grupo.nombre}</div>
-                          <div className="text-muted" style={{ fontSize: "0.72rem" }}>{docIdentidad().nombre}: {grupo.dni}</div>
+                          <div className="text-muted" style={{ fontSize: "0.72rem" }}>{docIdentidad().nombre}: {grupo.dni}{grupo.sucursal && hayVariasSucursales ? ` · ${grupo.sucursal}` : ""}</div>
                         </div>
                       </div>
                       <button className="btn btn-sm fw-semibold flex-shrink-0"

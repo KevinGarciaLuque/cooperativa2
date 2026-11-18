@@ -17,7 +17,8 @@ import {
   FaSave,
   FaTimes,
   FaCamera,
-  FaKey
+  FaKey,
+  FaStore
 } from "react-icons/fa";
 import { docIdentidad, pais } from "../../utils/pais";
 
@@ -38,6 +39,7 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
   });
   const [loading, setLoading] = useState(false);
   const [roles, setRoles] = useState([]);
+  const [sucursales, setSucursales] = useState([]);
   const [fotoFile, setFotoFile] = useState(null);
   const [fotoPreview, setFotoPreview] = useState(null);
 
@@ -55,6 +57,10 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
     };
     if (show) {
       fetchRoles();
+      axios
+        .get(`${API_URL}/configuracion/sucursales`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => setSucursales(r.data.data || []))
+        .catch(() => setSucursales([]));
     }
   }, [show, token, API_URL]);
 
@@ -71,6 +77,8 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
         rol_id: usuario.rol_id || 2,
         estado: usuario.estado || "activo",
         password: "",
+        id_sucursal: usuario.id_sucursal ? String(usuario.id_sucursal) : "",
+        sucursal_restringida: !!usuario.sucursal_restringida,
       });
       setFotoFile(null);
       const base = import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:5000";
@@ -87,6 +95,8 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
         rol_id: 2,
         estado: "activo",
         password: "",
+        id_sucursal: "",
+        sucursal_restringida: false,
       });
       setFotoFile(null);
       setFotoPreview(null);
@@ -105,6 +115,7 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
 
   // Restablecer la contraseña de otro usuario (solo Super Administrador)
   const esSuperAdmin = usuarioLogueado?.rol === "Super Administrador";
+  const puedeRestringir = ["Super Administrador", "Administrador"].includes(usuarioLogueado?.rol);
   const [nuevaClave, setNuevaClave] = useState({ abierta: false, password: "", confirmar: "", guardando: false });
   useEffect(() => {
     setNuevaClave({ abierta: false, password: "", confirmar: "", guardando: false });
@@ -474,6 +485,52 @@ export default function ModalAcciones({ show, tipo, usuario, onClose, onRefresh 
                   <option value="inactivo">✗ Inactivo</option>
                 </select>
               </div>
+
+              {/* Sucursal (solo si la cooperativa tiene más de una) */}
+              {sucursales.length > 1 && (
+                <div className="col-md-6">
+                  <label className="form-label fw-semibold d-flex align-items-center" style={{ color: "#2c3e50" }}>
+                    <FaStore className="me-2" style={{ color: "#667eea" }} />
+                    Sucursal
+                  </label>
+                  <select
+                    name="id_sucursal"
+                    className="form-select form-select-lg"
+                    value={form.id_sucursal}
+                    onChange={handleInput}
+                    disabled={tipo === "editar" && usuario?.id_usuario === usuarioLogueado?.id_usuario && !puedeRestringir}
+                    style={{ borderRadius: "10px", border: "2px solid #e9ecef", padding: "12px 16px" }}
+                  >
+                    {tipo === "crear" && <option value="">La que estoy viendo</option>}
+                    {sucursales.map((s) => (
+                      <option key={s.id_sucursal} value={s.id_sucursal}>{s.nombre}</option>
+                    ))}
+                  </select>
+                  <div className="form-text">
+                    {String(form.rol_id) === "2"
+                      ? "Su cartera se ve en esta sucursal; puede pagar y depositar en cualquiera."
+                      : "Sucursal donde trabaja."}
+                  </div>
+                </div>
+              )}
+              {sucursales.length > 1 && puedeRestringir && String(form.rol_id) !== "2" &&
+                !(tipo === "editar" && usuario?.id_usuario === usuarioLogueado?.id_usuario) && (
+                <div className="col-md-6 d-flex align-items-center">
+                  <div className="form-check mt-md-4">
+                    <input
+                      id="sucursal_restringida"
+                      type="checkbox"
+                      className="form-check-input"
+                      checked={!!form.sucursal_restringida}
+                      onChange={(e) => setForm({ ...form, sucursal_restringida: e.target.checked })}
+                    />
+                    <label htmlFor="sucursal_restringida" className="form-check-label">
+                      Solo ve su sucursal
+                      <div className="form-text mt-0">Puede atender a socios de otras sucursales si los busca.</div>
+                    </label>
+                  </div>
+                </div>
+              )}
 
               {/* Restablecer contraseña (al editar, solo Super Administrador) */}
               {tipo === "editar" && esSuperAdmin && usuario?.id_usuario !== usuarioLogueado?.id_usuario && (

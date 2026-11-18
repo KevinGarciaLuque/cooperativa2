@@ -1912,6 +1912,68 @@ test("restablecer contraseña: solo el Super Administrador, con la política de 
   assert.equal((await api("POST", ruta, { password_nuevo: "Clave1234" }, ids.tSuper)).s, 200);
 });
 
+test("sucursales: cada socio en la suya, el personal elige qué ver y el restringido ve solo la suya", async () => {
+  const conSucursal = async (ruta, token, idSucursal) => {
+    const r = await fetch(`${base}/api${ruta}`, {
+      headers: { Authorization: `Bearer ${token}`, ...(idSucursal ? { "X-Sucursal": String(idSucursal) } : {}) },
+    });
+    return { s: r.status, b: await r.json() };
+  };
+  const [[principal]] = await pool.query("SELECT id_sucursal FROM sucursales ORDER BY id_sucursal LIMIT 1");
+  const nueva = await api("POST", "/caja/sucursales", { nombre: "Sucursal Sur" }, ids.tSuper);
+  assert.equal(nueva.s, 201);
+  const sur = nueva.b.id_sucursal;
+
+  // El socio 2 pasa a la sucursal Sur
+  assert.equal((await api("PUT", `/usuarios/${ids.socio2}`, { id_sucursal: 99999 }, ids.tAdmin)).s, 400);
+  assert.equal((await api("PUT", `/usuarios/${ids.socio2}`, { id_sucursal: sur }, ids.tAdmin)).s, 200);
+
+  // Listas: con "Todas" se ven los dos; con Sur, solo el socio 2
+  const socios = async (idS) => (await conSucursal("/usuarios?rol=Socio&limit=100", ids.tAdmin, idS)).b.data.map((u) => u.id_usuario);
+  assert.ok((await socios()).includes(ids.socio) && (await socios()).includes(ids.socio2));
+  assert.deepEqual((await socios(sur)).filter((x) => [ids.socio, ids.socio2].includes(x)), [ids.socio2]);
+  const cuentasSur = (await conSucursal("/cuentas", ids.tAdmin, sur)).b.data;
+  assert.ok(cuentasSur.length > 0 && cuentasSur.every((c) => c.id_usuario === ids.socio2));
+  // Buscar un socio concreto funciona desde cualquier sucursal
+  const buscado = (await conSucursal("/usuarios?search=0801000000003", ids.tAdmin, sur)).b.data;
+  assert.equal(buscado[0]?.id_usuario, ids.socio);
+
+  // Personal que solo ve su sucursal (la principal): aunque pida Sur, ve la principal
+  const [r] = await pool.query(
+    `INSERT INTO usuarios (nombre_completo, dni, telefono, correo, password, rol_id, estado, fecha_registro, id_sucursal, sucursal_restringida)
+     VALUES ('Cajera Principal', '0801000000088', '98765432', 'cajera@prueba.hn', 'x', 3, 'activo', NOW(), ?, 1)`,
+    [principal.id_sucursal]
+  );
+  const tCajera = tokenDe(r.insertId, "Contador", 3);
+  const info = await conSucursal("/configuracion/sucursales", tCajera);
+  assert.equal(info.b.restringida, true);
+  const vistaCajera = (await conSucursal("/cuentas", tCajera, sur)).b.data;
+  assert.ok(!vistaCajera.some((c) => c.id_usuario === ids.socio2), "no ve la cartera de Sur");
+  // ...pero atiende al socio de Sur si lo pide: un depósito queda en la sucursal donde se hizo
+  const cuentasSocio2 = (await conSucursal(`/cuentas?id_usuario=${ids.socio2}`, tCajera)).b.data;
+  assert.ok(cuentasSocio2.length > 0);
+  const dep = await api("POST", "/movimientos", { id_cuenta: cuentasSocio2[0].id_cuenta, tipo: "abono", monto: 20, metodo: "efectivo", descripcion: "En la principal" }, tCajera);
+  assert.equal(dep.s, 200, dep.b?.message);
+  const [[mov]] = await pool.query("SELECT id_sucursal FROM caja_movimientos WHERE id_socio = ? ORDER BY id_movimiento DESC LIMIT 1", [ids.socio2]);
+  assert.equal(mov.id_sucursal, principal.id_sucursal);
+
+  // Caja por sucursal: en Sur no aparece ese depósito; el cierre general es con "Todas"
+  const cajaSur = (await conSucursal("/caja/resumen", ids.tAdmin, sur)).b;
+  assert.equal(cajaSur.por_sucursal, true);
+  assert.ok(!cajaSur.movimientos.some((m) => m.descripcion === "En la principal"));
+  assert.equal((await conSucursal("/caja/resumen", ids.tAdmin)).b.por_sucursal, false);
+
+  // Indicadores del dashboard por sucursal
+  const kTodas = (await conSucursal("/dashboard/kpis", ids.tAdmin)).b;
+  const kSur = (await conSucursal("/dashboard/kpis", ids.tAdmin, sur)).b;
+  assert.ok(kSur.socios.total < kTodas.socios.total);
+
+  // Limpieza
+  await pool.query("UPDATE usuarios SET id_sucursal = ? WHERE id_usuario = ?", [principal.id_sucursal, ids.socio2]);
+  await pool.query("DELETE FROM usuarios WHERE id_usuario = ?", [r.insertId]);
+  await pool.query("UPDATE sucursales SET activa = 0 WHERE id_sucursal = ?", [sur]);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

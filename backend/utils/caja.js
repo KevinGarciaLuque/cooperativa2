@@ -7,6 +7,7 @@
 // la partida por la diferencia con registrarCambio, porque saben cómo estaba la operación.
 const { contabilizar, registrarCambio, conSalvaguarda } = require("./contabilidad");
 const { evaluarMovimiento } = require("./cumplimiento");
+const { sucursalOperacion } = require("./sucursal");
 
 const METODOS = ["efectivo", "transferencia", "cheque", "deposito"];
 
@@ -71,6 +72,8 @@ const registrarCaja = async (conn, mov) => {
   try {
     // El movimiento queda en el turno abierto de quien lo registra (si tiene uno)
     const turno = await turnoAbierto(conn, mov.id_registrado_por);
+    // Y en la sucursal donde se hizo (turno, sucursal de quien registra, la del socio o la principal)
+    const idSucursal = await sucursalOperacion(conn, mov.id_registrado_por, mov.id_socio, turno);
     const [r] = await conn.query(
       `INSERT INTO caja_movimientos
          (fecha, tipo, categoria, monto, metodo, descripcion, referencia_tipo, referencia_id, id_socio, id_registrado_por, id_turno, id_sucursal)
@@ -87,7 +90,7 @@ const registrarCaja = async (conn, mov) => {
         mov.id_socio || null,
         mov.id_registrado_por || null,
         turno?.id_turno || null,
-        turno?.id_sucursal || null,
+        idSucursal || null,
       ]
     );
     id = r.insertId;

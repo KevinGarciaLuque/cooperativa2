@@ -8,6 +8,10 @@ import "./ui/tokens.css";
 import App from './App.jsx'
 import { cargarArranque } from "./utils/arranque";
 import AvisoAmbiente from "./components/AvisoAmbiente";
+import { instalarCabeceraSucursal } from "./utils/sucursalVista";
+
+// La sucursal que el personal está viendo viaja en cada pedido al servidor
+instalarCabeceraSucursal();
 
 // Si se publicó una versión nueva mientras la pestaña seguía abierta, los archivos de las
 // pantallas de la versión anterior ya no existen: se recarga para traer la versión nueva

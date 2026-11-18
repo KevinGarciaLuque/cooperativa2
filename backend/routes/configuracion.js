@@ -118,6 +118,23 @@ router.get("/", async (req, res) => {
 // GET/PUT /api/configuracion/financiera  (requiere sesión; PUT solo Super Admin)
 // Parámetros de mora que usa todo el sistema
 // ============================================================
+// GET /api/configuracion/sucursales → sucursales activas y la del usuario (para el selector)
+router.get("/sucursales", verificarToken, async (req, res) => {
+  try {
+    const { datosUsuario, sucursalPrincipal } = require("../utils/sucursal");
+    const [lista] = await pool.query("SELECT id_sucursal, nombre FROM sucursales WHERE activa = 1 ORDER BY id_sucursal");
+    const d = await datosUsuario(req.usuario.id_usuario);
+    res.json({
+      success: true,
+      data: lista,
+      mi_sucursal: d.id_sucursal || (await sucursalPrincipal()),
+      restringida: d.restringida,
+    });
+  } catch (error) {
+    res.json({ success: true, data: [], mi_sucursal: null, restringida: false });
+  }
+});
+
 router.get("/financiera", verificarToken, async (req, res) => {
   const respuesta = { success: true, data: configFin.obtener() };
   // Para la verificación en dos pasos: si hay correo configurado y qué personal no tiene correo

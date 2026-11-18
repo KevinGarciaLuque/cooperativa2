@@ -3,6 +3,7 @@ const { hoyISO } = require("../utils/fechas");
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { filtroSocio } = require("../utils/sucursal");
 const ExcelJS = require("exceljs");
 const { dinero, locale } = require("../utils/pais");
 
@@ -331,6 +332,7 @@ router.get("/balance-general", async (req, res) => {
 router.get("/prestamos-activos", async (req, res) => {
   try {
     const { estado = 'activo' } = req.query;
+    const porSucursal = await filtroSocio(req, "u");
 
     const [prestamos] = await pool.query(
       `SELECT 
@@ -350,9 +352,9 @@ router.get("/prestamos-activos", async (req, res) => {
        u.correo
        FROM prestamos p
        INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
-       WHERE p.estado = ?
+       WHERE p.estado = ?${porSucursal.sql}
        ORDER BY p.fecha_otorgado DESC`,
-      [estado]
+      [estado, ...porSucursal.params]
     );
 
     const workbook = new ExcelJS.Workbook();
@@ -453,6 +455,7 @@ router.get("/prestamos-activos", async (req, res) => {
 // ============================================
 router.get("/morosidad", async (req, res) => {
   try {
+    const porSucursal = await filtroSocio(req, "u");
     const [prestamos] = await pool.query(
       `SELECT 
        p.*,
@@ -466,8 +469,9 @@ router.get("/morosidad", async (req, res) => {
        (p.monto_pendiente * 0.24 * GREATEST(DATEDIFF(CURDATE(), DATE_ADD(p.fecha_aprobacion, INTERVAL 35 DAY)), 0) / 365) as interes_mora_estimado
        FROM prestamos p
        INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
-       WHERE p.estado = 'mora'
-       ORDER BY dias_mora DESC`
+       WHERE p.estado = 'mora'${porSucursal.sql}
+       ORDER BY dias_mora DESC`,
+      porSucursal.params
     );
 
     const workbook = new ExcelJS.Workbook();
@@ -621,6 +625,8 @@ router.get("/aportaciones", async (req, res) => {
       whereClause += ` AND DATE(a.fecha) BETWEEN ? AND ?`;
       params.push(fecha_inicio, fecha_fin);
     }
+    const porSucursal = await filtroSocio(req, "u");
+    params.push(...porSucursal.params);
 
     const [aportaciones] = await pool.query(
       `SELECT 
@@ -633,6 +639,7 @@ router.get("/aportaciones", async (req, res) => {
        MAX(a.fecha) as ultima_aportacion
        FROM usuarios u
        LEFT JOIN aportaciones a ON u.id_usuario = a.id_usuario ${whereClause.replace('WHERE 1=1', 'AND 1=1')}
+       WHERE 1=1${porSucursal.sql}
        GROUP BY u.id_usuario, u.nombre_completo, u.dni
        HAVING total_aportado > 0
        ORDER BY total_aportado DESC`,

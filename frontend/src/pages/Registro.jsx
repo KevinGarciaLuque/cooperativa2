@@ -43,6 +43,7 @@ export default function Registro() {
     password: "",
     confirmar: "",
     acepta: false,
+    id_sucursal: "",
     website: "", // campo trampa
   });
   const [enviando, setEnviando] = useState(false);
@@ -156,6 +157,7 @@ export default function Registro() {
           password: form.password,
           codigo,
           prestamo: quierePrestamo ? solicitudDesde(solicitud, true) : undefined,
+          id_sucursal: form.id_sucursal || undefined,
           website: form.website,
         })
       );
@@ -381,6 +383,27 @@ export default function Registro() {
                       ayuda: "Aquí recibirás tus recibos.",
                       input: { type: "email", required: true, maxLength: 100, placeholder: "tucorreo@ejemplo.com", autoComplete: "email" },
                     })}
+                    {(estado?.sucursales || []).length > 1 && (
+                      <div className="col-12">
+                        <label className="form-label fw-semibold small">
+                          Sucursal donde serás socio <span className="text-danger">*</span>
+                        </label>
+                        <select
+                          className="form-select form-select-lg"
+                          style={{ borderRadius: 10 }}
+                          name="id_sucursal"
+                          value={form.id_sucursal}
+                          onChange={cambiar}
+                          required
+                        >
+                          <option value="">Elige la sucursal más cercana</option>
+                          {estado.sucursales.map((s) => (
+                            <option key={s.id_sucursal} value={s.id_sucursal}>{s.nombre}</option>
+                          ))}
+                        </select>
+                        <div className="form-text">Podrás pagar y depositar en cualquier sucursal.</div>
+                      </div>
+                    )}
                     {campo("Dirección", "direccion", {
                       input: { maxLength: 200, placeholder: "Colonia, barrio o aldea y municipio", autoComplete: "street-address" },
                     })}

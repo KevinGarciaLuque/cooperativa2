@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { filtroSocio } = require("../utils/sucursal");
 const { DIAS_MES } = require("../utils/calculosPrestamo");
 const { obtenerCartera, resumirCartera } = require("../utils/cartera");
 const { notificarSocio } = require("../utils/notificaciones");
@@ -18,7 +19,7 @@ const {
 // ============================================
 router.get("/cartera", async (req, res) => {
   try {
-    const filas = await obtenerCartera();
+    const filas = await obtenerCartera(await filtroSocio(req));
     const { resumen } = resumirCartera(filas);
     res.json({ success: true, dias_mes: DIAS_MES, resumen, data: filas });
   } catch (error) {

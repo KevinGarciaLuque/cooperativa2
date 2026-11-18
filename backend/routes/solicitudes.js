@@ -3,6 +3,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { filtroSocio } = require("../utils/sucursal");
 const config = require("../utils/configFinanciera");
 const { parametrosSolicitud, validarSolicitud, insertarSolicitud } = require("../utils/solicitudPrestamo");
 const { leerRegistro, guardarRegistro } = require("../utils/registroConfig");
@@ -121,10 +122,17 @@ router.post("/prestamo", async (req, res) => {
 // ============================================
 router.get("/resumen", soloPersonal, async (req, res) => {
   try {
-    const [[s]] = await pool.query(`SELECT COUNT(*) AS n FROM usuarios WHERE estado = 'pendiente'`);
+    const porSucursal = await filtroSocio(req, "u");
+    const [[s]] = await pool.query(
+      `SELECT COUNT(*) AS n FROM usuarios u WHERE u.estado = 'pendiente'${porSucursal.sql}`,
+      porSucursal.params
+    );
     const [[p]] = await pool.query(
       `SELECT COUNT(*) AS n FROM solicitudes_prestamo sp
-       INNER JOIN prestamos pr ON sp.id_prestamo = pr.id_prestamo WHERE pr.estado = 'pendiente'`
+       INNER JOIN prestamos pr ON sp.id_prestamo = pr.id_prestamo
+       INNER JOIN usuarios u ON u.id_usuario = pr.id_usuario
+       WHERE pr.estado = 'pendiente'${porSucursal.sql}`,
+      porSucursal.params
     );
     const [[c]] = await pool.query(
       `SELECT COUNT(DISTINCT id_recibo) AS n FROM comprobantes_firmados
@@ -146,10 +154,13 @@ router.get("/resumen", soloPersonal, async (req, res) => {
 
 router.get("/", soloPersonal, async (req, res) => {
   try {
+    const porSucursal = await filtroSocio(req, "u");
     const [socios] = await pool.query(
-      `SELECT id_usuario, nombre_completo, dni, telefono, correo, direccion, fecha_nacimiento, fecha_registro,
-              (SELECT COUNT(*) FROM documentos_identidad d WHERE d.id_usuario = usuarios.id_usuario) AS fotos_identidad
-       FROM usuarios WHERE estado = 'pendiente' ORDER BY fecha_registro ASC`
+      `SELECT u.id_usuario, u.nombre_completo, u.dni, u.telefono, u.correo, u.direccion, u.fecha_nacimiento, u.fecha_registro,
+              (SELECT nombre FROM sucursales WHERE id_sucursal = u.id_sucursal) AS sucursal,
+              (SELECT COUNT(*) FROM documentos_identidad d WHERE d.id_usuario = u.id_usuario) AS fotos_identidad
+       FROM usuarios u WHERE u.estado = 'pendiente'${porSucursal.sql} ORDER BY u.fecha_registro ASC`,
+      porSucursal.params
     );
 
     const [filas] = await pool.query(
@@ -167,8 +178,9 @@ router.get("/", soloPersonal, async (req, res) => {
        INNER JOIN prestamos pr ON s.id_prestamo = pr.id_prestamo
        INNER JOIN usuarios u ON pr.id_usuario = u.id_usuario
        LEFT JOIN productos_credito pc ON pc.id_producto = pr.id_producto
-       WHERE pr.estado IN ('pendiente', 'aprobado')
-       ORDER BY s.creada_en ASC`
+       WHERE pr.estado IN ('pendiente', 'aprobado')${porSucursal.sql}
+       ORDER BY s.creada_en ASC`,
+      porSucursal.params
     );
 
     const prestamos = filas.map((f) => {

@@ -184,6 +184,21 @@ El catálogo base está en `backend/utils/contabilidad.js`; el contador puede ag
 - Si el correo falla al enviar, no se abre la sesión: revisa el servidor de correo antes de activarla.
 - En el ambiente de pruebas solo se pide si existe CORREO_PRUEBAS (los códigos llegan a esa dirección).
 
+## Varias sucursales
+
+- Las sucursales se crean en **Caja → Mi turno → Sucursales** (Super Administrador). Con una sola, el
+  sistema se ve y funciona como siempre: todo lo existente quedó en la sucursal principal.
+- **Cada socio pertenece a una sucursal** (se elige al registrarse o en Usuarios). Su cartera
+  (préstamos, cuentas, aportaciones, solicitudes, cobranza) aparece en las listas de esa sucursal,
+  pero **puede pagar y depositar en cualquiera**: buscándolo por nombre, DNI o número se le atiende.
+- **El personal** elige arriba qué sucursal ver ("Todas las sucursales" o una). Listas, dashboard,
+  cobranza, caja y reportes en Excel muestran solo esa sucursal.
+- **"Solo ve su sucursal"** (Usuarios, lo marca el Administrador): ese usuario ve siempre su sucursal en
+  las listas, aunque puede buscar y atender a socios de otras.
+- **Caja:** cada movimiento queda en la sucursal donde se hizo (la del turno del cajero, o la sucursal del
+  usuario). El cierre diario es de toda la cooperativa (con "Todas"); cada cajero cierra su turno.
+- La contabilidad es una sola para toda la cooperativa.
+
 ## Sucursales y turnos de caja
 
 - Se crea una sucursal "Oficina principal"; el Super Administrador agrega más en **Caja → Mi turno → Sucursales**.

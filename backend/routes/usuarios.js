@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { formatearNombre } = require("../utils/nombres");
 const pool = require("../db");
+const { filtroSocio, filtroCaja } = require("../utils/sucursal");
 const bcrypt = require("bcryptjs");
 const { validarPassword } = require("../utils/passwordPolicy");
 const { asignarNumeroSocio } = require("../utils/numeroSocio");
@@ -9,6 +10,16 @@ const { abrirCuentasAutomaticas } = require("../utils/ahorro");
 const archivos = require("../utils/archivos");
 const jwt = require("jsonwebtoken");
 const verificacion = require("../utils/verificacion");
+const { sucursalVista, sucursalPrincipal, olvidarUsuario } = require("../utils/sucursal");
+
+// Sucursal válida (activa) o null
+const sucursalValida = async (conn, valor) => {
+  const id = parseInt(valor);
+  if (!id) return null;
+  const [[s]] = await conn.query("SELECT id_sucursal FROM sucursales WHERE id_sucursal = ? AND activa = 1", [id]);
+  return s?.id_sucursal || null;
+};
+const puedeRestringir = (req) => ["Super Administrador", "Administrador"].includes(req.usuario?.rol);
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
@@ -123,6 +134,8 @@ const emitirSesion = async (user, res) => {
       foto: user.foto,
       estado: user.estado,
       fecha_registro: user.fecha_registro,
+      id_sucursal: user.id_sucursal,
+      sucursal_restringida: !!user.sucursal_restringida,
     },
   });
 };
@@ -270,6 +283,11 @@ router.get("/", async (req, res) => {
       whereClause += ` AND NOT EXISTS (SELECT 1 FROM prestamos x WHERE x.id_usuario = u.id_usuario AND x.estado IN ('activo','mora'))`;
     }
 
+    // Sucursal que se está viendo (un socio buscado o pedido se atiende en cualquiera)
+    const porSucursal = await filtroSocio(req, "u", !!search);
+    whereClause += porSucursal.sql;
+    params.push(...porSucursal.params);
+
     // Obtener total de registros
     const [countResult] = await pool.query(
       `SELECT COUNT(*) as total FROM usuarios u INNER JOIN roles r ON u.rol_id = r.id_rol ${whereClause}`,
@@ -280,6 +298,7 @@ router.get("/", async (req, res) => {
     // Obtener usuarios con paginación
     const [usuarios] = await pool.query(
       `SELECT u.*, r.nombre AS rol,
+       (SELECT nombre FROM sucursales WHERE id_sucursal = u.id_sucursal) AS sucursal,
        (SELECT COUNT(*) FROM prestamos WHERE id_usuario = u.id_usuario AND estado = 'activo') as prestamos_activos,
        (SELECT IFNULL(SUM(saldo_actual), 0) FROM cuentas WHERE id_usuario = u.id_usuario) as saldo_total,
        (SELECT COUNT(*) FROM prestamos WHERE id_usuario = u.id_usuario AND estado IN ('activo','mora')) as prestamos_vigentes,
@@ -446,8 +465,8 @@ router.post("/", async (req, res) => {
     // Insertar usuario
     const [result] = await connection.query(
       `INSERT INTO usuarios 
-      (nombre_completo, dni, telefono, correo, direccion, fecha_nacimiento, password, rol_id, estado, fecha_registro) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'activo', NOW())`,
+      (nombre_completo, dni, telefono, correo, direccion, fecha_nacimiento, password, rol_id, estado, fecha_registro, id_sucursal, sucursal_restringida) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'activo', NOW(), ?, ?)`,
       [
         nombre_completo,
         dni,
@@ -457,6 +476,9 @@ router.post("/", async (req, res) => {
         fecha_nacimiento || null,
         passwordHash,
         rol_id || 2, // Por defecto rol "Socio"
+        // La sucursal indicada, la que se está viendo o la principal
+        (await sucursalValida(connection, req.body.id_sucursal)) || (await sucursalVista(req)) || (await sucursalPrincipal(connection)),
+        puedeRestringir(req) && req.body.sucursal_restringida ? 1 : 0,
       ]
     );
 
@@ -576,6 +598,20 @@ router.put("/:id", async (req, res) => {
       updateFields.push("estado = ?");
       values.push(estado);
     }
+    // Nadie cambia su propia sucursal salvo la administración (un usuario restringido no se "muda")
+    const esMismo = parseInt(req.params.id) === req.usuario?.id_usuario;
+    if (req.body.id_sucursal !== undefined && req.body.id_sucursal !== "" && (!esMismo || puedeRestringir(req))) {
+      const idSuc = await sucursalValida(pool, req.body.id_sucursal);
+      if (!idSuc) return res.status(400).json({ message: "Elige una sucursal activa." });
+      updateFields.push("id_sucursal = ?");
+      values.push(idSuc);
+    }
+    // Solo la administración decide quién ve únicamente su sucursal (y no sobre sí misma)
+    if (req.body.sucursal_restringida !== undefined && puedeRestringir(req) && parseInt(req.params.id) !== req.usuario.id_usuario) {
+      updateFields.push("sucursal_restringida = ?");
+      values.push(req.body.sucursal_restringida ? 1 : 0);
+    }
+    olvidarUsuario(parseInt(req.params.id));
 
     // Si hay nueva contraseña, validarla y hashearla
     if (password) {

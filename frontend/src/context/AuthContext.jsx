@@ -65,6 +65,7 @@ export function AuthProvider({ children }) {
     setToken("");
     localStorage.removeItem("user");
     localStorage.removeItem("token");
+    localStorage.removeItem("sucursal_vista"); // la próxima sesión empieza viendo todas
   };
 
   // Si el servidor indica que la sesión ya no es válida (expiró o la cuenta se

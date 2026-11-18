@@ -8,6 +8,8 @@ import {
   FaChevronDown,
 } from "react-icons/fa";
 import LogoCoop from "./LogoCoop";
+import SelectorSucursal from "./SelectorSucursal";
+import { useAuth } from "../context/AuthContext";
 import { useConfigSitio } from "../hooks/useConfigSitio";
 
 const ACCENT = "#a8cd3a";
@@ -22,6 +24,7 @@ function getInitials(name) {
 }
 
 export default function Navbar({ user, onLogout, onMenuClick }) {
+  const { token } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const refMenu = useRef();
   const { config } = useConfigSitio();
@@ -279,6 +282,7 @@ export default function Navbar({ user, onLogout, onMenuClick }) {
 
           {/* Acciones derecha */}
           <div className="d-flex align-items-center gap-3">
+            {user && user.rol !== "Socio" && <SelectorSucursal token={token} />}
             {user ? (
               <div ref={refMenu} style={{ position: "relative" }}>
                 <button

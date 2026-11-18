@@ -985,6 +985,34 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_11_011_sucursales_operacion",
+    descripcion: "Socios y personal por sucursal; movimientos de caja con su sucursal",
+    async up(conn) {
+      const [[e]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND COLUMN_NAME = 'sucursal_restringida'`
+      );
+      if (!e.n) await conn.query("ALTER TABLE usuarios ADD COLUMN sucursal_restringida TINYINT(1) NOT NULL DEFAULT 0");
+      const [[idx]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND INDEX_NAME = 'idx_usuario_sucursal'`
+      );
+      if (!idx.n) await conn.query("ALTER TABLE usuarios ADD INDEX idx_usuario_sucursal (id_sucursal)");
+      // Todo lo que ya existe queda en la sucursal principal (una cooperativa con una sola
+      // oficina no nota ningún cambio)
+      const [[p]] = await conn.query("SELECT id_sucursal FROM sucursales ORDER BY id_sucursal LIMIT 1");
+      if (p) {
+        await conn.query("UPDATE usuarios SET id_sucursal = ? WHERE id_sucursal IS NULL", [p.id_sucursal]);
+        await conn.query("UPDATE caja_movimientos SET id_sucursal = ? WHERE id_sucursal IS NULL", [p.id_sucursal]);
+      }
+      const [[ic]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'caja_movimientos' AND INDEX_NAME = 'idx_caja_sucursal'`
+      );
+      if (!ic.n) await conn.query("ALTER TABLE caja_movimientos ADD INDEX idx_caja_sucursal (id_sucursal, fecha)");
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

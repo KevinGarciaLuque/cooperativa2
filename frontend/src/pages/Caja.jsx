@@ -251,6 +251,12 @@ export default function Caja() {
                     <FaLock className="me-2" />
                     Cierre de caja
                   </h5>
+                  {data.por_sucursal && (
+                    <div className="alert alert-info py-2 small">
+                      Estás viendo una sola sucursal: estos montos son solo sus movimientos en efectivo. El cierre del día es de
+                      toda la cooperativa: elige "Todas las sucursales" arriba para hacerlo. Cada cajero cierra su turno en "Mi turno".
+                    </div>
+                  )}
 
                   <div className="small mb-3">
                     <div className="d-flex justify-content-between">
@@ -325,7 +331,7 @@ export default function Caja() {
                         type="submit"
                         className="btn fw-semibold w-100"
                         style={{ background: ACCENT, color: "#1a2a00" }}
-                        disabled={guardando || contado === ""}
+                        disabled={guardando || contado === "" || data.por_sucursal}
                       >
                         {guardando ? "Cerrando..." : "Cerrar caja del día"}
                       </button>

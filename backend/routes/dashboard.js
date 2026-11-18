@@ -2,19 +2,25 @@ const express = require("express");
 const { hoyISO, anioMesActual } = require("../utils/fechas");
 const router = express.Router();
 const pool = require("../db");
+const { deSociosDeSucursal } = require("../utils/sucursal");
 
 // ============================================
 // ENDPOINT 1: KPIs PRINCIPALES
 // ============================================
 router.get("/kpis", async (req, res) => {
   try {
+    // Con una sucursal elegida, los indicadores son los de sus socios
+    const fU = await deSociosDeSucursal(req, "id_usuario");
+    const fP = await deSociosDeSucursal(req, "(SELECT x.id_usuario FROM prestamos x WHERE x.id_prestamo = pagos_prestamo.id_prestamo)");
+
     // Total de socios
     const [socios] = await pool.query(
       `SELECT 
        COUNT(*) as total,
        SUM(CASE WHEN estado = 'activo' THEN 1 ELSE 0 END) as activos,
        SUM(CASE WHEN estado = 'inactivo' THEN 1 ELSE 0 END) as inactivos
-       FROM usuarios WHERE rol_id != 1`
+       FROM usuarios WHERE rol_id != 1${fU.sql}`,
+      fU.params
     );
 
     // Préstamos
@@ -26,7 +32,8 @@ router.get("/kpis", async (req, res) => {
        SUM(CASE WHEN estado = 'pagado' THEN 1 ELSE 0 END) as pagados,
        IFNULL(SUM(CASE WHEN estado IN ('activo', 'mora') THEN monto ELSE 0 END), 0) as monto_cartera,
        IFNULL(SUM(CASE WHEN estado IN ('activo', 'mora') THEN saldo_restante ELSE 0 END), 0) as saldo_pendiente
-       FROM prestamos`
+       FROM prestamos WHERE 1=1${fU.sql}`,
+      fU.params
     );
 
     // Tasa de morosidad
@@ -36,7 +43,8 @@ router.get("/kpis", async (req, res) => {
 
     // Total aportaciones
     const [aportaciones] = await pool.query(
-      `SELECT IFNULL(SUM(monto), 0) as total FROM aportaciones`
+      `SELECT IFNULL(SUM(monto), 0) as total FROM aportaciones WHERE 1=1${fU.sql}`,
+      fU.params
     );
 
     // Saldos en cuentas por tipo
@@ -44,8 +52,9 @@ router.get("/kpis", async (req, res) => {
       `SELECT 
        tipo_cuenta,
        IFNULL(SUM(saldo_actual), 0) as saldo_total
-       FROM cuentas
-       GROUP BY tipo_cuenta`
+       FROM cuentas WHERE 1=1${fU.sql}
+       GROUP BY tipo_cuenta`,
+      fU.params
     );
 
     // Ingresos del mes actual
@@ -54,7 +63,8 @@ router.get("/kpis", async (req, res) => {
        IFNULL(SUM(monto), 0) as aportaciones_mes
        FROM aportaciones 
        WHERE MONTH(fecha) = MONTH(CURRENT_DATE()) 
-       AND YEAR(fecha) = YEAR(CURRENT_DATE())`
+       AND YEAR(fecha) = YEAR(CURRENT_DATE())${fU.sql}`,
+      fU.params
     );
 
     const [pagosMes] = await pool.query(
@@ -62,7 +72,8 @@ router.get("/kpis", async (req, res) => {
        IFNULL(SUM(monto_pagado), 0) as pagos_mes
        FROM pagos_prestamo 
        WHERE MONTH(fecha_pago) = MONTH(CURRENT_DATE()) 
-       AND YEAR(fecha_pago) = YEAR(CURRENT_DATE())`
+       AND YEAR(fecha_pago) = YEAR(CURRENT_DATE())${fP.sql}`,
+      fP.params
     );
 
     const [actividadesMes] = await pool.query(
@@ -87,7 +98,8 @@ router.get("/kpis", async (req, res) => {
 
     // Intereses generados reales (suma directa de monto_interes en pagos)
     const [interesesGenerados] = await pool.query(
-      `SELECT IFNULL(SUM(monto_interes), 0) as total_intereses FROM pagos_prestamo`
+      `SELECT IFNULL(SUM(monto_interes), 0) as total_intereses FROM pagos_prestamo WHERE 1=1${fP.sql}`,
+      fP.params
     );
     
     const interesesTotales = parseFloat(interesesGenerados[0].total_intereses);
@@ -97,7 +109,8 @@ router.get("/kpis", async (req, res) => {
       `SELECT IFNULL(SUM(monto_interes), 0) as total
        FROM pagos_prestamo
        WHERE MONTH(fecha_pago) = MONTH(CURRENT_DATE())
-       AND YEAR(fecha_pago) = YEAR(CURRENT_DATE())`
+       AND YEAR(fecha_pago) = YEAR(CURRENT_DATE())${fP.sql}`,
+      fP.params
     );
 
     res.json({

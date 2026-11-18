@@ -37,6 +37,15 @@ const nombreCooperativa = async () => {
 };
 
 // GET /api/registro/estado?c=CODIGO  → la pantalla de registro decide qué mostrar
+const sucursalesActivas = async () => {
+  try {
+    const [f] = await pool.query("SELECT id_sucursal, nombre FROM sucursales WHERE activa = 1 ORDER BY id_sucursal");
+    return f;
+  } catch {
+    return [];
+  }
+};
+
 router.get("/estado", async (req, res) => {
   try {
     const cfg = await leerRegistro();
@@ -48,6 +57,8 @@ router.get("/estado", async (req, res) => {
       valido,
       // Para calcular la cuota estimada en el formulario (solo con un enlace válido)
       parametros: valido ? await parametrosSolicitud() : null,
+      // Con varias sucursales, el socio elige la suya
+      sucursales: valido ? await sucursalesActivas() : [],
     });
   } catch (error) {
     res.status(500).json({ message: "No se pudo verificar el enlace de registro" });
@@ -149,13 +160,18 @@ router.post("/", recibirFormulario, async (req, res) => {
 
     const hash = await bcrypt.hash(password, 10);
 
+    // Sucursal elegida (si no es válida o no eligió, la principal)
+    const activas = await sucursalesActivas();
+    const idSucursal =
+      activas.find((x) => x.id_sucursal === parseInt(req.body.id_sucursal))?.id_sucursal || activas[0]?.id_sucursal || null;
+
     connection = await pool.getConnection();
     await connection.beginTransaction();
 
     const [r] = await connection.query(
       `INSERT INTO usuarios
-         (nombre_completo, dni, telefono, correo, direccion, fecha_nacimiento, password, rol_id, estado, fecha_registro)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', NOW())`,
+         (nombre_completo, dni, telefono, correo, direccion, fecha_nacimiento, password, rol_id, estado, fecha_registro, id_sucursal)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', NOW(), ?)`,
       [
         nombre,
         dni,
@@ -165,6 +181,7 @@ router.post("/", recibirFormulario, async (req, res) => {
         fecha_nacimiento,
         hash,
         rol[0].id_rol,
+        idSucursal,
       ]
     );
 

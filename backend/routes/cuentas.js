@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { filtroSocio, filtroCaja } = require("../utils/sucursal");
 const { verificarToken, soloAdmin } = require("../middleware/auth");
 const { dinero } = require("../utils/pais");
 const { contabilizar, conSalvaguarda } = require("../utils/contabilidad");
@@ -60,6 +61,11 @@ router.get("/", async (req, res) => {
       whereClause += ` AND c.id_usuario = ?`;
       params.push(id_usuario);
     }
+
+    // Sucursal que se está viendo (un socio buscado o pedido se atiende en cualquiera)
+    const porSucursal = await filtroSocio(req, "u", !!id_usuario);
+    whereClause += porSucursal.sql;
+    params.push(...porSucursal.params);
 
     const [cuentas] = await pool.query(
       `SELECT c.*, 

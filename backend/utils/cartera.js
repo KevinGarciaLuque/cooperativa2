@@ -28,7 +28,8 @@ const clasificar = (diasMora, diasParaVencer) => {
   return "al_dia";
 };
 
-const obtenerCartera = async () => {
+// filtro: condición SQL opcional sobre el socio (alias u), por ejemplo su sucursal
+const obtenerCartera = async (filtro = { sql: "", params: [] }) => {
   const [prestamos] = await pool.query(
     `SELECT p.id_prestamo, p.id_usuario, p.monto, p.saldo_restante, p.tasa_interes, p.plazo_meses,
             p.estado, p.fecha_otorgado,
@@ -39,7 +40,8 @@ const obtenerCartera = async () => {
             (SELECT promesa_fecha FROM gestiones_cobro g WHERE g.id_prestamo = p.id_prestamo AND g.promesa_fecha IS NOT NULL ORDER BY g.fecha DESC, g.id_gestion DESC LIMIT 1) AS promesa_fecha
      FROM prestamos p
      INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
-     WHERE p.estado IN ('activo', 'mora')`
+     WHERE p.estado IN ('activo', 'mora')${filtro.sql}`,
+    filtro.params
   );
 
   const hoy = hoyISO();

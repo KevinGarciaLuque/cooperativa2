@@ -1,5 +1,6 @@
 const express = require("express");
 const { registrarCaja, turnoAbierto } = require("../utils/caja");
+const { filtroCaja, sucursalVista, olvidarPrincipal } = require("../utils/sucursal");
 const router = express.Router();
 const pool = require("../db");
 
@@ -37,32 +38,42 @@ const efectivoDelDia = async (fecha) => {
 router.get("/resumen", async (req, res) => {
   try {
     const fecha = esFecha(req.query.fecha) ? req.query.fecha : hoyISO();
+    // Con una sucursal elegida se ven sus movimientos; el cierre diario es de toda la cooperativa
+    const porSucursal = await filtroCaja(req, "c");
+    const idSucursal = await sucursalVista(req);
 
     const [movimientos] = await pool.query(
-      `SELECT c.*, u.nombre_completo AS socio, r.nombre_completo AS registrado_por
+      `SELECT c.*, u.nombre_completo AS socio, r.nombre_completo AS registrado_por, s.nombre AS sucursal
        FROM caja_movimientos c
        LEFT JOIN usuarios u ON c.id_socio = u.id_usuario
        LEFT JOIN usuarios r ON c.id_registrado_por = r.id_usuario
-       WHERE DATE(c.fecha) = ?
+       LEFT JOIN sucursales s ON s.id_sucursal = c.id_sucursal
+       WHERE DATE(c.fecha) = ?${porSucursal.sql}
        ORDER BY c.fecha DESC, c.id_movimiento DESC`,
-      [fecha]
+      [fecha, ...porSucursal.params]
     );
 
     const [porMetodo] = await pool.query(
       `SELECT metodo,
               IFNULL(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE 0 END), 0) AS ingresos,
               IFNULL(SUM(CASE WHEN tipo = 'egreso' THEN monto ELSE 0 END), 0) AS egresos
-       FROM caja_movimientos WHERE DATE(fecha) = ? GROUP BY metodo`,
-      [fecha]
+       FROM caja_movimientos c WHERE DATE(c.fecha) = ?${porSucursal.sql} GROUP BY metodo`,
+      [fecha, ...porSucursal.params]
     );
 
     const [porCategoria] = await pool.query(
       `SELECT categoria, tipo, COUNT(*) AS cantidad, IFNULL(SUM(monto), 0) AS total
-       FROM caja_movimientos WHERE DATE(fecha) = ? GROUP BY categoria, tipo ORDER BY total DESC`,
-      [fecha]
+       FROM caja_movimientos c WHERE DATE(c.fecha) = ?${porSucursal.sql} GROUP BY categoria, tipo ORDER BY total DESC`,
+      [fecha, ...porSucursal.params]
     );
 
-    const efectivo = await efectivoDelDia(fecha);
+    let efectivo = await efectivoDelDia(fecha);
+    if (idSucursal) {
+      // Solo el flujo de efectivo de la sucursal (el saldo inicial es el del cierre general)
+      const ing = porMetodo.filter((m) => m.metodo === "efectivo").reduce((t, m) => t + num(m.ingresos), 0);
+      const egr = porMetodo.filter((m) => m.metodo === "efectivo").reduce((t, m) => t + num(m.egresos), 0);
+      efectivo = { saldo_inicial: 0, ingresos_efectivo: ing, egresos_efectivo: egr, efectivo_esperado: parseFloat((ing - egr).toFixed(2)) };
+    }
     const [cierre] = await pool.query(`SELECT * FROM cierres_caja WHERE fecha = ?`, [fecha]);
 
     const ingresos = movimientos.filter((m) => m.tipo === "ingreso").reduce((s, m) => s + num(m.monto), 0);
@@ -86,6 +97,7 @@ router.get("/resumen", async (req, res) => {
       })),
       movimientos: movimientos.map((m) => ({ ...m, monto: num(m.monto) })),
       cierre: cierre.length ? cierre[0] : null,
+      por_sucursal: !!idSucursal,
     });
   } catch (error) {
     console.error("ERROR AL OBTENER RESUMEN DE CAJA:", error);
@@ -337,6 +349,7 @@ const guardarSucursal = async (req, res) => {
       return res.json({ success: true, message: "Sucursal guardada." });
     }
     const [r] = await pool.query("INSERT INTO sucursales (nombre, direccion, activa) VALUES (?, ?, ?)", [nombre, direccion, activa]);
+    olvidarPrincipal();
     res.status(201).json({ success: true, message: "Sucursal creada.", id_sucursal: r.insertId });
   } catch (error) {
     console.error("ERROR AL GUARDAR SUCURSAL:", error);
@@ -446,9 +459,10 @@ router.get("/turnos", async (req, res) => {
     const fecha = esFecha(req.query.fecha) ? req.query.fecha : hoyISO();
     const params = [fecha];
     let filtro = "";
-    if (parseInt(req.query.id_sucursal)) {
+    const vista = parseInt(req.query.id_sucursal) || (await sucursalVista(req));
+    if (vista) {
       filtro = " AND t.id_sucursal = ?";
-      params.push(parseInt(req.query.id_sucursal));
+      params.push(vista);
     }
     const [filas] = await pool.query(
       `${SQL_TURNO} WHERE (DATE(t.abierto_en) = ? OR t.estado = 'abierto')${filtro} ORDER BY t.abierto_en DESC`,

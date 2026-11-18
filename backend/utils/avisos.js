@@ -9,6 +9,7 @@ const { hoyISO, diasEntre, soloFecha } = require("./calculosPrestamo");
 const { dinero } = require("./pais");
 const { filtroSocio } = require("./sucursal");
 const comite = require("./comite");
+const { contarSolicitudes } = require("./pendientesSolicitudes");
 
 const DIAS_AVISO_CUOTA = 3; // días antes del vencimiento en que se recuerda la cuota
 const DIAS_AVISO_PLAZO = 7;
@@ -121,8 +122,8 @@ const pendientesPersonal = async (req) => {
   };
 
   if (tiene("prestamos")) {
-    const [[s]] = await pool.query(`SELECT COUNT(*) AS n FROM usuarios u WHERE u.estado = 'pendiente'${filtro.sql}`, filtro.params);
-    agregar(s.n, {
+    const cs = await contarSolicitudes(req);
+    agregar(cs.socios_pendientes, {
       clave: "socios_pendientes",
       titulo: "Nuevos socios por aprobar",
       detalle: "Se registraron con el enlace y esperan tu revisión.",
@@ -130,14 +131,7 @@ const pendientesPersonal = async (req) => {
       nivel: "media",
     });
 
-    const [[sp]] = await pool.query(
-      `SELECT COUNT(*) AS n FROM solicitudes_prestamo s
-       INNER JOIN prestamos p ON p.id_prestamo = s.id_prestamo
-       INNER JOIN usuarios u ON u.id_usuario = p.id_usuario
-       WHERE p.estado = 'pendiente'${filtro.sql}`,
-      filtro.params
-    );
-    agregar(sp.n, {
+    agregar(cs.prestamos_pendientes, {
       clave: "solicitudes_prestamo",
       titulo: "Solicitudes de préstamo",
       detalle: "Socios que pidieron un préstamo desde su cuenta.",
@@ -145,8 +139,7 @@ const pendientesPersonal = async (req) => {
       nivel: "media",
     });
 
-    const [[pr]] = await pool.query("SELECT COUNT(*) AS n FROM pagos_reportados WHERE estado = 'pendiente'");
-    agregar(pr.n, {
+    agregar(cs.pagos_reportados, {
       clave: "pagos_reportados",
       titulo: "Pagos reportados por socios",
       detalle: "Transferencias o depósitos que hay que confirmar o rechazar.",
@@ -154,10 +147,7 @@ const pendientesPersonal = async (req) => {
       nivel: "alta",
     });
 
-    const [[cf]] = await pool.query(
-      "SELECT COUNT(DISTINCT id_recibo) AS n FROM comprobantes_firmados WHERE subido_por_rol = 'Socio' AND revisado_en IS NULL"
-    );
-    agregar(cf.n, {
+    agregar(cs.comprobantes_por_revisar, {
       clave: "comprobantes_firmados",
       titulo: "Comprobantes firmados por revisar",
       detalle: "Socios que subieron su comprobante de entrega firmado.",

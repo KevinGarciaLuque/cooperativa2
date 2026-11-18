@@ -3,6 +3,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { contarSolicitudes } = require("../utils/pendientesSolicitudes");
 const { filtroSocio } = require("../utils/sucursal");
 const config = require("../utils/configFinanciera");
 const { parametrosSolicitud, validarSolicitud, insertarSolicitud } = require("../utils/solicitudPrestamo");
@@ -122,31 +123,7 @@ router.post("/prestamo", async (req, res) => {
 // ============================================
 router.get("/resumen", soloPersonal, async (req, res) => {
   try {
-    const porSucursal = await filtroSocio(req, "u");
-    const [[s]] = await pool.query(
-      `SELECT COUNT(*) AS n FROM usuarios u WHERE u.estado = 'pendiente'${porSucursal.sql}`,
-      porSucursal.params
-    );
-    const [[p]] = await pool.query(
-      `SELECT COUNT(*) AS n FROM solicitudes_prestamo sp
-       INNER JOIN prestamos pr ON sp.id_prestamo = pr.id_prestamo
-       INNER JOIN usuarios u ON u.id_usuario = pr.id_usuario
-       WHERE pr.estado = 'pendiente'${porSucursal.sql}`,
-      porSucursal.params
-    );
-    const [[c]] = await pool.query(
-      `SELECT COUNT(DISTINCT id_recibo) AS n FROM comprobantes_firmados
-       WHERE subido_por_rol = 'Socio' AND revisado_en IS NULL`
-    );
-    const [[pr]] = await pool.query(`SELECT COUNT(*) AS n FROM pagos_reportados WHERE estado = 'pendiente'`);
-    res.json({
-      success: true,
-      socios_pendientes: s.n,
-      prestamos_pendientes: p.n,
-      comprobantes_por_revisar: c.n,
-      pagos_reportados: pr.n,
-      total: s.n + p.n + c.n + pr.n,
-    });
+    res.json({ success: true, ...(await contarSolicitudes(req)) });
   } catch (error) {
     res.status(500).json({ message: "No se pudo obtener el resumen" });
   }

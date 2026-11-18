@@ -2487,6 +2487,27 @@ test("campanita: recordatorio de cuota y mora al socio (una sola vez) y pendient
   await pool.query("DELETE FROM notificaciones WHERE id_usuario = ?", [idSocio]);
 });
 
+test("el número rojo de Solicitudes no cuenta comprobantes de recibos anulados o inexistentes", async () => {
+  const antes = (await api("GET", "/solicitudes/resumen", null, ids.tAdmin)).b.comprobantes_por_revisar;
+  const [r] = await pool.query(
+    `INSERT INTO recibos (tipo, referencia_tipo, referencia_id, id_socio, monto, metodo, concepto, emitido_por, anulado)
+     VALUES ('desembolso', 'prestamo', 0, ?, 100, 'efectivo', 'Anulado', ?, 1)`,
+    [ids.socio, ids.super]
+  );
+  for (const idRecibo of [r.insertId, 99999999]) {
+    await pool.query(
+      `INSERT INTO comprobantes_firmados (id_recibo, nombre_archivo, mime, tamano, contenido, subido_por_rol)
+       VALUES (?, 'x.png', 'image/png', 1, 'x', 'Socio')`,
+      [idRecibo]
+    );
+  }
+  const res = await api("GET", "/solicitudes/resumen", null, ids.tAdmin);
+  assert.equal(res.b.comprobantes_por_revisar, antes);
+  const lista = await api("GET", "/solicitudes/comprobantes-recibidos", null, ids.tAdmin);
+  assert.equal(lista.b.data.length, res.b.comprobantes_por_revisar, "el número coincide con la lista");
+  await pool.query("DELETE FROM comprobantes_firmados WHERE id_recibo IN (?)", [[r.insertId, 99999999]]);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

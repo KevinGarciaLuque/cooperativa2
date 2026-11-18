@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { useConfigSitio } from "../hooks/useConfigSitio";
@@ -113,6 +113,7 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 992);
   const [permisosRol, setPermisosRol] = useState(null); // null = cargando
   const [solicitudesPendientes, setSolicitudesPendientes] = useState(0);
+  const { pathname } = useLocation();
 
   // Contador de solicitudes por revisar (personal)
   useEffect(() => {
@@ -129,7 +130,7 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
       activo = false;
       clearInterval(id);
     };
-  }, [user, token]);
+  }, [user, token, pathname]); // también al cambiar de pantalla: se ve al instante lo ya atendido
 
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth >= 992);

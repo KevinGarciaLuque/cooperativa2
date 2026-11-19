@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
 import { FaInbox, FaLink, FaCopy, FaWhatsapp, FaSyncAlt, FaFilePdf, FaEnvelope, FaHandHoldingUsd, FaUserPlus, FaMoneyCheckAlt, FaFileSignature } from "react-icons/fa";
 import Pestanas from "../components/Pestanas";
+import { useAcciones } from "../hooks/useAcciones";
 import CalificacionSocio from "../components/CalificacionSocio";
 import { EmptyState, PageHeader } from "../ui/Componentes";
 import InputMonto from "../ui/InputMonto";
@@ -23,6 +24,7 @@ const ACCENT = "#a8cd3a";
 
 export default function Solicitudes() {
   const { token } = useAuth();
+  const { puede } = useAcciones(); // botones que el rol no puede usar no se muestran
   const { mostrarAlerta } = useAlerta();
   const navigate = useNavigate();
   const { config: sitio } = useConfigSitio();
@@ -300,13 +302,15 @@ export default function Solicitudes() {
                         <FaEnvelope />
                       </button>
                     </div>
-                    <button
-                      className="btn fw-semibold"
-                      style={{ background: ACCENT, color: "#1a2a00" }}
-                      onClick={() => setADesembolsar(p)}
-                    >
-                      Desembolsar
-                    </button>
+                    {puede("prestamos.desembolsar") && (
+                      <button
+                        className="btn fw-semibold"
+                        style={{ background: ACCENT, color: "#1a2a00" }}
+                        onClick={() => setADesembolsar(p)}
+                      >
+                        Desembolsar
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -408,16 +412,20 @@ export default function Solicitudes() {
                       </div>
 
                       <div className="d-flex gap-2">
-                        <button
-                          className="btn fw-semibold flex-fill"
-                          style={{ background: ACCENT, color: "#1a2a00" }}
-                          onClick={() => abrirRevision(p)}
-                        >
-                          Revisar y aprobar
-                        </button>
-                        <button className="btn btn-outline-danger" onClick={() => rechazarPrestamo(p)}>
-                          Rechazar
-                        </button>
+                        {puede("prestamos.aprobar") && (
+                          <button
+                            className="btn fw-semibold flex-fill"
+                            style={{ background: ACCENT, color: "#1a2a00" }}
+                            onClick={() => abrirRevision(p)}
+                          >
+                            Revisar y aprobar
+                          </button>
+                        )}
+                        {puede("prestamos.rechazar") && (
+                          <button className="btn btn-outline-danger" onClick={() => rechazarPrestamo(p)}>
+                            Rechazar
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -463,16 +471,22 @@ export default function Solicitudes() {
                         </button>
                       </td>
                       <td className="text-nowrap">
-                        <button
-                          className="btn btn-sm fw-semibold me-1"
-                          style={{ background: ACCENT, color: "#1a2a00" }}
-                          onClick={() => aprobarSocio(s)}
-                        >
-                          Aprobar
-                        </button>
-                        <button className="btn btn-sm btn-outline-danger" onClick={() => rechazarSocio(s)}>
-                          Rechazar
-                        </button>
+                        {puede("socios.aprobar") ? (
+                          <>
+                            <button
+                              className="btn btn-sm fw-semibold me-1"
+                              style={{ background: ACCENT, color: "#1a2a00" }}
+                              onClick={() => aprobarSocio(s)}
+                            >
+                              Aprobar
+                            </button>
+                            <button className="btn btn-sm btn-outline-danger" onClick={() => rechazarSocio(s)}>
+                              Rechazar
+                            </button>
+                          </>
+                        ) : (
+                          <span className="small text-muted">Lo aprueba otro rol</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -533,18 +547,22 @@ export default function Solicitudes() {
                         >
                           Comprobante
                         </button>
-                        <button
-                          className="btn btn-sm fw-semibold me-1"
-                          style={{ background: ACCENT, color: "#1a2a00" }}
-                          onClick={() =>
-                            navigate(`/pagos?accion=nuevo&socio=${r.id_usuario}&prestamo=${r.id_prestamo}&reporte=${r.id_reporte}`)
-                          }
-                        >
-                          Confirmar y registrar
-                        </button>
-                        <button className="btn btn-sm btn-outline-danger" onClick={() => rechazarPagoReportado(r)}>
-                          Rechazar
-                        </button>
+                        {puede("pagos.registrar") && (
+                          <>
+                            <button
+                              className="btn btn-sm fw-semibold me-1"
+                              style={{ background: ACCENT, color: "#1a2a00" }}
+                              onClick={() =>
+                                navigate(`/pagos?accion=nuevo&socio=${r.id_usuario}&prestamo=${r.id_prestamo}&reporte=${r.id_reporte}`)
+                              }
+                            >
+                              Confirmar y registrar
+                            </button>
+                            <button className="btn btn-sm btn-outline-danger" onClick={() => rechazarPagoReportado(r)}>
+                              Rechazar
+                            </button>
+                          </>
+                        )}
                       </td>
                     </tr>
                   ))}

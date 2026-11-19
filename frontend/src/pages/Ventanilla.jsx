@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import Pestanas from "../components/Pestanas";
+import { useAcciones } from "../hooks/useAcciones";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
 import DetallePrestamoVentanilla from "./DetallePrestamoVentanilla";
@@ -43,6 +44,7 @@ const esVigente = (p) => ESTADOS_VIGENTES.includes((p.estado || "").toLowerCase(
 
 export default function Ventanilla() {
   const { token, user } = useAuth();
+  const { puede } = useAcciones(); // botones que el rol no puede usar no se muestran
   const esSuperAdmin = user?.rol === "Super Administrador";
   const { mostrarAlerta } = useAlerta();
   const navigate = useNavigate();
@@ -208,6 +210,7 @@ export default function Ventanilla() {
           icon: <FaMoneyCheckAlt />,
           color: "#27ae60",
           titulo: "Pagar cuota",
+          accion: "pagos.registrar",
           desc: resumen?.vigentes.length
             ? `${resumen.vigentes.length} préstamo(s) vigente(s)`
             : "Sin préstamos vigentes",
@@ -227,6 +230,7 @@ export default function Ventanilla() {
           icon: <FaHandHoldingUsd />,
           color: "#2980b9",
           titulo: "Solicitar préstamo",
+          accion: "prestamos.crear",
           desc: "Registrar nueva solicitud",
           onClick: () => irNuevo("/prestamos"),
         },
@@ -234,6 +238,7 @@ export default function Ventanilla() {
           icon: <FaPiggyBank />,
           color: "#d68910",
           titulo: "Registrar aportación",
+          accion: "ahorro.depositar",
           desc: "Aporte a capital del socio",
           onClick: () => irNuevo("/aportaciones"),
         },
@@ -667,7 +672,7 @@ export default function Ventanilla() {
                         >
                           Ver detalles y tabla de amortización
                         </button>
-                        <div className="d-flex gap-2">
+                        {puede("pagos.registrar") && <div className="d-flex gap-2">
                           <button
                             className="btn fw-semibold flex-fill"
                             style={{ background: ACCENT, color: "#1a2a00" }}
@@ -683,7 +688,7 @@ export default function Ventanilla() {
                           >
                             Liquidar total
                           </button>
-                        </div>
+                        </div>}
                       </div>
                     </div>
                   );
@@ -752,7 +757,7 @@ export default function Ventanilla() {
           {/* Acciones */}
           <h5 className="fw-bold mb-3" style={{ color: AZUL }}>¿Qué desea hacer el socio?</h5>
           <div className="row g-3 mb-4">
-            {acciones.map((a) => (
+            {acciones.filter((a) => !a.accion || puede(a.accion)).map((a) => (
               <div className="col-12 col-md-6 col-xl-4" key={a.titulo}>
                 <button className="vt-action" onClick={a.onClick} disabled={a.deshabilitado || cargandoFicha}>
                   <div className="d-flex align-items-center gap-3">

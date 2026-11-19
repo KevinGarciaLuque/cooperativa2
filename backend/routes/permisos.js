@@ -152,6 +152,23 @@ router.post("/roles-recomendados", verificarToken, soloSuperAdmin, async (req, r
   }
 });
 
+// GET /api/permisos/mis-acciones → qué acciones puede hacer el usuario de la sesión, para que la
+// pantalla esconda los botones que no le sirven. Con la función apagada, todo está permitido.
+router.get("/mis-acciones", verificarToken, async (req, res) => {
+  try {
+    const u = req.usuario;
+    const estado = await require("../utils/funciones").leer();
+    if (u.rol === "Super Administrador" || u.rol === "Socio" || !estado.permisos_por_accion) {
+      return res.json({ success: true, activa: false, solo_lectura: false, acciones: {} });
+    }
+    const rol = await acciones.datosDelRol(u.rol_id);
+    res.json({ success: true, activa: true, solo_lectura: rol.solo_lectura, acciones: rol.acciones });
+  } catch (error) {
+    console.error("ERROR AL LEER MIS ACCIONES:", error);
+    res.status(500).json({ message: "No se pudieron leer tus permisos" });
+  }
+});
+
 router.get("/:rol_id", verificarToken, async (req, res) => {
   const { rol_id } = req.params;
 

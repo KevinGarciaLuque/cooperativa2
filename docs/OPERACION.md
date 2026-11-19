@@ -375,3 +375,7 @@ Función nueva **"Descuento por planilla"** (*Control de Accesos → Funciones n
 3. **Excel para la empresa:** lista de empleados con el monto a descontar y columnas para que anoten lo descontado.
 4. **Aplicar el pago:** cuando la empresa paga, revisa cuánto descontó a cada uno (0 si no se lo descontó, con una nota), elige cómo pagó (transferencia, depósito, cheque o efectivo) y la referencia, y pulsa *Aplicar*. Se registra un pago normal en cada préstamo (interés, mora, recibo y aviso al socio). Si uno falla, no se aplica ninguno. Los no descontados quedan marcados para cobrarlos por otra vía.
 - Aplicar es la acción "Registrar pagos" de los permisos por acción. Las planillas por aplicar aparecen en la campanita del personal.
+
+## Etapa 11a: botones según los permisos del rol
+
+Con **"Permisos por acción"** encendida, cada pantalla esconde los botones de las acciones que el rol no tiene (en vez de mostrarlos y responder "no tienes permiso"): Préstamos (nuevo, aprobar, rechazar, desembolsar, editar, eliminar), Pagos (registrar, editar, anular), Solicitudes, Ventanilla (cobrar, solicitar préstamo, aportación), Usuarios (nuevo, editar, eliminar) y Caja (gastos e ingresos). Un rol de solo lectura no ve ningún botón de cambio. El servidor sigue comprobando cada acción.

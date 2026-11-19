@@ -435,20 +435,20 @@ function ModalHistorialPagos({ grupo, prestamos, onClose, onEdit, onDelete }) {
                               style={{ padding: "3px 8px", fontSize: 12, marginRight: 4 }}>
                               Recibo
                             </button>
-                            <button className="btn btn-sm" title="Editar"
+                            {onEdit && <button className="btn btn-sm" title="Editar"
                               onClick={() => { onClose(); setTimeout(() => onEdit(pago), 60); }}
                               style={{ background: "rgba(52,152,219,0.1)", color: "#3498db", border: "1px solid #3498db", borderRadius: "6px 0 0 6px", padding: "3px 8px" }}
                               onMouseEnter={e => { e.currentTarget.style.background = "#3498db"; e.currentTarget.style.color = "white"; }}
                               onMouseLeave={e => { e.currentTarget.style.background = "rgba(52,152,219,0.1)"; e.currentTarget.style.color = "#3498db"; }}>
                               <FaEdit style={{ fontSize: 12 }} />
-                            </button>
-                            <button className="btn btn-sm" title="Eliminar"
+                            </button>}
+                            {onDelete && <button className="btn btn-sm" title="Eliminar"
                               onClick={() => onDelete(pago.id_pago)}
                               style={{ background: "rgba(231,76,60,0.1)", color: "#e74c3c", border: "1px solid #e74c3c", borderLeft: "none", borderRadius: "0 6px 6px 0", padding: "3px 8px" }}
                               onMouseEnter={e => { e.currentTarget.style.background = "#e74c3c"; e.currentTarget.style.color = "white"; }}
                               onMouseLeave={e => { e.currentTarget.style.background = "rgba(231,76,60,0.1)"; e.currentTarget.style.color = "#e74c3c"; }}>
                               <FaTrash style={{ fontSize: 12 }} />
-                            </button>
+                            </button>}
                           </div>
                         </div>
                       );

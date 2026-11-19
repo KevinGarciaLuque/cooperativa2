@@ -230,7 +230,7 @@ export default function ModalPerfilUsuario({ show, usuario, onClose, onEdit, onD
 
             {/* Acciones */}
             <div className="row g-2">
-              <div className="col-6">
+              {onEdit && <div className={onDelete ? "col-6" : "col-12"}>
                 <button
                   className="btn w-100"
                   onClick={() => { onClose(); onEdit(usuario); }}
@@ -246,8 +246,8 @@ export default function ModalPerfilUsuario({ show, usuario, onClose, onEdit, onD
                   <FaEdit className="me-2" />
                   Editar
                 </button>
-              </div>
-              <div className="col-6">
+              </div>}
+              {onDelete && <div className={onEdit ? "col-6" : "col-12"}>
                 <button
                   className="btn w-100"
                   onClick={() => { onClose(); onDelete(usuario.id_usuario); }}
@@ -263,7 +263,7 @@ export default function ModalPerfilUsuario({ show, usuario, onClose, onEdit, onD
                   <FaTrash className="me-2" />
                   Eliminar
                 </button>
-              </div>
+              </div>}
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { hoyLocal } from "../utils/fechas";
+import { useAcciones } from "../hooks/useAcciones";
 import { useEffect, useState } from "react";
 import { verComprobanteReportado } from "../utils/pagosReportados";
 import useAccionRapida from "../hooks/useAccionRapida";
@@ -17,6 +18,7 @@ const fmt = (n) =>
 
 export default function Pagos() {
   const { token } = useAuth();
+  const { puede } = useAcciones(); // botones que el rol no puede usar no se muestran
   const { mostrarAlerta } = useAlerta();
   const [pagos, setPagos] = useState([]);
   const [prestamos, setPrestamos] = useState([]);
@@ -322,7 +324,7 @@ export default function Pagos() {
             Registro y seguimiento de pagos de préstamos
           </p>
         </div>
-        <button
+        {puede("pagos.registrar") && <button
           className="btn btn-lg shadow-sm"
           onClick={openCrearModal}
           style={{
@@ -335,7 +337,7 @@ export default function Pagos() {
         >
           <FaPlus className="me-2" />
           Registrar Pago
-        </button>
+        </button>}
       </div>
 
       {/* Cards de Estadísticas */}
@@ -644,8 +646,8 @@ export default function Pagos() {
           prestamos={prestamos}
           usuarios={usuarios}
           pagosPorPrestamo={pagosPorPrestamo}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
+          onEdit={puede("pagos.editar") ? handleEdit : null}
+          onDelete={puede("pagos.anular") ? handleDelete : null}
         />
       )}
 

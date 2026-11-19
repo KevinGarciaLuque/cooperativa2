@@ -364,27 +364,35 @@ function ModalHistorialPrestamos({ grupo, onClose, onEdit, onDelete, onVerDetall
                       <div className="d-flex gap-1 flex-shrink-0 flex-wrap justify-content-end">
                         {p.estado === "pendiente" && (
                           <>
-                            <button className="btn btn-sm btn-success fw-semibold"
-                              onClick={() => { onClose(); setTimeout(() => onAprobar(p), 60); }}>
-                              Aprobar
-                            </button>
-                            <button className="btn btn-sm btn-outline-danger"
-                              onClick={() => { onClose(); setTimeout(() => onRechazar(p), 60); }}>
-                              Rechazar
-                            </button>
+                            {onAprobar && (
+                              <button className="btn btn-sm btn-success fw-semibold"
+                                onClick={() => { onClose(); setTimeout(() => onAprobar(p), 60); }}>
+                                Aprobar
+                              </button>
+                            )}
+                            {onRechazar && (
+                              <button className="btn btn-sm btn-outline-danger"
+                                onClick={() => { onClose(); setTimeout(() => onRechazar(p), 60); }}>
+                                Rechazar
+                              </button>
+                            )}
                           </>
                         )}
                         {p.estado === "aprobado" && (
                           <>
-                            <button className="btn btn-sm fw-semibold"
-                              style={{ background: "#a8cd3a", color: "#1a2a00" }}
-                              onClick={() => { onClose(); setTimeout(() => onDesembolsar(p), 60); }}>
-                              Desembolsar
-                            </button>
-                            <button className="btn btn-sm btn-outline-danger"
-                              onClick={() => { onClose(); setTimeout(() => onRechazar(p), 60); }}>
-                              Rechazar
-                            </button>
+                            {onDesembolsar && (
+                              <button className="btn btn-sm fw-semibold"
+                                style={{ background: "#a8cd3a", color: "#1a2a00" }}
+                                onClick={() => { onClose(); setTimeout(() => onDesembolsar(p), 60); }}>
+                                Desembolsar
+                              </button>
+                            )}
+                            {onRechazar && (
+                              <button className="btn btn-sm btn-outline-danger"
+                                onClick={() => { onClose(); setTimeout(() => onRechazar(p), 60); }}>
+                                Rechazar
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -396,20 +404,20 @@ function ModalHistorialPrestamos({ grupo, onClose, onEdit, onDelete, onVerDetall
                           onMouseLeave={e => { e.currentTarget.style.background = "rgba(52,152,219,0.1)"; e.currentTarget.style.color = "#3498db"; }}>
                           <FaEye style={{ fontSize: 13 }} />
                         </button>
-                        <button className="btn btn-sm" title="Editar"
+                        {onEdit && <button className="btn btn-sm" title="Editar"
                           onClick={() => { onClose(); setTimeout(() => onEdit(p), 60); }}
                           style={{ background: "rgba(243,156,18,0.1)", color: "#f39c12", border: "1px solid #f39c12", borderLeft: "none", padding: "5px 10px" }}
                           onMouseEnter={e => { e.currentTarget.style.background = "#f39c12"; e.currentTarget.style.color = "white"; }}
                           onMouseLeave={e => { e.currentTarget.style.background = "rgba(243,156,18,0.1)"; e.currentTarget.style.color = "#f39c12"; }}>
                           <FaEdit style={{ fontSize: 13 }} />
-                        </button>
-                        <button className="btn btn-sm" title="Eliminar"
+                        </button>}
+                        {onDelete && <button className="btn btn-sm" title="Eliminar"
                           onClick={() => onDelete(p.id_prestamo)}
                           style={{ background: "rgba(231,76,60,0.1)", color: "#e74c3c", border: "1px solid #e74c3c", borderLeft: "none", borderRadius: "0 6px 6px 0", padding: "5px 10px" }}
                           onMouseEnter={e => { e.currentTarget.style.background = "#e74c3c"; e.currentTarget.style.color = "white"; }}
                           onMouseLeave={e => { e.currentTarget.style.background = "rgba(231,76,60,0.1)"; e.currentTarget.style.color = "#e74c3c"; }}>
                           <FaTrash style={{ fontSize: 13 }} />
-                        </button>
+                        </button>}
                       </div>
                     </div>
 

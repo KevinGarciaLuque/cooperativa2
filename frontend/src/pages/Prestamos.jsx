@@ -13,12 +13,14 @@ import ModalDetallePrestamo from "./PrestamosUI/ModalDetallePrestamo";
 import { dinero } from "../utils/pais";
 import { CAMPOS_CREDITO } from "../components/CamposCredito";
 import { useFunciones } from "../hooks/useFunciones";
+import { useAcciones } from "../hooks/useAcciones";
 
 import "react-circular-progressbar/dist/styles.css";
 
 export default function Prestamos() {
   const { token } = useAuth();
   const funciones = useFunciones();
+  const { puede } = useAcciones(); // botones que el rol no puede usar no se muestran
   const { mostrarAlerta } = useAlerta();
   const [prestamos, setPrestamos] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
@@ -382,7 +384,7 @@ export default function Prestamos() {
             Administra los préstamos de la cooperativa
           </p>
         </div>
-        <button
+        {puede("prestamos.crear") && <button
           className="btn btn-lg shadow-sm"
           onClick={openCrearModal}
           style={{
@@ -395,7 +397,7 @@ export default function Prestamos() {
         >
           <FaPlus className="me-2" />
           Nuevo Préstamo
-        </button>
+        </button>}
       </div>
 
       {/* Cards de Estadísticas */}
@@ -668,12 +670,12 @@ export default function Prestamos() {
         <TablaPrestamos
           prestamos={prestamosFiltrados}
           usuarios={usuarios}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
+          onEdit={puede("prestamos.editar") ? handleEdit : null}
+          onDelete={puede("prestamos.eliminar") ? handleDelete : null}
           onVerDetalle={verDetalle}
-          onAprobar={aprobarPrestamo}
-          onRechazar={rechazarPrestamo}
-          onDesembolsar={setADesembolsar}
+          onAprobar={puede("prestamos.aprobar") ? aprobarPrestamo : null}
+          onRechazar={puede("prestamos.rechazar") ? rechazarPrestamo : null}
+          onDesembolsar={puede("prestamos.desembolsar") ? setADesembolsar : null}
           getEstadoInfo={getEstadoInfo}
         />
       )}

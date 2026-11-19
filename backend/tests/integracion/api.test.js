@@ -2851,6 +2851,31 @@ test("etapa 10: descuento por planilla — empresa, préstamos, planilla del mes
   assert.equal((await api("PUT", "/configuracion/funciones", { descuento_planilla: false }, ids.tSuper)).s, 200);
 });
 
+test("etapa 11a: mis acciones — la pantalla sabe qué botones esconder", async () => {
+  const [r] = await pool.query("INSERT INTO roles (nombre, solo_lectura) VALUES ('Cajero sin anular', 0)");
+  const rol = r.insertId;
+  await pool.query("INSERT INTO permisos_acciones (rol_id, accion, activo) VALUES (?, 'pagos.anular', 0), (?, 'pagos.registrar', 1)", [rol, rol]);
+  const [u] = await pool.query(
+    `INSERT INTO usuarios (nombre_completo, dni, telefono, correo, password, rol_id, estado, fecha_registro)
+     VALUES ('Cajero Prueba', '0801000000611', '98765432', 'cajero611@prueba.hn', 'x', ?, 'activo', NOW())`,
+    [rol]
+  );
+  const t = tokenDe(u.insertId, "Cajero sin anular", rol);
+  // Apagada: todo permitido
+  const off = await api("GET", "/permisos/mis-acciones", null, t);
+  assert.equal(off.s, 200);
+  assert.equal(off.b.activa, false);
+  assert.equal((await api("PUT", "/configuracion/funciones", { permisos_por_accion: true }, ids.tSuper)).s, 200);
+  const on = (await api("GET", "/permisos/mis-acciones", null, t)).b;
+  assert.equal(on.activa, true);
+  assert.equal(on.acciones["pagos.anular"], false);
+  assert.equal(on.acciones["pagos.registrar"], true);
+  // El Super Administrador lo puede todo
+  assert.equal((await api("GET", "/permisos/mis-acciones", null, ids.tSuper)).b.activa, false);
+  assert.equal((await api("PUT", "/configuracion/funciones", { permisos_por_accion: false }, ids.tSuper)).s, 200);
+  await pool.query("DELETE FROM usuarios WHERE id_usuario = ?", [u.insertId]);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

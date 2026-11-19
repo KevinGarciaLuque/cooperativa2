@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAcciones } from "../../hooks/useAcciones";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import TablaUsuarios from "./TablaUsuarios";
@@ -11,6 +12,7 @@ import { docIdentidad } from "../../utils/pais";
 
 export default function Usuarios() {
   const { token } = useAuth();
+  const { puede } = useAcciones(); // botones que el rol no puede usar no se muestran
   const { mostrarAlerta } = useAlerta();
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -120,7 +122,7 @@ export default function Usuarios() {
           </h2>
           <p className="text-muted mb-0">Administra los socios y usuarios del sistema</p>
         </div>
-        <button 
+        {puede("socios.crear") && <button 
           className="btn btn-primary btn-lg shadow-sm" 
           onClick={openCrear}
           style={{ 
@@ -131,7 +133,7 @@ export default function Usuarios() {
         >
           <FaUserPlus className="me-2" />
           Nuevo Usuario
-        </button>
+        </button>}
       </div>
 
       {/* Tarjetas de Estadísticas */}
@@ -274,8 +276,8 @@ export default function Usuarios() {
       ) : (
         <TablaUsuarios
           usuarios={usuariosFiltrados}
-          onEdit={openEditar}
-          onDelete={handleEliminar}
+          onEdit={puede("socios.editar") ? openEditar : null}
+          onDelete={puede("socios.eliminar") ? handleEliminar : null}
           onVerPerfil={(u) => setPerfilModal({ show: true, usuario: u })}
         />
       )}
@@ -293,8 +295,8 @@ export default function Usuarios() {
         show={perfilModal.show}
         usuario={perfilModal.usuario}
         onClose={() => setPerfilModal({ show: false, usuario: null })}
-        onEdit={openEditar}
-        onDelete={handleEliminar}
+        onEdit={puede("socios.editar") ? openEditar : null}
+        onDelete={puede("socios.eliminar") ? handleEliminar : null}
       />
 
       {/* Modal paso 1: primera advertencia */}

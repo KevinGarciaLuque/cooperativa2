@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAcciones } from "../hooks/useAcciones";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
@@ -82,6 +83,7 @@ const hora = (f) => {
 
 export default function Caja() {
   const { token, user } = useAuth();
+  const { puede } = useAcciones(); // botones que el rol no puede usar no se muestran
   const { mostrarAlerta } = useAlerta();
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
@@ -194,12 +196,16 @@ export default function Caja() {
           <span className="text-muted">Ingresos, egresos y cierre diario del efectivo.</span>
         </div>
         <div className="d-flex flex-wrap align-items-center gap-2">
-          <button className="btn btn-sm btn-outline-danger" onClick={() => abrirManual("gasto")}>
-            Registrar gasto
-          </button>
-          <button className="btn btn-sm btn-outline-success" onClick={() => abrirManual("ingreso")}>
-            Registrar ingreso
-          </button>
+          {puede("caja.gastos") && (
+            <>
+              <button className="btn btn-sm btn-outline-danger" onClick={() => abrirManual("gasto")}>
+                Registrar gasto
+              </button>
+              <button className="btn btn-sm btn-outline-success" onClick={() => abrirManual("ingreso")}>
+                Registrar ingreso
+              </button>
+            </>
+          )}
           <button className="btn btn-outline-secondary btn-sm" onClick={() => setFecha(moverDia(fecha, -1))}>
             <FaChevronLeft />
           </button>

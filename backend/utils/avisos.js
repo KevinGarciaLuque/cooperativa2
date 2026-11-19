@@ -216,6 +216,18 @@ const pendientesPersonal = async (req) => {
       ruta: "/cobranza",
       nivel: "alta",
     });
+    // Agenda del asesor: sus préstamos atrasados o que vencen hoy (función "cartera_asesor")
+    if (await require("./funciones").habilitada("cartera_asesor", u)) {
+      const propios = await obtenerCartera({ sql: " AND p.id_promotor = ?", params: [u.id_usuario] });
+      const mios = propios.filter((c) => (c.con_plan ? c.dias_atraso : c.dias_mora) > 0 || c.dias_para_vencer === 0);
+      agregar(mios.length, {
+        clave: "agenda_cobro",
+        titulo: "Tu agenda de cobro de hoy",
+        detalle: "Socios de tu cartera con cuotas atrasadas o que vencen hoy.",
+        ruta: "/cobranza?vista=agenda",
+        nivel: "media",
+      });
+    }
     agregar(promesas.length, {
       clave: "promesas_vencidas",
       titulo: "Promesas de pago incumplidas",

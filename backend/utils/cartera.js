@@ -56,7 +56,8 @@ const obtenerCartera = async (filtro = { sql: "", params: [] }) => {
   const [prestamos] = await pool.query(
     `SELECT p.id_prestamo, p.id_usuario, p.monto, p.saldo_restante, p.tasa_interes, p.plazo_meses,
             p.mora_tasa_anual, p.mora_dias_gracia, p.redondeo_cuota, p.metodo_interes, p.frecuencia_pago,
-            p.estado, p.fecha_otorgado,
+            p.estado, p.fecha_otorgado, p.id_promotor,
+            (SELECT a.nombre_completo FROM usuarios a WHERE a.id_usuario = p.id_promotor) AS asesor,
             u.nombre_completo, u.dni, u.telefono, u.correo,
             (SELECT MAX(fecha_pago) FROM pagos_prestamo WHERE id_prestamo = p.id_prestamo) AS ultimo_pago,
             (SELECT nota FROM gestiones_cobro g WHERE g.id_prestamo = p.id_prestamo ORDER BY g.fecha DESC, g.id_gestion DESC LIMIT 1) AS ultima_nota,
@@ -105,6 +106,8 @@ const obtenerCartera = async (filtro = { sql: "", params: [] }) => {
       ultima_gestion: p.ultima_gestion,
       ultima_nota: p.ultima_nota,
       promesa_fecha: soloFecha(p.promesa_fecha),
+      id_asesor: p.id_promotor || null,
+      asesor: p.asesor || null,
       promesa_vencida: p.promesa_fecha ? soloFecha(p.promesa_fecha) < hoy && (diasAtraso > 0 || diasMora > 0) : false,
     };
   });

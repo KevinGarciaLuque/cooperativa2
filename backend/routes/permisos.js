@@ -91,12 +91,16 @@ router.get("/acciones/catalogo", verificarToken, soloSuperAdmin, (req, res) => {
 // GET /api/permisos/:rol_id/acciones → { solo_lectura, acciones: { clave: true|false } } (sin configurar = true)
 router.get("/:rol_id/acciones", verificarToken, soloSuperAdmin, async (req, res) => {
   const d = await acciones.datosDelRol(parseInt(req.params.rol_id));
+  const [[rol]] = await pool.query("SELECT nombre FROM roles WHERE id_rol = ?", [parseInt(req.params.rol_id)]);
+  // Lo que vale cada acción sin configurar (debe coincidir con lo que aplica el servidor)
+  const porDefecto = (clave) =>
+    clave === "pagos.condonar" ? "autorizar" : clave === "autorizaciones.resolver" ? rol?.nombre === "Administrador" : true;
   res.json({
     success: true,
     solo_lectura: d.solo_lectura,
     // true | false | "autorizar"; sin configurar = true (salvo las que solo valen si se dan expresamente)
     acciones: Object.fromEntries(
-      acciones.ACCIONES.map((a) => [a.clave, d.acciones[a.clave] === undefined ? !acciones.SOLO_EXPRESAS.has(a.clave) : d.acciones[a.clave]])
+      acciones.ACCIONES.map((a) => [a.clave, d.acciones[a.clave] === undefined ? porDefecto(a.clave) : d.acciones[a.clave]])
     ),
     limites: d.limites || {},
     con_monto: acciones.ACCIONES_CON_MONTO,

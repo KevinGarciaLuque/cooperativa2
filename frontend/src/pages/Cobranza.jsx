@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useAlerta } from "../context/AlertaContext";
 import { FaPhoneAlt, FaClipboardList, FaTimes, FaWhatsapp, FaEnvelope } from "react-icons/fa";
 import { DataTable, EmptyState, PageHeader } from "../ui/Componentes";
+import Pestanas from "../components/Pestanas";
+import { AgendaCobro, CarteraAsesores } from "../components/CobranzaAsesor";
+import { useFunciones } from "../hooks/useFunciones";
+import { FaCalendarDay, FaUserTie, FaListUl } from "react-icons/fa";
 import { dinero, numeroWhatsApp } from "../utils/pais";
 
 const AZUL = "#1a2035";
@@ -33,6 +37,14 @@ export default function Cobranza() {
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   const [cartera, setCartera] = useState(null);
+  // Cartera por asesor y agenda (función "cartera_asesor")
+  const { cartera_asesor: conAsesor } = useFunciones();
+  const [params] = useSearchParams();
+  const [vista, setVista] = useState(params.get("vista") === "agenda" ? "agenda" : "cartera");
+  const [filtroAsesor, setFiltroAsesor] = useState("");
+  const [asesores, setAsesores] = useState([]);
+  const [recargaAgenda, setRecargaAgenda] = useState(0);
+  const [asesorGestion, setAsesorGestion] = useState("");
   const [categoria, setCategoria] = useState("todas");
   const [busqueda, setBusqueda] = useState("");
   const [cargando, setCargando] = useState(true);
@@ -45,7 +57,7 @@ export default function Cobranza() {
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      const res = await axios.get(`${API_URL}/cobranza/cartera`, { headers });
+      const res = await axios.get(`${API_URL}/cobranza/cartera`, { headers, params: conAsesor && filtroAsesor ? { id_asesor: filtroAsesor } : {} });
       setCartera(res.data);
     } catch {
       mostrarAlerta("No se pudo cargar la cartera.", "error");
@@ -53,14 +65,32 @@ export default function Cobranza() {
       setCargando(false);
     }
     // eslint-disable-next-line
-  }, [headers]);
+  }, [headers, filtroAsesor, conAsesor]);
 
   useEffect(() => {
     cargar();
   }, [cargar]);
 
+  useEffect(() => {
+    if (!conAsesor) return;
+    axios.get(`${API_URL}/cobranza/personal`, { headers }).then((r) => setAsesores(r.data.data || [])).catch(() => {});
+  }, [conAsesor, headers]);
+
+  // Asignar el préstamo en gestión a un asesor
+  const asignarAsesor = async () => {
+    try {
+      const r = await axios.post(`${API_URL}/cobranza/asignar`, { ids: [gestion.id_prestamo], id_asesor: asesorGestion || null }, { headers });
+      mostrarAlerta(r.data.message, "success");
+      cargar();
+      setRecargaAgenda((n) => n + 1);
+    } catch (e) {
+      mostrarAlerta(e.response?.data?.message || "No se pudo asignar.", "error");
+    }
+  };
+
   const abrirGestion = async (fila) => {
     setGestion(fila);
+    setAsesorGestion(fila.id_asesor ? String(fila.id_asesor) : "");
     setForm({ medio: "llamada", nota: "", promesa_fecha: "", promesa_monto: "" });
     setHistorial([]);
     try {
@@ -89,6 +119,7 @@ export default function Cobranza() {
       mostrarAlerta("Gestión registrada.", "success");
       setGestion(null);
       cargar();
+      setRecargaAgenda((n) => n + 1);
     } catch (err) {
       mostrarAlerta(err.response?.data?.message || "No se pudo registrar la gestión.", "error");
     } finally {
@@ -149,6 +180,33 @@ export default function Cobranza() {
         titulo="Cobranza"
         subtitulo="Cartera por vencer y en mora, con el seguimiento de cada gestión."
       />
+
+      {conAsesor && (
+        <Pestanas
+          activa={vista}
+          onCambiar={setVista}
+          tabs={[
+            { clave: "cartera", titulo: "Cartera", icono: <FaListUl /> },
+            { clave: "agenda", titulo: "Agenda de hoy", icono: <FaCalendarDay /> },
+            { clave: "asesores", titulo: "Por asesor", icono: <FaUserTie /> },
+          ]}
+        />
+      )}
+      {conAsesor && vista === "agenda" && (
+        <AgendaCobro headers={headers} asesores={asesores} recarga={recargaAgenda} onGestionar={abrirGestion} />
+      )}
+      {conAsesor && vista === "asesores" && <CarteraAsesores headers={headers} />}
+
+      {(!conAsesor || vista === "cartera") && (
+      <>
+      {conAsesor && (
+        <select className="form-select form-select-sm mb-2" style={{ maxWidth: 280 }} value={filtroAsesor} onChange={(e) => setFiltroAsesor(e.target.value)}>
+          <option value="">Toda la cartera</option>
+          <option value="yo">Mi cartera</option>
+          <option value="sin">Sin asesor</option>
+          {asesores.map((a) => <option key={a.id_usuario} value={a.id_usuario}>{a.nombre_completo}</option>)}
+        </select>
+      )}
 
       {/* Filtros por categoría */}
       <div className="d-flex flex-wrap gap-2 mb-3">
@@ -214,7 +272,17 @@ export default function Cobranza() {
                 </>
               ),
             },
-            { clave: "id_prestamo", titulo: "Préstamo", ordenable: true, render: (f) => `#${f.id_prestamo}` },
+            {
+              clave: "id_prestamo",
+              titulo: "Préstamo",
+              ordenable: true,
+              render: (f) => (
+                <>
+                  #{f.id_prestamo}
+                  {conAsesor && <div className="small text-muted">{f.asesor || "Sin asesor"}</div>}
+                </>
+              ),
+            },
             {
               clave: "dias_atraso",
               titulo: "Situación",
@@ -305,6 +373,8 @@ export default function Cobranza() {
           ]}
         />
       </div>
+      </>
+      )}
 
       {/* Modal de gestión */}
       {gestion && (
@@ -324,6 +394,18 @@ export default function Cobranza() {
                 <button type="button" className="btn-close" onClick={() => setGestion(null)} />
               </div>
               <div className="modal-body">
+                {conAsesor && (
+                  <div className="d-flex gap-2 align-items-end mb-3">
+                    <div className="flex-grow-1">
+                      <label className="form-label small fw-semibold mb-1">Asesor de este préstamo</label>
+                      <select className="form-select form-select-sm" value={asesorGestion} onChange={(e) => setAsesorGestion(e.target.value)}>
+                        <option value="">Sin asesor</option>
+                        {asesores.map((a) => <option key={a.id_usuario} value={a.id_usuario}>{a.nombre_completo}</option>)}
+                      </select>
+                    </div>
+                    <button type="button" className="btn btn-sm btn-outline-dark" onClick={asignarAsesor}>Asignar</button>
+                  </div>
+                )}
                 {historial.length > 0 && (
                   <div className="mb-3" style={{ maxHeight: 150, overflowY: "auto" }}>
                     {historial.map((h) => (

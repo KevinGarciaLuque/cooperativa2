@@ -59,6 +59,7 @@ const REGLAS = [
   ["POST", /^\/grupos\/\d+\/creditos$/, "prestamos.crear"],
   ["PUT", /^\/prestamos\/\d+(\/datos-credito)?$/, "prestamos.editar"],
   ["PATCH", /^\/prestamos\/\d+\/estado$/, "prestamos.editar"],
+  ["POST", /^\/cobranza\/asignar$/, "prestamos.editar"],
   ["PATCH", /^\/prestamos\/\d+\/aprobar$/, "prestamos.aprobar"],
   ["POST", /^\/solicitudes\/prestamos\/\d+\/aprobar$/, "prestamos.aprobar"],
   ["PATCH", /^\/prestamos\/\d+\/rechazar$/, "prestamos.rechazar"],

@@ -45,6 +45,11 @@ const CATALOGO = [
     descripcion: "Historial crediticio, proyección de cobros, créditos vencidos, por cerrar y cerrados, por promotor y línea.",
   },
   {
+    clave: "cartera_asesor",
+    nombre: "Cartera por asesor y agenda de cobro",
+    descripcion: "Cada préstamo con su asesor; cartera y morosidad por asesor; agenda diaria de a quién llamar o visitar (promesas, cuotas atrasadas y por vencer).",
+  },
+  {
     clave: "descuento_planilla",
     nombre: "Descuento por planilla",
     descripcion: "Empresas con convenio, préstamos que se cobran por planilla, listado mensual de cuotas a descontar en Excel y aplicar en un paso el pago que manda la empresa.",

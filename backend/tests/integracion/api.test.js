@@ -2899,6 +2899,8 @@ test("etapa 11b/c: límites de monto por rol y autorización de un superior", as
   assert.equal(leida.limites["pagos.registrar"], 500);
   assert.equal(leida.acciones["ahorro.retirar"], "autorizar");
   assert.equal(leida.acciones["autorizaciones.resolver"], false, "autorizar solo si se da expresamente");
+  assert.equal(leida.acciones["pagos.condonar"], "autorizar", "omitir mora sin configurar pide autorización");
+  assert.equal((await api("GET", "/permisos/1/acciones", null, ids.tSuper)).b.acciones["autorizaciones.resolver"], true, "el Administrador autoriza");
 
   // Dentro del límite: pasa directo
   assert.equal((await api("POST", "/pagos", { id_prestamo: idP, monto_pagado: 300, metodo_pago: "efectivo" }, tc)).s, 201);
@@ -2957,6 +2959,62 @@ test("etapa 11b/c: límites de monto por rol y autorización de un superior", as
   await pool.query("UPDATE autorizaciones SET estado = 'cancelada' WHERE solicitado_por = ? AND estado = 'pendiente'", [u.insertId]);
   await pool.query("UPDATE prestamos SET estado = 'rechazado' WHERE id_prestamo = ?", [idP]);
   assert.equal((await api("PUT", "/configuracion/funciones", { permisos_por_accion: false }, ids.tSuper)).s, 200);
+});
+
+test("etapa 11d: cartera por asesor, agenda de cobro y asignación", async () => {
+  const [p1] = await pool.query(
+    `INSERT INTO prestamos (id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado)
+     VALUES (?, 3000, 12, 12, 3000, 'activo', DATE_SUB(CURDATE(), INTERVAL 75 DAY))`,
+    [ids.socio2]
+  );
+  const [p2] = await pool.query(
+    `INSERT INTO prestamos (id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado)
+     VALUES (?, 1000, 12, 12, 1000, 'activo', DATE_SUB(CURDATE(), INTERVAL 1 MONTH))`,
+    [ids.socio2]
+  );
+  const atrasado = p1.insertId;
+  const venceHoy = p2.insertId;
+
+  assert.equal((await api("GET", "/cobranza/agenda", null, ids.tAdmin)).s, 403, "apagada");
+  assert.equal((await api("PUT", "/configuracion/funciones", { cartera_asesor: true }, ids.tSuper)).s, 200);
+
+  // Asignar al Administrador como asesor
+  assert.equal((await api("POST", "/cobranza/asignar", { ids: [atrasado, venceHoy], id_asesor: ids.socio }, ids.tAdmin)).s, 400, "un socio no es asesor");
+  const asig = await api("POST", "/cobranza/asignar", { ids: [atrasado, venceHoy], id_asesor: ids.admin }, ids.tAdmin);
+  assert.equal(asig.s, 200, asig.b?.message);
+
+  // Mi cartera
+  const mia = await api("GET", "/cobranza/cartera?id_asesor=yo", null, ids.tAdmin);
+  assert.deepEqual(mia.b.data.map((f) => f.id_prestamo).sort((a, b) => a - b), [atrasado, venceHoy].sort((a, b) => a - b));
+  assert.ok(mia.b.data.every((f) => f.asesor === "Admin Prueba"));
+
+  // Agenda: primero el atrasado (sin gestionar), luego el que vence hoy
+  const ag = await api("GET", "/cobranza/agenda", null, ids.tAdmin);
+  assert.equal(ag.s, 200, ag.b?.message);
+  const orden = ag.b.data.map((i) => i.id_prestamo);
+  assert.ok(orden.indexOf(atrasado) > -1 && orden.indexOf(venceHoy) > -1);
+  assert.ok(orden.indexOf(atrasado) < orden.indexOf(venceHoy));
+  assert.match(ag.b.data.find((i) => i.id_prestamo === atrasado).motivo, /nunca se ha gestionado/);
+  assert.equal(ag.b.data.find((i) => i.id_prestamo === venceHoy).motivo, "Su cuota vence hoy");
+  // Una gestión hoy lo manda al final, marcado como gestionado
+  assert.equal((await api("POST", "/cobranza/gestiones", { id_prestamo: atrasado, medio: "llamada", nota: "No contestó" }, ids.tAdmin)).s, 201);
+  const ag2 = (await api("GET", "/cobranza/agenda", null, ids.tAdmin)).b;
+  const g = ag2.data.find((i) => i.id_prestamo === atrasado);
+  assert.ok(!g || g.gestionado_hoy, "ya gestionado hoy");
+
+  // Resumen por asesor
+  const por = (await api("GET", "/cobranza/asesores", null, ids.tAdmin)).b.data;
+  const mio = por.find((x) => x.id_asesor === ids.admin);
+  assert.ok(mio && mio.prestamos >= 2);
+  assert.ok(mio.con_atraso >= 1 && mio.morosidad > 0);
+  assert.ok(mio.gestiones_mes >= 1);
+
+  // La campanita avisa de la agenda
+  const per = (await api("GET", "/notificaciones/personal", null, ids.tAdmin)).b;
+  assert.ok(per.items.some((i) => i.clave === "agenda_cobro" && i.cantidad >= 2));
+
+  await pool.query("UPDATE prestamos SET estado = 'rechazado', id_promotor = NULL WHERE id_prestamo IN (?)", [[atrasado, venceHoy]]);
+  assert.equal((await api("PUT", "/configuracion/funciones", { cartera_asesor: false }, ids.tSuper)).s, 200);
 });
 
 test("monitoreo: el estado del servicio responde", async () => {

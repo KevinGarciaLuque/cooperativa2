@@ -389,3 +389,11 @@ Con **"Permisos por acción"** encendida, en *Control de Accesos → Acciones de
 - **Al autorizar**, la operación se aplica sola, tal como se pidió y a nombre de quien la pidió (su recibo, caja y bitácora); si ya no se puede aplicar (por ejemplo, el préstamo se pagó entretanto), queda "Autorizada, no se aplicó" con el motivo. Al **rechazar** se escribe el motivo. Quien la pidió puede **retirarla** mientras siga pendiente.
 - **Omitir la mora:** antes solo el Super Administrador. Ahora, con la función encendida, cualquiera del personal marca "Omitir mora": si su rol tiene la acción "Omitir la mora de un pago" se aplica directo; si no, pasa a autorización.
 - Cada autorización queda en la bitácora con quién la pidió y quién la autorizó.
+
+## Etapa 11d: cartera por asesor y agenda de cobro
+
+Función nueva **"Cartera por asesor y agenda de cobro"** (*Control de Accesos → Funciones nuevas*). En *Cobranza* aparecen tres pestañas:
+
+- **Cartera:** la de siempre, con el asesor de cada préstamo y un filtro: toda la cartera, *mi cartera*, sin asesor o la de un asesor. Al abrir la gestión de un préstamo se le asigna (o cambia) el asesor. El asesor es el mismo "promotor" del crédito.
+- **Agenda de hoy:** a quién llamar o visitar, en orden: promesas de pago para hoy o incumplidas, atrasos sin gestionar en 3 días (los de más de 30 días primero), cuotas que vencen hoy y en 3 días. Con botones para llamar, escribir por WhatsApp y registrar la gestión; lo gestionado hoy baja al final. Cada asesor ve su agenda en la campanita.
+- **Por asesor:** préstamos, saldo, saldo con atraso, morosidad, mora, lo cobrado en el mes y las gestiones de cada asesor, más los préstamos sin asesor.

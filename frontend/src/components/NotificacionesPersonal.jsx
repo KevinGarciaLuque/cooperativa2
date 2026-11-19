@@ -23,6 +23,7 @@ import {
   FaCheckCircle,
   FaChevronRight,
   FaBuilding,
+  FaUserShield,
 } from "react-icons/fa";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -42,6 +43,7 @@ const ICONOS = {
   alertas_cumplimiento: FaUserSecret,
   turno_abierto: FaCashRegister,
   planillas_por_aplicar: FaBuilding,
+  autorizaciones: FaUserShield,
 };
 const COLORES = {
   alta: ["#dc2626", "#fee2e2"],

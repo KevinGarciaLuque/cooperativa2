@@ -266,6 +266,28 @@ const pendientesPersonal = async (req) => {
     }
   }
 
+  // Operaciones esperando la autorización de un superior
+  if ((await require("./funciones").leer()).permisos_por_accion) {
+    try {
+      const { puedeResolver } = require("../routes/autorizaciones");
+      if (await puedeResolver(u)) {
+        const [[au]] = await pool.query(
+          "SELECT COUNT(*) AS n FROM autorizaciones WHERE estado = 'pendiente' AND solicitado_por <> ?",
+          [u.id_usuario]
+        );
+        agregar(au.n, {
+          clave: "autorizaciones",
+          titulo: "Operaciones por autorizar",
+          detalle: "Pagos, retiros o créditos que pasan del límite del rol o necesitan tu visto bueno.",
+          ruta: "/autorizaciones",
+          nivel: "alta",
+        });
+      }
+    } catch {
+      // la tabla aún no existe
+    }
+  }
+
   if (tiene("caja")) {
     // Turno propio que quedó abierto desde un día anterior
     const [[t]] = await pool.query(

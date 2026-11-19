@@ -188,6 +188,7 @@ app.use("/api/reportes-ampliados", ocultarInteresSocio, require("./routes/report
 app.use("/api/supervisor", ocultarInteresSocio, require("./routes/supervisor"));
 app.use("/api/app-socio", require("./routes/appSocio"));
 app.use("/api/planillas", require("./routes/planillas"));
+app.use("/api/autorizaciones", require("./routes/autorizaciones").router);
 app.use("/api/aportaciones", require("./routes/aportaciones"));
 app.use("/api/pagos", ocultarInteresSocio, require("./routes/pagos"));
 app.use("/api/movimientos", require("./routes/movimientos"));

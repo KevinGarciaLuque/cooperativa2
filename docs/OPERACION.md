@@ -379,3 +379,13 @@ Función nueva **"Descuento por planilla"** (*Control de Accesos → Funciones n
 ## Etapa 11a: botones según los permisos del rol
 
 Con **"Permisos por acción"** encendida, cada pantalla esconde los botones de las acciones que el rol no tiene (en vez de mostrarlos y responder "no tienes permiso"): Préstamos (nuevo, aprobar, rechazar, desembolsar, editar, eliminar), Pagos (registrar, editar, anular), Solicitudes, Ventanilla (cobrar, solicitar préstamo, aportación), Usuarios (nuevo, editar, eliminar) y Caja (gastos e ingresos). Un rol de solo lectura no ve ningún botón de cambio. El servidor sigue comprobando cada acción.
+
+## Etapa 11b y 11c: límites de monto por rol y autorización de un superior
+
+Con **"Permisos por acción"** encendida, en *Control de Accesos → Acciones del rol* cada acción tiene tres opciones: **Puede**, **Con autorización** o **No puede**. Las acciones con monto (registrar créditos, aprobar, desembolsar, cobrar, anular pagos, depósitos, retiros, gastos de caja) tienen además un **límite** ("hasta"): por encima de ese monto también piden autorización. Vacío = sin límite.
+
+- **Qué pasa al pedir autorización:** la operación **no se aplica** todavía; el usuario ve el aviso "Se envió a autorización de un superior (solicitud #N)". Queda en *Administración → Autorizaciones* y en la campanita de quienes autorizan.
+- **Quién autoriza:** el Super Administrador, el Administrador (salvo que se le quite) y los roles con la acción **"Autorizar operaciones de otros"**. Nadie autoriza lo que pidió.
+- **Al autorizar**, la operación se aplica sola, tal como se pidió y a nombre de quien la pidió (su recibo, caja y bitácora); si ya no se puede aplicar (por ejemplo, el préstamo se pagó entretanto), queda "Autorizada, no se aplicó" con el motivo. Al **rechazar** se escribe el motivo. Quien la pidió puede **retirarla** mientras siga pendiente.
+- **Omitir la mora:** antes solo el Super Administrador. Ahora, con la función encendida, cualquiera del personal marca "Omitir mora": si su rol tiene la acción "Omitir la mora de un pago" se aplica directo; si no, pasa a autorización.
+- Cada autorización queda en la bitácora con quién la pidió y quién la autorizó.

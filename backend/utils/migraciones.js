@@ -1309,6 +1309,42 @@ const MIGRACIONES = [
       `);
     },
   },
+  {
+    id: "2026_11_024_limites_y_autorizaciones",
+    descripcion: "Límites de monto por rol y autorizaciones de un superior",
+    async up(conn) {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS roles_limites (
+          rol_id INT NOT NULL,
+          accion VARCHAR(40) NOT NULL,
+          monto_max DECIMAL(14,2) NOT NULL,
+          PRIMARY KEY (rol_id, accion)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS autorizaciones (
+          id_autorizacion INT AUTO_INCREMENT PRIMARY KEY,
+          accion VARCHAR(40) NULL,
+          motivo VARCHAR(300) NOT NULL,
+          descripcion VARCHAR(300) NULL,
+          metodo VARCHAR(10) NOT NULL,
+          ruta VARCHAR(200) NOT NULL,
+          cuerpo MEDIUMTEXT NULL,
+          monto DECIMAL(14,2) NULL,
+          solicitado_por INT NOT NULL,
+          justificacion VARCHAR(300) NULL,
+          estado ENUM('pendiente','aprobada','ejecutando','ejecutada','fallida','rechazada','cancelada') NOT NULL DEFAULT 'pendiente',
+          resuelto_por INT NULL,
+          resuelto_en DATETIME NULL,
+          nota VARCHAR(300) NULL,
+          resultado VARCHAR(500) NULL,
+          creada_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_aut_estado (estado, creada_en),
+          INDEX idx_aut_solicitante (solicitado_por)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    },
+  },
 ];
 
 const aplicarMigraciones = async () => {

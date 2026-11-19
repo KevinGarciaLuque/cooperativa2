@@ -94,7 +94,12 @@ router.get("/:rol_id/acciones", verificarToken, soloSuperAdmin, async (req, res)
   res.json({
     success: true,
     solo_lectura: d.solo_lectura,
-    acciones: Object.fromEntries(acciones.ACCIONES.map((a) => [a.clave, d.acciones[a.clave] !== false])),
+    // true | false | "autorizar"; sin configurar = true (salvo las que solo valen si se dan expresamente)
+    acciones: Object.fromEntries(
+      acciones.ACCIONES.map((a) => [a.clave, d.acciones[a.clave] === undefined ? !acciones.SOLO_EXPRESAS.has(a.clave) : d.acciones[a.clave]])
+    ),
+    limites: d.limites || {},
+    con_monto: acciones.ACCIONES_CON_MONTO,
   });
 });
 
@@ -112,8 +117,21 @@ router.put("/:rol_id/acciones", verificarToken, soloSuperAdmin, async (req, res)
       if (!acciones.CLAVES.has(clave)) continue;
       await pool.query(
         "INSERT INTO permisos_acciones (rol_id, accion, activo) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE activo = VALUES(activo)",
-        [rolId, clave, valor ? 1 : 0]
+        [rolId, clave, valor === "autorizar" ? 2 : valor ? 1 : 0]
       );
+    }
+    // Límites de monto: vacío o 0 = sin límite
+    for (const [clave, valor] of Object.entries(req.body?.limites || {})) {
+      if (!acciones.ACCIONES_CON_MONTO.includes(clave)) continue;
+      const v = parseFloat(valor);
+      if (valor === "" || valor === null || !(v > 0)) {
+        await pool.query("DELETE FROM roles_limites WHERE rol_id = ? AND accion = ?", [rolId, clave]);
+      } else {
+        await pool.query(
+          "INSERT INTO roles_limites (rol_id, accion, monto_max) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE monto_max = VALUES(monto_max)",
+          [rolId, clave, Math.round(v * 100) / 100]
+        );
+      }
     }
     acciones.olvidarRol(rolId);
     await pool.query("INSERT INTO bitacora (id_usuario, accion, detalle, fecha) VALUES (?, ?, ?, NOW())", [

@@ -294,7 +294,8 @@ const procesarPago = async (connection, body, usuario) => {
     let moraCondonada = false;
     if (condonar_mora && moraGenerada > 0) {
       const rolSolicitante = usuario?.rol || null;
-      if (rolSolicitante !== "Super Administrador") {
+      // También quien tiene la acción "omitir mora" o la autorización de un superior
+      if (rolSolicitante !== "Super Administrador" && !usuario?.autorizado && !usuario?.condonar_directo) {
         return fail(403, { message: "Solo el Super Administrador puede omitir la mora." });
       }
       moraCondonada = true;

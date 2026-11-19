@@ -638,7 +638,7 @@ export default function ModalPago({
                           ⚠ {moraInfo.dias} día(s) de mora — Mora generada: {simboloMoneda()} {fmt(moraInfo.mora)}
                           {moraInfo.porDia > 0 && <span className="fw-normal"> (≈ {simboloMoneda()} {fmt(moraInfo.porDia)} por día)</span>}
                         </div>
-                        {esSuperAdmin ? (
+                        {esSuperAdmin || funciones.permisos_por_accion ? (
                           <div className="form-check mt-1">
                             <input
                               id="chk-condonar-mora"
@@ -651,6 +651,7 @@ export default function ModalPago({
                             />
                             <label className="form-check-label fw-semibold" htmlFor="chk-condonar-mora">
                               Omitir mora (cobrar normal, como si no hubiera mora)
+                              {!esSuperAdmin && <span className="fw-normal"> — si tu rol no la tiene, pasa a autorización de un superior</span>}
                             </label>
                           </div>
                         ) : (

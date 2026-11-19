@@ -82,19 +82,52 @@ export default function AccionesRol({ token, rol, mostrarAlerta, onRolesCreados 
               {grupos.map((g) => (
                 <div className="col-12 col-md-6 col-xl-4" key={g}>
                   <div className="fw-semibold small mb-1">{g}</div>
-                  {catalogo.filter((a) => a.grupo === g).map((a) => (
-                    <div className="form-check" key={a.clave}>
-                      <input id={`ac-${a.clave}`} type="checkbox" className="form-check-input" disabled={datos.solo_lectura}
-                        checked={!!datos.acciones[a.clave]}
-                        onChange={(e) => setDatos({ ...datos, acciones: { ...datos.acciones, [a.clave]: e.target.checked } })} />
-                      <label htmlFor={`ac-${a.clave}`} className="form-check-label small">{a.nombre}</label>
-                    </div>
-                  ))}
+                  {catalogo.filter((a) => a.grupo === g).map((a) => {
+                    const valor = datos.acciones[a.clave];
+                    const conMonto = (datos.con_monto || []).includes(a.clave);
+                    return (
+                      <div className="mb-2" key={a.clave}>
+                        <div className="small">{a.nombre}</div>
+                        <div className="d-flex gap-2 align-items-center flex-wrap">
+                          <select
+                            className="form-select form-select-sm"
+                            style={{ width: 170 }}
+                            disabled={datos.solo_lectura}
+                            value={valor === "autorizar" ? "autorizar" : valor ? "si" : "no"}
+                            onChange={(e) =>
+                              setDatos({
+                                ...datos,
+                                acciones: { ...datos.acciones, [a.clave]: e.target.value === "autorizar" ? "autorizar" : e.target.value === "si" },
+                              })
+                            }
+                          >
+                            <option value="si">Puede</option>
+                            {a.clave !== "autorizaciones.resolver" && <option value="autorizar">Con autorización</option>}
+                            <option value="no">No puede</option>
+                          </select>
+                          {conMonto && valor === true && (
+                            <div className="input-group input-group-sm" style={{ width: 170 }} title="Por encima de este monto pide autorización. Vacío = sin límite.">
+                              <span className="input-group-text">hasta</span>
+                              <input
+                                type="number" min="0" step="0.01" className="form-control" placeholder="sin límite"
+                                disabled={datos.solo_lectura}
+                                value={datos.limites?.[a.clave] ?? ""}
+                                onChange={(e) => setDatos({ ...datos, limites: { ...(datos.limites || {}), [a.clave]: e.target.value } })}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ))}
             </div>
             <div className="small text-muted mt-3">
-              Estas acciones se aplican dentro de los módulos que el rol tiene arriba. El Super Administrador siempre puede todo.
+              Estas acciones se aplican dentro de los módulos que el rol tiene arriba. <strong>Con autorización</strong>: la operación
+              queda pendiente hasta que un superior la autoriza en Autorizaciones. <strong>Hasta</strong>: por encima de ese monto
+              también pide autorización. Autorizan el Administrador y los roles con "Autorizar operaciones de otros". El Super
+              Administrador siempre puede todo.
             </div>
             <button className="btn btn-primary mt-3" onClick={guardar} disabled={guardando}>
               <FaSave className="me-2" /> {guardando ? "Guardando..." : "Guardar acciones"}

@@ -36,6 +36,7 @@ import {
   FaBolt,
   FaChartBar,
   FaBuilding,
+  FaUserCheck,
 } from "react-icons/fa";
 import LogoCoop from "./LogoCoop";
 import { useFunciones } from "../hooks/useFunciones";
@@ -53,6 +54,7 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const TODOS_MODULOS = [
   { key: "dashboard",     to: "/dashboard", grupo: "principal",     icon: <FaTachometerAlt />, label: "Dashboard" },
   { key: "ventanilla",    to: "/ventanilla", grupo: "principal",    icon: <FaConciergeBell />,  label: "Ventanilla" },
+  { to: "/autorizaciones", grupo: "administracion", icon: <FaUserCheck />, label: "Autorizaciones", funcion: "permisos_por_accion" },
   { key: "usuarios",      to: "/usuarios", grupo: "administracion",      icon: <FaUsers />,          label: "Usuarios" },
   { key: "roles",         to: "/roles", grupo: "administracion",         icon: <FaUserShield />,     label: "Roles" },
   { key: "cuentas",       to: "/cuentas", grupo: "ahorro",       icon: <FaUniversity />,     label: "Cuentas" },

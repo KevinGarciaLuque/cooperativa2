@@ -37,6 +37,7 @@ const CreditosGrupales = lazy(() => import("../pages/CreditosGrupales"));
 const PagosAmpliados = lazy(() => import("../pages/PagosAmpliados"));
 const ReportesAmpliados = lazy(() => import("../pages/ReportesAmpliados"));
 const PlanillasConvenio = lazy(() => import("../pages/PlanillasConvenio"));
+const Autorizaciones = lazy(() => import("../pages/Autorizaciones"));
 const Politicas = lazy(() => import("../pages/SuperAdmin/Politicas"));
 // Vistas de usuario socio
 const SocioPerfil = lazy(() => import("../pages/Socio/SocioPerfil"));
@@ -146,6 +147,14 @@ export default function Rutas() {
             element={
               <PrivateRoute>
                 <ReportesAmpliados />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/autorizaciones"
+            element={
+              <PrivateRoute>
+                <Autorizaciones />
               </PrivateRoute>
             }
           />

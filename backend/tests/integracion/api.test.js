@@ -2876,6 +2876,89 @@ test("etapa 11a: mis acciones — la pantalla sabe qué botones esconder", async
   await pool.query("DELETE FROM usuarios WHERE id_usuario = ?", [u.insertId]);
 });
 
+test("etapa 11b/c: límites de monto por rol y autorización de un superior", async () => {
+  const [r] = await pool.query("INSERT INTO roles (nombre, solo_lectura) VALUES ('Cajero con límite', 0)");
+  const rol = r.insertId;
+  const [u] = await pool.query(
+    `INSERT INTO usuarios (nombre_completo, dni, telefono, correo, password, rol_id, estado, fecha_registro)
+     VALUES ('Cajera Límite', '0801000000612', '98765432', 'cajera612@prueba.hn', 'x', ?, 'activo', NOW())`,
+    [rol]
+  );
+  const tc = tokenDe(u.insertId, "Cajero con límite", rol);
+  const [p] = await pool.query(
+    `INSERT INTO prestamos (id_usuario, monto, tasa_interes, plazo_meses, saldo_restante, estado, fecha_otorgado)
+     VALUES (?, 20000, 12, 24, 20000, 'activo', DATE_SUB(CURDATE(), INTERVAL 20 DAY))`,
+    [ids.socio2]
+  );
+  const idP = p.insertId;
+
+  assert.equal((await api("PUT", "/configuracion/funciones", { permisos_por_accion: true }, ids.tSuper)).s, 200);
+  const conf = await api("PUT", `/permisos/${rol}/acciones`, { solo_lectura: false, acciones: { "ahorro.retirar": "autorizar" }, limites: { "pagos.registrar": 500 } }, ids.tSuper);
+  assert.equal(conf.s, 200, conf.b?.message);
+  const leida = (await api("GET", `/permisos/${rol}/acciones`, null, ids.tSuper)).b;
+  assert.equal(leida.limites["pagos.registrar"], 500);
+  assert.equal(leida.acciones["ahorro.retirar"], "autorizar");
+  assert.equal(leida.acciones["autorizaciones.resolver"], false, "autorizar solo si se da expresamente");
+
+  // Dentro del límite: pasa directo
+  assert.equal((await api("POST", "/pagos", { id_prestamo: idP, monto_pagado: 300, metodo_pago: "efectivo" }, tc)).s, 201);
+  // Por encima: queda pendiente de autorización y no se registra
+  const alto = await api("POST", "/pagos", { id_prestamo: idP, monto_pagado: 800, metodo_pago: "efectivo" }, tc);
+  assert.equal(alto.s, 202, alto.b?.message);
+  assert.equal(alto.b.pendiente_autorizacion, true);
+  assert.match(alto.b.message, /supera tu límite/);
+  const pagosAntes = (await pool.query("SELECT COUNT(*) AS n FROM pagos_prestamo WHERE id_prestamo = ?", [idP]))[0][0].n;
+  assert.equal(pagosAntes, 1);
+
+  // La cajera ve solo lo suyo y no puede autorizar
+  const suyas = (await api("GET", "/autorizaciones?estado=pendiente", null, tc)).b;
+  assert.equal(suyas.puede_resolver, false);
+  assert.ok(suyas.data.every((x) => x.propia));
+  assert.equal((await api("POST", `/autorizaciones/${alto.b.id_autorizacion}/aprobar`, {}, tc)).s, 403);
+  // Una autorización inventada no sirve
+  const r0 = await fetch(`${base}/api/pagos`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${tc}`, "X-Autorizacion": String(alto.b.id_autorizacion) },
+    body: JSON.stringify({ id_prestamo: idP, monto_pagado: 800, metodo_pago: "efectivo" }),
+  });
+  assert.equal(r0.status, 403, "sin aprobar no se puede usar");
+
+  // El Administrador la autoriza y se aplica a nombre de la cajera
+  const ok = await api("POST", `/autorizaciones/${alto.b.id_autorizacion}/aprobar`, { nota: "Pago de cliente conocido" }, ids.tAdmin);
+  assert.equal(ok.s, 200, ok.b?.message);
+  assert.equal(ok.b.estado, "ejecutada");
+  const [[pg]] = await pool.query("SELECT monto_pagado FROM pagos_prestamo WHERE id_prestamo = ? ORDER BY id_pago DESC LIMIT 1", [idP]);
+  cerca(parseFloat(pg.monto_pagado), 800);
+  const [[cj]] = await pool.query("SELECT id_registrado_por FROM caja_movimientos WHERE referencia_tipo = 'pago' ORDER BY id_movimiento DESC LIMIT 1");
+  assert.equal(cj.id_registrado_por, u.insertId, "queda registrado por quien lo pidió");
+  assert.equal((await api("POST", `/autorizaciones/${alto.b.id_autorizacion}/aprobar`, {}, ids.tAdmin)).s, 400, "no se aplica dos veces");
+
+  // Rechazo con motivo
+  const otro = await api("POST", "/pagos", { id_prestamo: idP, monto_pagado: 900, metodo_pago: "efectivo" }, tc);
+  assert.equal(otro.s, 202);
+  assert.equal((await api("POST", `/autorizaciones/${otro.b.id_autorizacion}/rechazar`, {}, ids.tAdmin)).s, 400);
+  assert.equal((await api("POST", `/autorizaciones/${otro.b.id_autorizacion}/rechazar`, { nota: "Verificar origen" }, ids.tAdmin)).s, 200);
+  assert.equal((await pool.query("SELECT estado FROM autorizaciones WHERE id_autorizacion = ?", [otro.b.id_autorizacion]))[0][0].estado, "rechazada");
+
+  // Acción "con autorización": retiro de ahorro
+  const [[cta]] = await pool.query("SELECT id_cuenta FROM cuentas WHERE id_usuario = ? LIMIT 1", [ids.socio2]);
+  const ret = await api("POST", "/movimientos", { id_cuenta: cta.id_cuenta, tipo: "retiro", monto: 10 }, tc);
+  assert.equal(ret.s, 202, ret.b?.message);
+  assert.match(ret.b.message, /necesita autorización/);
+  // Omitir la mora sin tener la acción: pide autorización
+  const mora = await api("POST", "/pagos", { id_prestamo: idP, monto_pagado: 100, metodo_pago: "efectivo", condonar_mora: true }, tc);
+  assert.equal(mora.s, 202);
+  assert.match(mora.b.message, /Omitir la mora/);
+
+  // La campanita del Administrador lo muestra
+  const per = (await api("GET", "/notificaciones/personal", null, ids.tAdmin)).b;
+  assert.ok(per.items.some((i) => i.clave === "autorizaciones" && i.cantidad >= 2));
+
+  await pool.query("UPDATE autorizaciones SET estado = 'cancelada' WHERE solicitado_por = ? AND estado = 'pendiente'", [u.insertId]);
+  await pool.query("UPDATE prestamos SET estado = 'rechazado' WHERE id_prestamo = ?", [idP]);
+  assert.equal((await api("PUT", "/configuracion/funciones", { permisos_por_accion: false }, ids.tSuper)).s, 200);
+});
+
 test("monitoreo: el estado del servicio responde", async () => {
   const r = await api("GET", "/salud");
   assert.equal(r.s, 200);

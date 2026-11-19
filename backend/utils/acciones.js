@@ -23,6 +23,7 @@ const ACCIONES = [
   { grupo: "Pagos", clave: "pagos.editar", nombre: "Corregir pagos" },
   { grupo: "Pagos", clave: "pagos.anular", nombre: "Anular pagos" },
   { grupo: "Pagos", clave: "pagos.conciliar", nombre: "Conciliar boletas" },
+  { grupo: "Pagos", clave: "pagos.condonar", nombre: "Omitir la mora de un pago" },
   { grupo: "Ahorro", clave: "ahorro.depositar", nombre: "Depósitos y aportaciones" },
   { grupo: "Ahorro", clave: "ahorro.retirar", nombre: "Retiros de ahorro" },
   { grupo: "Ahorro", clave: "ahorro.corregir", nombre: "Corregir o anular depósitos, retiros y aportaciones" },
@@ -30,7 +31,17 @@ const ACCIONES = [
   { grupo: "Caja", clave: "caja.cierre", nombre: "Cierre diario de caja" },
   { grupo: "Contabilidad", clave: "contabilidad.partidas", nombre: "Partidas manuales y anulaciones contables" },
   { grupo: "Otros", clave: "actividades.registrar", nombre: "Actividades y liquidaciones" },
+  { grupo: "Supervisión", clave: "autorizaciones.resolver", nombre: "Autorizar operaciones de otros" },
 ];
+
+// Acciones a las que se les puede poner un monto máximo por rol (por encima, pide autorización)
+const ACCIONES_CON_MONTO = [
+  "prestamos.crear", "prestamos.aprobar", "prestamos.desembolsar", "pagos.registrar", "pagos.anular",
+  "ahorro.depositar", "ahorro.retirar", "caja.gastos",
+];
+// Estas solo cuentan si se dan expresamente (sin configurar = no): autorizar y omitir mora directo.
+// El Administrador puede autorizar salvo que se le quite.
+const SOLO_EXPRESAS = new Set(["autorizaciones.resolver", "pagos.condonar"]);
 const CLAVES = new Set(ACCIONES.map((a) => a.clave));
 const nombreDe = (clave) => ACCIONES.find((a) => a.clave === clave)?.nombre || clave;
 
@@ -101,11 +112,21 @@ const cache = new Map();
 const datosDelRol = async (rolId) => {
   const c = cache.get(rolId);
   if (c && Date.now() - c.t < 30 * 1000) return c.d;
-  let d = { solo_lectura: false, acciones: {} };
+  let d = { solo_lectura: false, acciones: {}, limites: {} };
   try {
     const [[r]] = await pool.query("SELECT solo_lectura FROM roles WHERE id_rol = ?", [rolId]);
     const [filas] = await pool.query("SELECT accion, activo FROM permisos_acciones WHERE rol_id = ?", [rolId]);
-    d = { solo_lectura: !!r?.solo_lectura, acciones: Object.fromEntries(filas.map((f) => [f.accion, f.activo === 1])) };
+    // activo: 1 = puede, 0 = no puede, 2 = puede con autorización de un superior
+    let limites = {};
+    try {
+      const [lim] = await pool.query("SELECT accion, monto_max FROM roles_limites WHERE rol_id = ?", [rolId]);
+      limites = Object.fromEntries(lim.map((l) => [l.accion, parseFloat(l.monto_max)]));
+    } catch {}
+    d = {
+      solo_lectura: !!r?.solo_lectura,
+      acciones: Object.fromEntries(filas.map((f) => [f.accion, f.activo === 1 ? true : f.activo === 2 ? "autorizar" : false])),
+      limites,
+    };
   } catch {}
   cache.set(rolId, { t: Date.now(), d });
   return d;
@@ -207,6 +228,6 @@ const crearRolesRecomendados = async (conn) => {
 };
 
 module.exports = {
-  ACCIONES, CLAVES, nombreDe, accionDe, PERMITIDO_SOLO_LECTURA, datosDelRol, olvidarRol,
+  ACCIONES, CLAVES, nombreDe, accionDe, PERMITIDO_SOLO_LECTURA, datosDelRol, olvidarRol, ACCIONES_CON_MONTO, SOLO_EXPRESAS,
   ROLES_RECOMENDADOS, crearRolesRecomendados,
 };
